@@ -13,7 +13,7 @@ from .corpus import tokenizer_and_tokens
 from .dataset import TokenWindowDataset
 from .device import resolve_device
 from .model import CatAI
-from .training import train_epochs
+from .training import train_step
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -36,21 +36,24 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     """Train CatAI from a text corpus and save a checkpoint."""
     args = build_parser().parse_args(argv)
-    if args.grad_clip <= 0:
-        raise ValueError("--grad-clip must be positive")
+    if args.sequence_length < 1:
+        raise ValueError("--sequence-length must be positive")
+    if args.d_model < 1 or args.heads < 1 or args.layers < 1:
+        raise ValueError("model dimensions must be positive")
+    if args.d_model % args.heads != 0:
+        raise ValueError("--d-model must be divisible by --heads")
 
     tokenizer, tokens = tokenizer_and_tokens(args.corpus)
     dataset = TokenWindowDataset(tokens, sequence_length=args.sequence_length)
     loader = make_dataloader(dataset, batch_size=args.batch_size, shuffle=True)
+    device = resolve_device(args.device)
     model = CatAI(
         vocab_size=len(tokenizer.vocab),
         max_seq_len=args.sequence_length,
         d_model=args.d_model,
         n_heads=args.heads,
         n_layers=args.layers,
-    )
-    device = resolve_device(args.device)
-    model.to(device)
+    ).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
     config = TrainingConfig(
         batch_size=args.batch_size,
@@ -60,17 +63,14 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     losses = []
-    for _ in range(config.epochs):
+    for epoch in range(config.epochs):
         total = 0.0
         batches = 0
         for batch in loader:
-            batch = batch.to(device)
-            total += __import__("catai.training", fromlist=["train_step"]).train_step(
-                model, optimizer, batch, grad_clip=config.grad_clip
-            )
+            total += train_step(model, optimizer, batch.to(device), grad_clip=config.grad_clip)
             batches += 1
         losses.append(total / batches)
-        print(f"epoch {len(losses)}/{config.epochs}: loss={losses[-1]:.4f}")
+        print(f"epoch {epoch + 1}/{config.epochs}: loss={losses[-1]:.4f}")
 
     save_checkpoint(
         args.checkpoint,
