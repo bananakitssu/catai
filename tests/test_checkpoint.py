@@ -26,7 +26,17 @@ def test_checkpoint_round_trip(tmp_path):
     assert step == 7
     for name, value in restored.state_dict().items():
         assert torch.equal(value, expected[name])
-    assert restored_optimizer.state_dict()["state"] == optimizer.state_dict()["state"]
+
+    original_state = optimizer.state_dict()["state"]
+    restored_state = restored_optimizer.state_dict()["state"]
+    assert restored_state.keys() == original_state.keys()
+    for parameter_id in original_state:
+        for key, value in original_state[parameter_id].items():
+            restored_value = restored_state[parameter_id][key]
+            if torch.is_tensor(value):
+                assert torch.equal(restored_value, value)
+            else:
+                assert restored_value == value
 
 
 def test_checkpoint_rejects_negative_step(tmp_path):
