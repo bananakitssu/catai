@@ -80,3 +80,16 @@ def train_epoch(
     if batches == 0:
         raise ValueError("loader must contain at least one batch")
     return total_loss / batches
+
+
+def train_epochs(
+    model: nn.Module,
+    optimizer: torch.optim.Optimizer,
+    loader: DataLoader[torch.Tensor],
+    epochs: int,
+    grad_clip: float | None = None,
+) -> list[float]:
+    """Train over a DataLoader for multiple epochs and return epoch losses."""
+    if epochs < 1:
+        raise ValueError("epochs must be positive")
+    return [train_epoch(model, optimizer, loader, grad_clip=grad_clip) for _ in range(epochs)]
