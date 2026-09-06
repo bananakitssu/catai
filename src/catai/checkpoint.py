@@ -14,16 +14,25 @@ def save_checkpoint(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
     step: int,
+    *,
+    epoch: int = 0,
+    loss: float | None = None,
 ) -> None:
-    """Save model, optimizer, and training step to a checkpoint file."""
+    """Save model, optimizer, and resumable training metadata."""
     if step < 0:
         raise ValueError("step must be non-negative")
+    if epoch < 0:
+        raise ValueError("epoch must be non-negative")
     checkpoint = {
         "model_state_dict": model.state_dict(),
         "optimizer_state_dict": optimizer.state_dict(),
         "step": step,
+        "epoch": epoch,
+        "loss": loss,
     }
-    torch.save(checkpoint, Path(path))
+    checkpoint_path = Path(path)
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(checkpoint, checkpoint_path)
 
 
 def load_checkpoint(
@@ -38,3 +47,13 @@ def load_checkpoint(
     if optimizer is not None:
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
     return int(checkpoint["step"])
+
+
+def load_training_metadata(path: str | Path) -> dict[str, int | float | None]:
+    """Load resumable epoch and loss metadata without loading a model."""
+    checkpoint: dict[str, Any] = torch.load(Path(path), map_location="cpu", weights_only=True)
+    return {
+        "step": int(checkpoint["step"]),
+        "epoch": int(checkpoint.get("epoch", 0)),
+        "loss": checkpoint.get("loss"),
+    }
