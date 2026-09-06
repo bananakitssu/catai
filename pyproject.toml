@@ -7,6 +7,10 @@ name = "catai"
 version = "0.1.0"
 description = "A small language model built from scratch for learning and experimentation."
 requires-python = ">=3.10"
+dependencies = ["torch>=2.2"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
