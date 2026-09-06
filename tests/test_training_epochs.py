@@ -1,6 +1,9 @@
+from pathlib import Path
+
 import torch
 
 from catai.batching import make_dataloader
+from catai.corpus import tokenizer_and_tokens
 from catai.dataset import TokenWindowDataset
 from catai.model import CatAI
 from catai.training import train_epochs
@@ -32,3 +35,25 @@ def test_train_epochs_rejects_non_positive_epochs():
         assert "epochs" in str(exc)
     else:
         raise AssertionError("expected ValueError")
+
+
+def test_tiny_corpus_trains_end_to_end():
+    corpus = Path(__file__).parents[1] / "data" / "tiny.txt"
+    tokenizer, tokens = tokenizer_and_tokens(corpus)
+    sequence_length = 32
+    dataset = TokenWindowDataset(tokens, sequence_length=sequence_length)
+    loader = make_dataloader(dataset, batch_size=8, shuffle=False)
+    model = CatAI(
+        vocab_size=tokenizer.vocab_size,
+        max_seq_len=sequence_length,
+        d_model=16,
+        n_heads=4,
+        n_layers=1,
+    )
+    optimizer = torch.optim.AdamW(model.parameters(), lr=3e-3)
+
+    losses = train_epochs(model, optimizer, loader, epochs=2, grad_clip=1.0)
+
+    assert len(losses) == 2
+    assert all(torch.isfinite(torch.tensor(loss)) for loss in losses)
+    assert losses[-1] < losses[0]
