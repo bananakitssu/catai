@@ -38,3 +38,17 @@ def test_parser_requires_corpus():
         assert exc.code == 2
     else:
         raise AssertionError("expected argparse to reject missing corpus")
+
+
+def test_parser_defaults_are_stable():
+    args = build_parser().parse_args(["--corpus", "corpus.txt"])
+    assert args.checkpoint == "catai.pt"
+    assert args.epochs == 1
+    assert args.batch_size == 32
+    assert args.learning_rate == 3e-4
+    assert args.grad_clip == 1.0
+    assert args.sequence_length == 32
+    assert args.d_model == 128
+    assert args.heads == 4
+    assert args.layers == 4
+    assert args.device is None
