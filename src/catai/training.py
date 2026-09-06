@@ -23,14 +23,30 @@ def causal_language_model_loss(logits: torch.Tensor, targets: torch.Tensor) -> t
     return nn.functional.cross_entropy(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
 
 
-def train_step(model: nn.Module, optimizer: torch.optim.Optimizer, tokens: torch.Tensor) -> float:
+def clip_gradients(model: nn.Module, max_norm: float) -> float:
+    """Clip model gradients to a maximum global norm and return the pre-clip norm."""
+    if max_norm <= 0:
+        raise ValueError("max_norm must be positive")
+    return float(nn.utils.clip_grad_norm_(model.parameters(), max_norm))
+
+
+def train_step(
+    model: nn.Module,
+    optimizer: torch.optim.Optimizer,
+    tokens: torch.Tensor,
+    grad_clip: float | None = None,
+) -> float:
     """Run one optimization step and return the loss before the update."""
+    if grad_clip is not None and grad_clip <= 0:
+        raise ValueError("grad_clip must be positive when provided")
     model.train()
     inputs, targets = make_next_token_batch(tokens)
     logits = model(inputs)
     loss = causal_language_model_loss(logits, targets)
     optimizer.zero_grad(set_to_none=True)
     loss.backward()
+    if grad_clip is not None:
+        clip_gradients(model, grad_clip)
     optimizer.step()
     return float(loss.detach())
 
@@ -40,24 +56,26 @@ def train(
     optimizer: torch.optim.Optimizer,
     tokens: torch.Tensor,
     steps: int,
+    grad_clip: float | None = None,
 ) -> list[float]:
     """Train on a fixed token batch for a number of optimization steps."""
     if steps < 0:
         raise ValueError("steps must be non-negative")
-    return [train_step(model, optimizer, tokens) for _ in range(steps)]
+    return [train_step(model, optimizer, tokens, grad_clip=grad_clip) for _ in range(steps)]
 
 
 def train_epoch(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
     loader: DataLoader[torch.Tensor],
+    grad_clip: float | None = None,
 ) -> float:
     """Train over every token window once and return the mean loss."""
     model.train()
     total_loss = 0.0
     batches = 0
     for tokens in loader:
-        total_loss += train_step(model, optimizer, tokens)
+        total_loss += train_step(model, optimizer, tokens, grad_clip=grad_clip)
         batches += 1
     if batches == 0:
         raise ValueError("loader must contain at least one batch")
