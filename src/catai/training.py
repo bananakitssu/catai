@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import torch
 from torch import nn
+from torch.utils.data import DataLoader
 
 
 def make_next_token_batch(tokens: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
@@ -44,3 +45,20 @@ def train(
     if steps < 0:
         raise ValueError("steps must be non-negative")
     return [train_step(model, optimizer, tokens) for _ in range(steps)]
+
+
+def train_epoch(
+    model: nn.Module,
+    optimizer: torch.optim.Optimizer,
+    loader: DataLoader[torch.Tensor],
+) -> float:
+    """Train over every token window once and return the mean loss."""
+    model.train()
+    total_loss = 0.0
+    batches = 0
+    for tokens in loader:
+        total_loss += train_step(model, optimizer, tokens)
+        batches += 1
+    if batches == 0:
+        raise ValueError("loader must contain at least one batch")
+    return total_loss / batches
