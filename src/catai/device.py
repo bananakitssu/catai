@@ -6,7 +6,7 @@ import torch
 
 
 def resolve_device(device: str | torch.device | None = None) -> torch.device:
-    """Resolve an explicit device or choose the best available device."""
+    """Resolve an explicit device or choose the best available accelerator."""
     if device is not None:
         return torch.device(device)
     if torch.cuda.is_available():
