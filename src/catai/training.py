@@ -32,3 +32,15 @@ def train_step(model: nn.Module, optimizer: torch.optim.Optimizer, tokens: torch
     loss.backward()
     optimizer.step()
     return float(loss.detach())
+
+
+def train(
+    model: nn.Module,
+    optimizer: torch.optim.Optimizer,
+    tokens: torch.Tensor,
+    steps: int,
+) -> list[float]:
+    """Train on a fixed token batch for a number of optimization steps."""
+    if steps < 0:
+        raise ValueError("steps must be non-negative")
+    return [train_step(model, optimizer, tokens) for _ in range(steps)]
