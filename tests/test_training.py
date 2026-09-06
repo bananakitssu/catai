@@ -1,7 +1,12 @@
 import torch
 
 from catai.model import CatAI
-from catai.training import causal_language_model_loss, make_next_token_batch, train_step
+from catai.training import (
+    causal_language_model_loss,
+    make_next_token_batch,
+    train,
+    train_step,
+)
 
 
 def test_next_token_batch_shifts_targets():
@@ -28,3 +33,19 @@ def test_training_step_updates_parameters():
     before = [parameter.detach().clone() for parameter in model.parameters()]
     train_step(model, optimizer, tokens)
     assert any(not torch.equal(old, new) for old, new in zip(before, model.parameters()))
+
+
+def test_training_loop_reduces_loss():
+    torch.manual_seed(0)
+    model = CatAI(vocab_size=8, max_seq_len=16, d_model=16, n_heads=4, n_layers=1)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-2)
+    tokens = torch.tensor([[0, 1, 2, 3, 4, 5, 6, 7] * 2])
+
+    inputs, targets = make_next_token_batch(tokens)
+    with torch.no_grad():
+        initial_loss = causal_language_model_loss(model(inputs), targets).item()
+
+    losses = train(model, optimizer, tokens, steps=40)
+
+    assert len(losses) == 40
+    assert losses[-1] < initial_loss
