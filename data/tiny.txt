@@ -1,0 +1,5 @@
+Cats are curious creatures. Cats watch, learn, and explore.
+A small cat sits quietly, then walks across the room.
+The cat sees a window and watches the world outside.
+Learning is a little like exploring: step by step, pattern by pattern.
+CatAI learns patterns from text one token at a time.
