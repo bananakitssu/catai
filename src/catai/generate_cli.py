@@ -21,6 +21,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-new-tokens", type=int, default=50)
     parser.add_argument("--temperature", type=float, default=1.0)
     parser.add_argument("--repetition-penalty", type=float, default=1.1)
+    parser.add_argument("--no-repeat-ngram-size", type=int, default=3)
     parser.add_argument("--device", default=None)
     return parser
 
@@ -34,6 +35,8 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--temperature must be positive")
     if args.repetition_penalty < 1.0:
         raise ValueError("--repetition-penalty must be at least 1.0")
+    if args.no_repeat_ngram_size < 0:
+        raise ValueError("--no-repeat-ngram-size must be non-negative")
 
     metadata = load_checkpoint_metadata(args.checkpoint)
     model_metadata = metadata.get("model")
@@ -68,6 +71,7 @@ def main(argv: list[str] | None = None) -> int:
         max_new_tokens=args.max_new_tokens,
         temperature=args.temperature,
         repetition_penalty=args.repetition_penalty,
+        no_repeat_ngram_size=args.no_repeat_ngram_size,
     )
     print(tokenizer.decode(generated[0].tolist()))
     return 0
