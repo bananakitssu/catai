@@ -20,6 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--prompt", required=True, help="Text prompt to continue.")
     parser.add_argument("--max-new-tokens", type=int, default=50)
     parser.add_argument("--temperature", type=float, default=1.0)
+    parser.add_argument("--repetition-penalty", type=float, default=1.1)
     parser.add_argument("--device", default=None)
     return parser
 
@@ -31,6 +32,8 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--max-new-tokens must be non-negative")
     if args.temperature <= 0:
         raise ValueError("--temperature must be positive")
+    if args.repetition_penalty < 1.0:
+        raise ValueError("--repetition-penalty must be at least 1.0")
 
     metadata = load_checkpoint_metadata(args.checkpoint)
     model_metadata = metadata.get("model")
@@ -64,6 +67,7 @@ def main(argv: list[str] | None = None) -> int:
         torch.tensor([prompt_tokens], dtype=torch.long, device=device),
         max_new_tokens=args.max_new_tokens,
         temperature=args.temperature,
+        repetition_penalty=args.repetition_penalty,
     )
     print(tokenizer.decode(generated[0].tolist()))
     return 0
