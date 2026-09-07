@@ -17,8 +17,9 @@ def save_checkpoint(
     *,
     epoch: int = 0,
     loss: float | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> None:
-    """Save model, optimizer, and resumable training metadata."""
+    """Save model, optimizer, resumable progress, and optional metadata."""
     if step < 0:
         raise ValueError("step must be non-negative")
     if epoch < 0:
@@ -29,6 +30,7 @@ def save_checkpoint(
         "step": step,
         "epoch": epoch,
         "loss": loss,
+        "metadata": metadata or {},
     }
     checkpoint_path = Path(path)
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
@@ -57,3 +59,9 @@ def load_training_metadata(path: str | Path) -> dict[str, int | float | None]:
         "epoch": int(checkpoint.get("epoch", 0)),
         "loss": checkpoint.get("loss"),
     }
+
+
+def load_checkpoint_metadata(path: str | Path) -> dict[str, Any]:
+    """Load the optional model/tokenizer metadata from a checkpoint."""
+    checkpoint: dict[str, Any] = torch.load(Path(path), map_location="cpu", weights_only=True)
+    return dict(checkpoint.get("metadata", {}))
