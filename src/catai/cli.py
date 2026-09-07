@@ -48,7 +48,7 @@ def main(argv: list[str] | None = None) -> int:
     loader = make_dataloader(dataset, batch_size=args.batch_size, shuffle=True)
     device = resolve_device(args.device)
     model = CatAI(
-        vocab_size=len(tokenizer.vocab),
+        vocab_size=tokenizer.vocab_size,
         max_seq_len=args.sequence_length,
         d_model=args.d_model,
         n_heads=args.heads,
