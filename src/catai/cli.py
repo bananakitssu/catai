@@ -79,6 +79,18 @@ def main(argv: list[str] | None = None) -> int:
         step=len(losses) * len(loader),
         epoch=len(losses),
         loss=losses[-1],
+        metadata={
+            "model": {
+                "max_seq_len": args.sequence_length,
+                "d_model": args.d_model,
+                "n_heads": args.heads,
+                "n_layers": args.layers,
+            },
+            "tokenizer": {
+                "type": "char",
+                "vocabulary": list(tokenizer.vocabulary),
+            },
+        },
     )
     print(f"saved checkpoint to {args.checkpoint}")
     return 0
