@@ -13,6 +13,7 @@ def generate(
     max_new_tokens: int,
     temperature: float = 1.0,
     repetition_penalty: float = 1.1,
+    no_repeat_ngram_size: int = 3,
 ) -> torch.Tensor:
     """Generate tokens autoregressively from a prompt."""
     if tokens.ndim != 2:
@@ -23,6 +24,8 @@ def generate(
         raise ValueError("temperature must be positive")
     if repetition_penalty < 1.0:
         raise ValueError("repetition_penalty must be at least 1.0")
+    if no_repeat_ngram_size < 0:
+        raise ValueError("no_repeat_ngram_size must be non-negative")
 
     was_training = model.training
     model.eval()
@@ -42,6 +45,22 @@ def generate(
                             seen_logits * repetition_penalty,
                             seen_logits / repetition_penalty,
                         )
+
+                if no_repeat_ngram_size > 1:
+                    for batch_index in range(result.size(0)):
+                        sequence = context[batch_index].tolist()
+                        if len(sequence) >= no_repeat_ngram_size - 1:
+                            prefix = tuple(sequence[-(no_repeat_ngram_size - 1) :])
+                            banned = {
+                                ngram[-1]
+                                for ngram in (
+                                    tuple(sequence[i : i + no_repeat_ngram_size])
+                                    for i in range(len(sequence) - no_repeat_ngram_size + 1)
+                                )
+                                if ngram[:-1] == prefix
+                            }
+                            if banned:
+                                logits[batch_index, list(banned)] = float("-inf")
 
                 next_token = torch.multinomial(torch.softmax(logits, dim=-1), num_samples=1)
                 result = torch.cat((result, next_token), dim=1)
