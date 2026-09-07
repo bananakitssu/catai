@@ -1,4 +1,5 @@
-from catai.cli import build_parser
+from catai.checkpoint import load_training_metadata
+from catai.cli import build_parser, main
 
 
 def test_parser_accepts_training_options():
@@ -52,3 +53,27 @@ def test_parser_defaults_are_stable():
     assert args.heads == 4
     assert args.layers == 4
     assert args.device is None
+
+
+def test_cli_trains_and_writes_checkpoint(tmp_path):
+    checkpoint = tmp_path / "catai.pt"
+    exit_code = main(
+        [
+            "--corpus", "data/tiny.txt",
+            "--checkpoint", str(checkpoint),
+            "--epochs", "1",
+            "--batch-size", "8",
+            "--sequence-length", "16",
+            "--d-model", "16",
+            "--heads", "2",
+            "--layers", "1",
+            "--device", "cpu",
+        ]
+    )
+
+    assert exit_code == 0
+    assert checkpoint.exists()
+    metadata = load_training_metadata(checkpoint)
+    assert metadata["epoch"] == 1
+    assert metadata["step"] > 0
+    assert isinstance(metadata["loss"], float)
