@@ -30,17 +30,19 @@ jobs:
           python-version: "3.12"
       - name: Install CatAI
         run: python -m pip install -e .
-      - name: Train tiny model
+      - name: Generate training corpus
+        run: python data/generate_corpus.py --sentences 100000 --output data/generated.txt
+      - name: Train model
         run: |
           python -m catai \
-            --corpus data/tiny.txt \
+            --corpus data/generated.txt \
             --checkpoint catai.pt \
             --epochs 1 \
-            --batch-size 8 \
-            --sequence-length 16 \
-            --d-model 16 \
-            --heads 2 \
-            --layers 1 \
+            --batch-size 32 \
+            --sequence-length 64 \
+            --d-model 32 \
+            --heads 4 \
+            --layers 2 \
             --device cpu
       - name: Generate text
         run: |
@@ -49,4 +51,5 @@ jobs:
             --prompt "Cats" \
             --max-new-tokens 50 \
             --temperature 0.8 \
+            --repetition-penalty 1.1 \
             --device cpu
