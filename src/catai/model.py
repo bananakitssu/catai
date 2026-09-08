@@ -56,6 +56,7 @@ class CatAI(nn.Module):
         dropout: float = 0.0,
     ) -> None:
         super().__init__()
+        self.vocab_size = vocab_size
         self.max_seq_len = max_seq_len
         self.token_embedding = nn.Embedding(vocab_size, d_model)
         self.position_embedding = nn.Embedding(max_seq_len, d_model)
