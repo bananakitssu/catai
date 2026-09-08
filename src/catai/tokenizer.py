@@ -40,7 +40,12 @@ class CharTokenizer:
     def decode(self, tokens: list[int]) -> str:
         if any(token < 0 or token >= self.vocab_size for token in tokens):
             raise ValueError("token ID outside vocabulary")
-        return "".join(self.vocabulary[token] for token in tokens)
+        decoded: list[str] = []
+        for token in tokens:
+            if token == self.eos_token_id:
+                break
+            decoded.append(self.vocabulary[token])
+        return "".join(decoded)
 
     @classmethod
     def from_text(cls, text: str) -> "CharTokenizer":
