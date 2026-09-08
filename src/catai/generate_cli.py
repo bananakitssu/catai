@@ -72,6 +72,7 @@ def main(argv: list[str] | None = None) -> int:
         temperature=args.temperature,
         repetition_penalty=args.repetition_penalty,
         no_repeat_ngram_size=args.no_repeat_ngram_size,
+        eos_token_id=tokenizer.eos_token_id,
     )
     print(tokenizer.decode(generated[0].tolist()))
     return 0
