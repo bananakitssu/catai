@@ -16,6 +16,7 @@ class Tokenizer(Protocol):
     def encode(self, text: str) -> list[int]: ...
 
 
+
 def load_text(path: str | Path, *, encoding: str = "utf-8") -> str:
     """Read a text corpus from disk."""
     text = Path(path).read_text(encoding=encoding)
@@ -24,12 +25,17 @@ def load_text(path: str | Path, *, encoding: str = "utf-8") -> str:
     return text
 
 
-def load_tokens(path: str | Path, tokenizer: Tokenizer, *, encoding: str = "utf-8") -> list[int]:
-    """Load a text corpus and encode it as token IDs."""
-    encode = getattr(tokenizer, "encode", None)
-    if encode is None or not callable(encode):
-        raise TypeError("tokenizer must provide an encode method")
-    return list(encode(load_text(path, encoding=encoding)))
+def load_tokens(path: str | Path, tokenizer: CharTokenizer, *, encoding: str = "utf-8") -> list[int]:
+    """Load a text corpus and append EOS after every non-empty line."""
+    text = load_text(path, encoding=encoding)
+    tokens: list[int] = []
+    for line in text.splitlines():
+        if line:
+            tokens.extend(tokenizer.encode(line))
+            tokens.append(tokenizer.eos_token_id)
+    if not tokens:
+        raise ValueError("training corpus must contain at least one non-empty line")
+    return tokens
 
 
 def tokenizer_and_tokens(path: str | Path, *, encoding: str = "utf-8") -> tuple[CharTokenizer, torch.Tensor]:
