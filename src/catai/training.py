@@ -51,6 +51,26 @@ def train_step(
     return float(loss.detach())
 
 
+def evaluate(model: nn.Module, loader: DataLoader[torch.Tensor], device: torch.device | str = "cpu") -> float:
+    """Evaluate mean next-token loss without updating model parameters."""
+    was_training = model.training
+    model.eval()
+    total_loss = 0.0
+    batches = 0
+    try:
+        with torch.no_grad():
+            for tokens in loader:
+                inputs, targets = make_next_token_batch(tokens.to(device))
+                loss = causal_language_model_loss(model(inputs), targets)
+                total_loss += float(loss)
+                batches += 1
+    finally:
+        model.train(was_training)
+    if batches == 0:
+        raise ValueError("loader must contain at least one batch")
+    return total_loss / batches
+
+
 def train(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
