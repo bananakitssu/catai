@@ -25,16 +25,18 @@ def load_text(path: str | Path, *, encoding: str = "utf-8") -> str:
     return text
 
 
-def load_tokens(path: str | Path, tokenizer: CharTokenizer, *, encoding: str = "utf-8") -> list[int]:
-    """Load a text corpus and append EOS after every non-empty line."""
+def load_tokens(path: str | Path, tokenizer: Tokenizer, *, encoding: str = "utf-8") -> list[int]:
+    """Load a text corpus, preserving its contents, and append one EOS token."""
     text = load_text(path, encoding=encoding)
-    tokens: list[int] = []
-    for line in text.splitlines():
-        if line:
-            tokens.extend(tokenizer.encode(line))
-            tokens.append(tokenizer.eos_token_id)
+    encode = getattr(tokenizer, "encode", None)
+    if not callable(encode):
+        raise TypeError("tokenizer must provide an encode method")
+    tokens = list(encode(text))
     if not tokens:
-        raise ValueError("training corpus must contain at least one non-empty line")
+        raise ValueError("training corpus must contain at least one token")
+    if not isinstance(tokenizer, CharTokenizer):
+        return tokens
+    tokens.append(tokenizer.eos_token_id)
     return tokens
 
 
