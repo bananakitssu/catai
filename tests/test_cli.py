@@ -55,7 +55,7 @@ def test_parser_defaults_are_stable():
     assert args.device is None
 
 
-def test_cli_trains_and_writes_checkpoint(tmp_path):
+def test_cli_trains_and_writes_checkpoint(tmp_path, capsys):
     checkpoint = tmp_path / "catai.pt"
     exit_code = main(
         [
@@ -77,3 +77,9 @@ def test_cli_trains_and_writes_checkpoint(tmp_path):
     assert metadata["epoch"] == 1
     assert metadata["step"] > 0
     assert isinstance(metadata["loss"], float)
+
+    output = capsys.readouterr().out
+    assert "epoch 1/1" in output
+    assert "batch" in output
+    assert "loss=" in output
+    assert "saved checkpoint" in output
