@@ -48,7 +48,7 @@ jobs:
         run: |
           python -m catai.generate_cli \
             --checkpoint catai.pt \
-            --prompt "Cats" \
+            --prompt "The cat" \
             --max-new-tokens 50 \
             --temperature 0.8 \
             --repetition-penalty 1.1 \
