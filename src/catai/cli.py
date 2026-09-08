@@ -63,14 +63,23 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     losses = []
+    total_batches = len(loader)
+    progress_interval = max(1, total_batches // 10)
     for epoch in range(config.epochs):
         total = 0.0
         batches = 0
-        for batch in loader:
+        print(f"epoch {epoch + 1}/{config.epochs}", flush=True)
+        for batch_index, batch in enumerate(loader, start=1):
             total += train_step(model, optimizer, batch.to(device), grad_clip=config.grad_clip)
             batches += 1
+            if batch_index % progress_interval == 0 or batch_index == total_batches:
+                running_loss = total / batches
+                print(
+                    f"  batch {batch_index}/{total_batches}: loss={running_loss:.4f}",
+                    flush=True,
+                )
         losses.append(total / batches)
-        print(f"epoch {epoch + 1}/{config.epochs}: loss={losses[-1]:.4f}")
+        print(f"epoch {epoch + 1}/{config.epochs}: loss={losses[-1]:.4f}", flush=True)
 
     save_checkpoint(
         args.checkpoint,
