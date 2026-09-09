@@ -1,35 +1,18 @@
-from pathlib import Path
-
-import pytest
-
-from catai.corpus import load_text, load_tokens
-from catai.tokenizer import CharTokenizer
+from catai.corpus import tokenizer_and_tokens
 
 
-def test_load_text_reads_utf8(tmp_path: Path) -> None:
+def test_bpe_corpus_loader(tmp_path):
     path = tmp_path / "corpus.txt"
-    path.write_text("cat\nAI", encoding="utf-8")
-    assert load_text(path) == "cat\nAI"
+    path.write_text("banana cat banana", encoding="utf-8")
+    tokenizer, tokens = tokenizer_and_tokens(path, tokenizer_type="bpe", vocab_size=12)
+    assert tokenizer.vocab_size <= 12
+    assert tokens.dtype.name == "int64" if hasattr(tokens.dtype, "name") else str(tokens.dtype) == "torch.int64"
+    assert tokenizer.decode(tokens.tolist()) == "banana cat banana"
 
 
-def test_load_tokens_encodes_text_and_appends_eos(tmp_path: Path) -> None:
+def test_corpus_token_budget(tmp_path):
     path = tmp_path / "corpus.txt"
-    path.write_text("cat", encoding="utf-8")
-    tokenizer = CharTokenizer.from_text("cat")
-    assert load_tokens(path, tokenizer) == tokenizer.encode("cat") + [tokenizer.eos_token_id]
-
-
-def test_load_tokens_preserves_line_breaks(tmp_path: Path) -> None:
-    path = tmp_path / "corpus.txt"
-    path.write_text("cat\nAI", encoding="utf-8")
-    tokenizer = CharTokenizer.from_text("cat\nAI")
-    tokens = load_tokens(path, tokenizer)
-    assert tokenizer.decode(tokens) == "cat\nAI"
-    assert tokens[-1] == tokenizer.eos_token_id
-
-
-def test_load_tokens_requires_encode(tmp_path: Path) -> None:
-    path = tmp_path / "corpus.txt"
-    path.write_text("cat", encoding="utf-8")
-    with pytest.raises(TypeError, match="encode"):
-        load_tokens(path, object())
+    path.write_text("abcdefghij", encoding="utf-8")
+    tokenizer, tokens = tokenizer_and_tokens(path, max_tokens=4)
+    assert len(tokens) == 5
+    assert tokens[-1].item() == tokenizer.eos_token_id

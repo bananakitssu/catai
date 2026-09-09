@@ -1,32 +1,20 @@
-from catai.tokenizer import CharTokenizer, EOS_TOKEN
+from catai.tokenizer import BPETokenizer, EOS_TOKEN
 
 
-def test_encode_decode_round_trip() -> None:
-    tokenizer = CharTokenizer.from_text("cat banana")
-    text = "cat banana"
+def test_bpe_round_trip():
+    tokenizer = BPETokenizer.from_text("banana banana cat", vocab_size=16)
+    text = "banana cat"
     assert tokenizer.decode(tokenizer.encode(text)) == text
 
 
-def test_vocabulary_is_deterministic() -> None:
-    first = CharTokenizer.from_text("banana cat")
-    second = CharTokenizer.from_text("cat banana")
-    assert first.vocabulary == second.vocabulary
-    assert first.vocab_size == len(set("banana cat")) + 1
-    assert first.vocabulary[-1] == EOS_TOKEN
+def test_bpe_has_merges_and_eos():
+    tokenizer = BPETokenizer.from_text("banana banana banana", vocab_size=10)
+    assert tokenizer.eos_token_id == tokenizer.vocab_size - 1
+    assert tokenizer.vocabulary[-1] == EOS_TOKEN
+    assert tokenizer.merges
 
 
-def test_legacy_vocabulary_without_eos_is_supported() -> None:
-    tokenizer = CharTokenizer(("a", "b", "c"))
-    assert tokenizer.eos_token_id is None
-    assert tokenizer.vocab_size == 3
-    assert tokenizer.decode(tokenizer.encode("abc")) == "abc"
-
-
-def test_unknown_character_is_rejected() -> None:
-    tokenizer = CharTokenizer.from_text("abc")
-    try:
-        tokenizer.encode("abd")
-    except ValueError as exc:
-        assert "unknown characters" in str(exc)
-    else:
-        raise AssertionError("expected ValueError")
+def test_bpe_is_deterministic():
+    first = BPETokenizer.from_text("banana cat banana", vocab_size=12)
+    second = BPETokenizer.from_text("banana cat banana", vocab_size=12)
+    assert first == second

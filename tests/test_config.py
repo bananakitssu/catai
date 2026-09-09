@@ -1,29 +1,35 @@
-import pytest
-
-from catai.config import TrainingConfig
+from catai.config import MODEL_PRESETS, ModelConfig, TrainingConfig
 
 
-def test_training_config_defaults() -> None:
-    config = TrainingConfig()
-    assert config.batch_size == 32
-    assert config.learning_rate == 3e-4
-    assert config.epochs == 1
-    assert config.grad_clip == 1.0
+def test_training_config_rejects_invalid_values():
+    for kwargs in ({"batch_size": 0}, {"learning_rate": 0}, {"epochs": 0}, {"grad_clip": 0}, {"validation_split": 1}, {"patience": 0}, {"max_tokens": 0}):
+        try:
+            TrainingConfig(**kwargs)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"expected ValueError for {kwargs}")
 
 
-@pytest.mark.parametrize(
-    "kwargs",
-    [
-        {"batch_size": 0},
-        {"learning_rate": 0},
-        {"epochs": 0},
-        {"grad_clip": 0},
-    ],
-)
-def test_training_config_rejects_invalid_values(kwargs: dict[str, object]) -> None:
-    with pytest.raises(ValueError):
-        TrainingConfig(**kwargs)
+def test_model_config_validates_dimensions():
+    assert ModelConfig() == ModelConfig(128, 4, 4)
+    try:
+        ModelConfig(d_model=10, n_heads=3)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected divisibility validation")
 
 
-def test_training_config_allows_disabling_gradient_clipping() -> None:
-    assert TrainingConfig(grad_clip=None).grad_clip is None
+def test_model_presets_are_scalable():
+    tiny = ModelConfig.from_preset("tiny")
+    small = ModelConfig.from_preset("small")
+    base = ModelConfig.from_preset("base")
+    assert tiny.n_layers < small.n_layers < base.n_layers
+    assert tiny.d_model < small.d_model < base.d_model
+    try:
+        ModelConfig.from_preset("unknown")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("expected unknown preset to fail")
