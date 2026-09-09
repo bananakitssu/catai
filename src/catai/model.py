@@ -9,27 +9,27 @@ from torch import nn
 class CausalSelfAttention(nn.Module):
     """Multi-head self-attention with a causal mask."""
 
-    def __init__(self, d_model: int, n_heads: int, max_seq_len: int, dropout: float = 0.0) -> None:
+    def __init__(self, d_model: int, n_heads: int, context_length: int, dropout: float = 0.0) -> None:
         super().__init__()
         if d_model % n_heads:
             raise ValueError("d_model must be divisible by n_heads")
         self.attn = nn.MultiheadAttention(d_model, n_heads, dropout=dropout, batch_first=True)
         self.register_buffer(
-            "mask", torch.triu(torch.ones(max_seq_len, max_seq_len, dtype=torch.bool), diagonal=1)
+            "mask", torch.triu(torch.ones(context_length, context_length, dtype=torch.bool), diagonal=1)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         length = x.size(1)
         if length > self.mask.size(0):
-            raise ValueError("sequence exceeds max_seq_len")
+            raise ValueError("sequence exceeds context_length")
         return self.attn(x, x, x, attn_mask=self.mask[:length, :length], need_weights=False)[0]
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, d_model: int, n_heads: int, max_seq_len: int, mlp_ratio: int = 4, dropout: float = 0.0) -> None:
+    def __init__(self, d_model: int, n_heads: int, context_length: int, mlp_ratio: int = 4, dropout: float = 0.0) -> None:
         super().__init__()
         self.norm1 = nn.LayerNorm(d_model)
-        self.attention = CausalSelfAttention(d_model, n_heads, max_seq_len, dropout)
+        self.attention = CausalSelfAttention(d_model, n_heads, context_length, dropout)
         self.norm2 = nn.LayerNorm(d_model)
         self.mlp = nn.Sequential(
             nn.Linear(d_model, mlp_ratio * d_model),
@@ -54,14 +54,23 @@ class CatAI(nn.Module):
         n_heads: int = 4,
         n_layers: int = 4,
         dropout: float = 0.0,
+        *,
+        context_length: int | None = None,
     ) -> None:
         super().__init__()
+        if max_seq_len < 1:
+            raise ValueError("max_seq_len must be positive")
+        if context_length is not None:
+            if context_length < 1:
+                raise ValueError("context_length must be positive")
+            max_seq_len = context_length
         self.vocab_size = vocab_size
         self.max_seq_len = max_seq_len
+        self.context_length = max_seq_len
         self.token_embedding = nn.Embedding(vocab_size, d_model)
-        self.position_embedding = nn.Embedding(max_seq_len, d_model)
+        self.position_embedding = nn.Embedding(self.context_length, d_model)
         self.blocks = nn.ModuleList(
-            [TransformerBlock(d_model, n_heads, max_seq_len, dropout=dropout) for _ in range(n_layers)]
+            [TransformerBlock(d_model, n_heads, self.context_length, dropout=dropout) for _ in range(n_layers)]
         )
         self.norm = nn.LayerNorm(d_model)
         self.lm_head = nn.Linear(d_model, vocab_size, bias=False)
@@ -71,8 +80,8 @@ class CatAI(nn.Module):
         if tokens.ndim != 2:
             raise ValueError("tokens must have shape (batch, sequence)")
         batch, length = tokens.shape
-        if length > self.max_seq_len:
-            raise ValueError("sequence exceeds max_seq_len")
+        if length > self.context_length:
+            raise ValueError("sequence exceeds context_length")
         positions = torch.arange(length, device=tokens.device).expand(batch, length)
         x = self.token_embedding(tokens) + self.position_embedding(positions)
         for block in self.blocks:
