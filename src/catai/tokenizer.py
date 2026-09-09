@@ -21,10 +21,8 @@ class CharTokenizer:
             raise ValueError("vocabulary must not be empty")
         if len(set(self.vocabulary)) != len(self.vocabulary):
             raise ValueError("vocabulary contains duplicate tokens")
-        for special in (EOS_TOKEN, UNK_TOKEN):
-            if special in self.vocabulary and self.vocabulary.index(special) < len(self.vocabulary) - 1:
-                if special == EOS_TOKEN and self.vocabulary[-1] != EOS_TOKEN:
-                    raise ValueError(f"{EOS_TOKEN} must be the final vocabulary token")
+        if EOS_TOKEN in self.vocabulary and self.vocabulary[-1] != EOS_TOKEN:
+            raise ValueError(f"{EOS_TOKEN} must be the final vocabulary token")
 
     @property
     def vocab_size(self) -> int:
@@ -40,12 +38,11 @@ class CharTokenizer:
 
     def encode(self, text: str) -> list[int]:
         lookup = {token: i for i, token in enumerate(self.vocabulary)}
+        unknown_id = self.unk_token_id
         unknown = sorted(set(text) - lookup.keys())
-        if unknown:
-            if self.unk_token_id is None:
-                raise ValueError(f"unknown characters: {unknown!r}")
-            return [lookup.get(char, self.unk_token_id) for char in text]
-        return [lookup[char] for char in text]
+        if unknown and unknown_id is None:
+            raise ValueError(f"unknown characters: {unknown!r}")
+        return [lookup.get(char, unknown_id) for char in text]
 
     def decode(self, tokens: list[int]) -> str:
         if any(token < 0 or token >= self.vocab_size for token in tokens):
@@ -92,9 +89,7 @@ class BPETokenizer:
 
     @property
     def eos_token_id(self) -> int | None:
-        if EOS_TOKEN not in self.vocabulary:
-            return None
-        return self.vocabulary.index(EOS_TOKEN)
+        return self.vocabulary.index(EOS_TOKEN) if EOS_TOKEN in self.vocabulary else None
 
     @property
     def unk_token_id(self) -> int | None:
@@ -110,19 +105,23 @@ class BPETokenizer:
                     index += 2
                 else:
                     merged.append(symbols[index])
-                index += 1
+                    index += 1
             symbols = merged
         return symbols
 
     def encode(self, text: str) -> list[int]:
-        symbols = self._apply_merges(list(text))
         lookup = {token: i for i, token in enumerate(self.vocabulary)}
-        unknown = [token for token in symbols if token not in lookup]
-        if unknown:
-            if self.unk_token_id is None:
-                raise ValueError(f"unknown text pieces: {sorted(set(unknown))!r}")
-            return [lookup.get(token, self.unk_token_id) for token in symbols]
-        return [lookup[token] for token in symbols]
+        unknown_id = self.unk_token_id
+        symbols = self._apply_merges(list(text))
+        result: list[int] = []
+        for symbol in symbols:
+            token_id = lookup.get(symbol)
+            if token_id is None:
+                if unknown_id is None:
+                    raise ValueError(f"unknown text pieces: {[symbol]!r}")
+                token_id = unknown_id
+            result.append(token_id)
+        return result
 
     def decode(self, tokens: list[int]) -> str:
         if any(token < 0 or token >= self.vocab_size for token in tokens):
@@ -139,7 +138,7 @@ class BPETokenizer:
 
     @classmethod
     def from_text(cls, text: str, vocab_size: int = 256) -> "BPETokenizer":
-        """Train a small deterministic BPE vocabulary from text."""
+        """Train a deterministic BPE vocabulary from a text sample."""
         if not text:
             raise ValueError("training text must not be empty")
         if vocab_size < 3:
@@ -155,18 +154,34 @@ class BPETokenizer:
         vocabulary = set(base_vocabulary)
         merges: list[tuple[str, str]] = []
         target = vocab_size - special_count
+
         while len(vocabulary) < target:
-            counts = Counter(zip(symbols, symbols[1:]))
+            # Do not learn merges across whitespace boundaries. This keeps
+            # subword tokens meaningful and prevents a merge from changing
+            # how neighboring words are segmented during encoding.
+            counts = Counter()
+            for left, right in zip(symbols, symbols[1:]):
+                if left.isspace() or right.isspace():
+                    continue
+                counts[(left, right)] += 1
+
             candidates = [pair for pair in counts if pair[0] + pair[1] not in vocabulary]
             if not candidates:
                 break
+
             best = max(candidates, key=lambda pair: (counts[pair], pair))
             left, right = best
             merged_token = left + right
             rewritten: list[str] = []
             index = 0
             while index < len(symbols):
-                if index + 1 < len(symbols) and symbols[index] == left and symbols[index + 1] == right:
+                if (
+                    index + 1 < len(symbols)
+                    and symbols[index] == left
+                    and symbols[index + 1] == right
+                    and not left.isspace()
+                    and not right.isspace()
+                ):
                     rewritten.append(merged_token)
                     index += 2
                 else:
