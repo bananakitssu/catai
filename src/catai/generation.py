@@ -15,8 +15,9 @@ def generate(
     repetition_penalty: float = 1.1,
     no_repeat_ngram_size: int = 3,
     eos_token_id: int | None = None,
+    top_k: int | None = None,
 ) -> torch.Tensor:
-    """Generate tokens autoregressively, optionally stopping at EOS."""
+    """Generate tokens autoregressively with optional top-k sampling and EOS stopping."""
     if tokens.ndim != 2:
         raise ValueError("tokens must have shape (batch, sequence)")
     if max_new_tokens < 0:
@@ -27,6 +28,8 @@ def generate(
         raise ValueError("repetition_penalty must be at least 1.0")
     if no_repeat_ngram_size < 0:
         raise ValueError("no_repeat_ngram_size must be non-negative")
+    if top_k is not None and (top_k < 1 or top_k > model.vocab_size):
+        raise ValueError("top_k must be between 1 and the model vocabulary size")
     if eos_token_id is not None and (eos_token_id < 0 or eos_token_id >= model.vocab_size):
         raise ValueError("eos_token_id outside vocabulary")
 
@@ -37,7 +40,7 @@ def generate(
             result = tokens
             finished = torch.zeros(result.size(0), dtype=torch.bool, device=result.device)
             for _ in range(max_new_tokens):
-                context = result[:, -model.max_seq_len :]
+                context = result[:, -model.context_length :]
                 logits = model(context)[:, -1, :] / temperature
 
                 if repetition_penalty > 1.0:
@@ -76,6 +79,12 @@ def generate(
                             }
                             if banned:
                                 logits[batch_index, list(banned)] = float("-inf")
+
+                if top_k is not None:
+                    values, indices = torch.topk(logits, top_k, dim=-1)
+                    filtered = torch.full_like(logits, float("-inf"))
+                    filtered.scatter_(1, indices, values)
+                    logits = filtered
 
                 next_token = torch.multinomial(torch.softmax(logits, dim=-1), num_samples=1)
                 if eos_token_id is not None:
