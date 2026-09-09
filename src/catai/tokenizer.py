@@ -7,11 +7,12 @@ from dataclasses import dataclass
 
 
 EOS_TOKEN = "<EOS>"
+UNK_TOKEN = "<UNK>"
 
 
 @dataclass(frozen=True)
 class CharTokenizer:
-    """Maps characters plus an optional EOS token to integer token IDs."""
+    """Maps characters plus special tokens to integer token IDs."""
 
     vocabulary: tuple[str, ...]
 
@@ -20,8 +21,10 @@ class CharTokenizer:
             raise ValueError("vocabulary must not be empty")
         if len(set(self.vocabulary)) != len(self.vocabulary):
             raise ValueError("vocabulary contains duplicate tokens")
-        if EOS_TOKEN in self.vocabulary and self.vocabulary[-1] != EOS_TOKEN:
-            raise ValueError(f"{EOS_TOKEN} must be the final vocabulary token")
+        for special in (EOS_TOKEN, UNK_TOKEN):
+            if special in self.vocabulary and self.vocabulary.index(special) < len(self.vocabulary) - 1:
+                if special == EOS_TOKEN and self.vocabulary[-1] != EOS_TOKEN:
+                    raise ValueError(f"{EOS_TOKEN} must be the final vocabulary token")
 
     @property
     def vocab_size(self) -> int:
@@ -29,15 +32,19 @@ class CharTokenizer:
 
     @property
     def eos_token_id(self) -> int | None:
-        if EOS_TOKEN not in self.vocabulary:
-            return None
-        return self.vocabulary.index(EOS_TOKEN)
+        return self.vocabulary.index(EOS_TOKEN) if EOS_TOKEN in self.vocabulary else None
+
+    @property
+    def unk_token_id(self) -> int | None:
+        return self.vocabulary.index(UNK_TOKEN) if UNK_TOKEN in self.vocabulary else None
 
     def encode(self, text: str) -> list[int]:
         lookup = {token: i for i, token in enumerate(self.vocabulary)}
         unknown = sorted(set(text) - lookup.keys())
         if unknown:
-            raise ValueError(f"unknown characters: {unknown!r}")
+            if self.unk_token_id is None:
+                raise ValueError(f"unknown characters: {unknown!r}")
+            return [lookup.get(char, self.unk_token_id) for char in text]
         return [lookup[char] for char in text]
 
     def decode(self, tokens: list[int]) -> str:
@@ -45,16 +52,19 @@ class CharTokenizer:
             raise ValueError("token ID outside vocabulary")
         decoded: list[str] = []
         for token in tokens:
-            if self.eos_token_id is not None and token == self.eos_token_id:
+            if token == self.eos_token_id:
                 break
-            decoded.append(self.vocabulary[token])
+            if token == self.unk_token_id:
+                decoded.append("�")
+            else:
+                decoded.append(self.vocabulary[token])
         return "".join(decoded)
 
     @classmethod
     def from_text(cls, text: str) -> "CharTokenizer":
         if not text:
             raise ValueError("training text must not be empty")
-        return cls(tuple(sorted(set(text))) + (EOS_TOKEN,))
+        return cls(tuple(sorted(set(text))) + (UNK_TOKEN, EOS_TOKEN))
 
 
 @dataclass(frozen=True)
@@ -86,6 +96,10 @@ class BPETokenizer:
             return None
         return self.vocabulary.index(EOS_TOKEN)
 
+    @property
+    def unk_token_id(self) -> int | None:
+        return self.vocabulary.index(UNK_TOKEN) if UNK_TOKEN in self.vocabulary else None
+
     def _apply_merges(self, symbols: list[str]) -> list[str]:
         for left, right in self.merges:
             merged: list[str] = []
@@ -96,7 +110,7 @@ class BPETokenizer:
                     index += 2
                 else:
                     merged.append(symbols[index])
-                    index += 1
+                index += 1
             symbols = merged
         return symbols
 
@@ -105,7 +119,9 @@ class BPETokenizer:
         lookup = {token: i for i, token in enumerate(self.vocabulary)}
         unknown = [token for token in symbols if token not in lookup]
         if unknown:
-            raise ValueError(f"unknown text pieces: {sorted(set(unknown))!r}")
+            if self.unk_token_id is None:
+                raise ValueError(f"unknown text pieces: {sorted(set(unknown))!r}")
+            return [lookup.get(token, self.unk_token_id) for token in symbols]
         return [lookup[token] for token in symbols]
 
     def decode(self, tokens: list[int]) -> str:
@@ -113,28 +129,32 @@ class BPETokenizer:
             raise ValueError("token ID outside vocabulary")
         decoded: list[str] = []
         for token in tokens:
-            if self.eos_token_id is not None and token == self.eos_token_id:
+            if token == self.eos_token_id:
                 break
-            decoded.append(self.vocabulary[token])
+            if token == self.unk_token_id:
+                decoded.append("�")
+            else:
+                decoded.append(self.vocabulary[token])
         return "".join(decoded)
 
     @classmethod
     def from_text(cls, text: str, vocab_size: int = 256) -> "BPETokenizer":
-        """Train a small deterministic BPE vocabulary from a text sample."""
+        """Train a small deterministic BPE vocabulary from text."""
         if not text:
             raise ValueError("training text must not be empty")
-        if vocab_size < 2:
-            raise ValueError("vocab_size must be at least 2")
+        if vocab_size < 3:
+            raise ValueError("vocab_size must be at least 3")
 
         symbols = list(text)
         base_vocabulary = set(symbols)
-        if len(base_vocabulary) + 1 >= vocab_size:
-            vocabulary = tuple(sorted(base_vocabulary)) + (EOS_TOKEN,)
+        special_count = 2
+        if len(base_vocabulary) + special_count >= vocab_size:
+            vocabulary = tuple(sorted(base_vocabulary)) + (UNK_TOKEN, EOS_TOKEN)
             return cls(vocabulary)
 
         vocabulary = set(base_vocabulary)
         merges: list[tuple[str, str]] = []
-        target = vocab_size - 1
+        target = vocab_size - special_count
         while len(vocabulary) < target:
             counts = Counter(zip(symbols, symbols[1:]))
             candidates = [pair for pair in counts if pair[0] + pair[1] not in vocabulary]
@@ -156,4 +176,4 @@ class BPETokenizer:
             vocabulary.add(merged_token)
             merges.append(best)
 
-        return cls(tuple(sorted(vocabulary)) + (EOS_TOKEN,), tuple(merges))
+        return cls(tuple(sorted(vocabulary)) + (UNK_TOKEN, EOS_TOKEN), tuple(merges))
