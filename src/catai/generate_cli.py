@@ -10,7 +10,7 @@ from .checkpoint import load_checkpoint, load_checkpoint_metadata
 from .device import resolve_device
 from .generation import generate
 from .model import CatAI
-from .tokenizer import CharTokenizer
+from .tokenizer import BPETokenizer, CharTokenizer
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -20,10 +20,33 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--prompt", required=True, help="Text prompt to continue.")
     parser.add_argument("--max-new-tokens", type=int, default=50)
     parser.add_argument("--temperature", type=float, default=1.0)
+    parser.add_argument("--top-k", type=int, default=None)
     parser.add_argument("--repetition-penalty", type=float, default=1.1)
     parser.add_argument("--no-repeat-ngram-size", type=int, default=3)
     parser.add_argument("--device", default=None)
     return parser
+
+
+def _load_tokenizer(metadata: dict) -> CharTokenizer | BPETokenizer:
+    tokenizer_type = metadata.get("type")
+    vocabulary = metadata.get("vocabulary")
+    if not isinstance(vocabulary, list):
+        raise ValueError("checkpoint has invalid tokenizer vocabulary")
+
+    if tokenizer_type == "char":
+        return CharTokenizer(tuple(vocabulary))
+
+    if tokenizer_type == "bpe":
+        merges = metadata.get("merges", [])
+        if not isinstance(merges, list):
+            raise ValueError("checkpoint has invalid BPE merge metadata")
+        try:
+            normalized_merges = tuple(tuple(pair) for pair in merges)
+        except TypeError as exc:
+            raise ValueError("checkpoint has invalid BPE merge metadata") from exc
+        return BPETokenizer(tuple(vocabulary), normalized_merges)
+
+    raise ValueError("checkpoint has unsupported tokenizer metadata")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -33,6 +56,8 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--max-new-tokens must be non-negative")
     if args.temperature <= 0:
         raise ValueError("--temperature must be positive")
+    if args.top_k is not None and args.top_k < 1:
+        raise ValueError("--top-k must be positive")
     if args.repetition_penalty < 1.0:
         raise ValueError("--repetition-penalty must be at least 1.0")
     if args.no_repeat_ngram_size < 0:
@@ -44,11 +69,7 @@ def main(argv: list[str] | None = None) -> int:
     if not isinstance(model_metadata, dict) or not isinstance(tokenizer_metadata, dict):
         raise ValueError("checkpoint is missing model/tokenizer metadata")
 
-    vocabulary = tokenizer_metadata.get("vocabulary")
-    if tokenizer_metadata.get("type") != "char" or not isinstance(vocabulary, list):
-        raise ValueError("checkpoint has unsupported tokenizer metadata")
-
-    tokenizer = CharTokenizer(tuple(vocabulary))
+    tokenizer = _load_tokenizer(tokenizer_metadata)
     try:
         model = CatAI(
             vocab_size=tokenizer.vocab_size,
@@ -70,6 +91,7 @@ def main(argv: list[str] | None = None) -> int:
         torch.tensor([prompt_tokens], dtype=torch.long, device=device),
         max_new_tokens=args.max_new_tokens,
         temperature=args.temperature,
+        top_k=args.top_k,
         repetition_penalty=args.repetition_penalty,
         no_repeat_ngram_size=args.no_repeat_ngram_size,
         eos_token_id=tokenizer.eos_token_id,
