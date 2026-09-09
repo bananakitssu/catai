@@ -133,9 +133,15 @@ def main(argv: list[str] | None = None) -> int:
             if batch_index % progress_interval == 0 or batch_index == total_batches:
                 elapsed = max(time.perf_counter() - started_at, 1e-9)
                 tokens_per_second = total_tokens / elapsed
+                completed_batches = (epoch * total_batches) + batch_index
+                total_training_batches = config.epochs * total_batches
+                remaining_batches = max(0, total_training_batches - completed_batches)
+                seconds_per_batch = elapsed / completed_batches
+                eta_seconds = remaining_batches * seconds_per_batch
                 print(
                     f"  batch {batch_index}/{total_batches}: loss={total / batches:.4f} "
-                    f"tokens={total_tokens} tok/s={tokens_per_second:.1f}",
+                    f"tokens={total_tokens} tok/s={tokens_per_second:.1f} "
+                    f"ETA={eta_seconds:.0f}s",
                     flush=True,
                 )
         epoch_loss = total / batches
