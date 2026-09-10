@@ -42,6 +42,15 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _progress_bar(completed: int, total: int, width: int = 30) -> str:
+    """Return a compact textual progress bar."""
+    if total <= 0:
+        return "[" + "-" * width + "]"
+    fraction = min(1.0, max(0.0, completed / total))
+    filled = int(width * fraction)
+    return "[" + "=" * filled + ">" + "-" * max(0, width - filled - 1) + "]"
+
+
 def main(argv: list[str] | None = None) -> int:
     """Train CatAI from a text corpus and save a checkpoint."""
     args = build_parser().parse_args(argv)
@@ -138,10 +147,21 @@ def main(argv: list[str] | None = None) -> int:
                 remaining_batches = max(0, total_training_batches - completed_batches)
                 seconds_per_batch = elapsed / completed_batches
                 eta_seconds = remaining_batches * seconds_per_batch
+                next_log_batch = min(
+                    total_batches,
+                    ((batch_index // progress_interval) + 1) * progress_interval,
+                )
+                batches_to_next_log = max(0, next_log_batch - batch_index)
+                eta_next_log = batches_to_next_log * seconds_per_batch
+                if batch_index == total_batches:
+                    eta_next_log = 0.0
+                progress = _progress_bar(completed_batches, total_training_batches)
+                percent = 100.0 * completed_batches / total_training_batches
                 print(
-                    f"  batch {batch_index}/{total_batches}: loss={total / batches:.4f} "
+                    f"  {progress} {percent:5.1f}% "
+                    f"batch {batch_index}/{total_batches}: loss={total / batches:.4f} "
                     f"tokens={total_tokens} tok/s={tokens_per_second:.1f} "
-                    f"ETA={eta_seconds:.0f}s",
+                    f"ETA={eta_seconds:.0f}s ETA to next log={eta_next_log:.0f}s",
                     flush=True,
                 )
         epoch_loss = total / batches
