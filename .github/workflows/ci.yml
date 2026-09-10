@@ -30,7 +30,7 @@ jobs:
           python-version: "3.12"
       - name: Install CatAI
         run: python -m pip install -e .
-      - name: Download real training corpus
+      - name: Download real text corpus
         run: python data/download_corpus.py --output data/tinyshakespeare.txt
       - name: Train model
         run: |
@@ -50,6 +50,8 @@ jobs:
             --checkpoint catai.pt \
             --prompt "The cat" \
             --max-new-tokens 200 \
-            --temperature 0.8 \
+            --temperature 0.7 \
+            --top-k 40 \
             --repetition-penalty 1.1 \
+            --no-repeat-ngram-size 3 \
             --device cpu
