@@ -49,7 +49,7 @@ jobs:
           python -m catai.generate_cli \
             --checkpoint catai.pt \
             --prompt "The cat" \
-            --max-new-tokens 50 \
+            --max-new-tokens 200 \
             --temperature 0.8 \
             --repetition-penalty 1.1 \
             --device cpu
