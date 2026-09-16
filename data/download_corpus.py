@@ -24,6 +24,7 @@ REDPAJAMA_BASE_URL = "https://data.together.xyz/redpajama-data-v2/v1.0.0"
 REDPAJAMA_DEFAULT_SNAPSHOT = "2023-06"
 REDPAJAMA_DEFAULT_LANGUAGE = "en"
 REDPAJAMA_DEFAULT_PARTITION = "head_middle"
+REDPAJAMA_DEFAULT_MAX_DOCUMENTS = 20
 
 
 def _download(url: str, timeout: int = 60) -> bytes:
@@ -120,11 +121,10 @@ def download_redpajama(
             characters += min(len(text), remaining)
             documents += 1
 
-            if documents % 100 == 0 or characters >= target_chars:
-                print(
-                    f"Collected {characters:,}/{target_chars:,} characters "
-                    f"from {documents:,} documents"
-                )
+            print(
+                f"Collected {characters:,}/{target_chars:,} characters "
+                f"from {documents:,}/{max_documents or '∞'} documents"
+            )
 
     if characters == 0:
         raise RuntimeError("RedPajama download produced no usable text")
@@ -160,8 +160,8 @@ def main() -> None:
     parser.add_argument(
         "--max-documents",
         type=int,
-        default=None,
-        help="Optional safety limit on the number of documents",
+        default=REDPAJAMA_DEFAULT_MAX_DOCUMENTS,
+        help="Maximum number of documents to download (default: 20)",
     )
     parser.add_argument("--seed", type=int, default=1337)
     args = parser.parse_args()
