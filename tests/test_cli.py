@@ -48,7 +48,7 @@ def test_parser_defaults_are_stable():
     assert args.batch_size == 32
     assert args.learning_rate == 3e-4
     assert args.grad_clip == 1.0
-    assert args.sequence_length == 32
+    assert args.sequence_length == 256
     assert args.d_model == 128
     assert args.heads == 4
     assert args.layers == 4

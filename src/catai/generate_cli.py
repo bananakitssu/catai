@@ -87,12 +87,13 @@ def main(argv: list[str] | None = None) -> int:
     load_checkpoint(args.checkpoint, model, map_location=device)
 
     prompt_tokens = tokenizer.encode(args.prompt)
+    effective_top_k = min(args.top_k, tokenizer.vocab_size) if args.top_k is not None else None
     generated = generate(
         model,
         torch.tensor([prompt_tokens], dtype=torch.long, device=device),
         max_new_tokens=args.max_new_tokens,
         temperature=args.temperature,
-        top_k=args.top_k,
+        top_k=effective_top_k,
         repetition_penalty=args.repetition_penalty,
         no_repeat_ngram_size=args.no_repeat_ngram_size,
         eos_token_id=tokenizer.eos_token_id,

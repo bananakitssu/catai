@@ -180,13 +180,17 @@ class BPETokenizer:
         if vocab_size < 3:
             raise ValueError("vocab_size must be at least 3")
 
-        # Start from the fixed printable set so the base symbols are complete.
+        # BPE starts with the characters that actually occur in the corpus.
+        # Unlike the character tokenizer, it must honor the requested vocabulary
+        # budget so small vocabularies remain useful and deterministic.
         symbols = list(text)
-        base_vocabulary = set(PRINTABLE_ASCII) | set(symbols)
+        base_vocabulary = set(symbols)
         special_count = 2
-        if len(base_vocabulary) + special_count >= vocab_size:
-            vocabulary = tuple(sorted(base_vocabulary)) + (UNK_TOKEN, EOS_TOKEN)
-            return cls(vocabulary)
+        if len(base_vocabulary) + special_count > vocab_size:
+            raise ValueError(
+                "vocab_size is too small to represent all corpus characters "
+                "plus UNK/EOS tokens"
+            )
 
         vocabulary = set(base_vocabulary)
         merges: list[tuple[str, str]] = []
