@@ -46,20 +46,20 @@ def download_tiny_shakespeare(output: Path) -> None:
     print(f"Downloaded {len(text):,} characters to {output}")
 
 
-def _extract_texts(payload: bytes) -> list[str]:
-    """Extract text fields from every JSONL record in a RedPajama shard."""
+def _extract_texts(payload: bytes) -> tuple[list[str], int]:
+    """Extract usable text fields from JSONL records in a RedPajama shard."""
     raw = gzip.decompress(payload).decode("utf-8")
     texts: list[str] = []
+    invalid_records = 0
 
     for line_number, line in enumerate(raw.splitlines(), start=1):
         if not line.strip():
             continue
         try:
             record = json.loads(line)
-        except json.JSONDecodeError as exc:
-            raise ValueError(
-                f"invalid JSONL at line {line_number}: {exc}"
-            ) from exc
+        except json.JSONDecodeError:
+            invalid_records += 1
+            continue
 
         if not isinstance(record, dict):
             continue
@@ -68,7 +68,7 @@ def _extract_texts(payload: bytes) -> list[str]:
         if isinstance(text, str) and text.strip():
             texts.append(text)
 
-    return texts
+    return texts, invalid_records
 
 
 def _print_progress(
@@ -157,7 +157,12 @@ def download_redpajama(
             shard_path = shard_id if shard_id.endswith(".json.gz") else f"{shard_id}.json.gz"
             url = f"{REDPAJAMA_BASE_URL}/documents/{shard_path}"
             try:
-                texts = _extract_texts(_download(url))
+                texts, invalid_records = _extract_texts(_download(url))
+                if invalid_records:
+                    print(
+                        f"Shard {shard_id}: skipped "
+                        f"{invalid_records:,} malformed JSONL records"
+                    )
             except Exception as exc:
                 failures += 1
                 if failures <= 10:
