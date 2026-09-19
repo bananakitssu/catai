@@ -16,6 +16,7 @@ def test_parser_accepts_training_options():
             "--heads", "2",
             "--layers", "1",
             "--device", "cpu",
+            "--window-stride", "8",
         ]
     )
     assert args.corpus == "data/tiny.txt"
@@ -53,6 +54,7 @@ def test_parser_defaults_are_stable():
     assert args.heads == 4
     assert args.layers == 4
     assert args.device is None
+    assert args.window_stride is None
 
 
 def test_cli_trains_and_writes_checkpoint(tmp_path, capsys):
