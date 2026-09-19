@@ -2,7 +2,7 @@
 """Download a configurable slice of RedPajama-V2 for CatAI experiments.
 
 RedPajama-V2 is much larger than Tiny Shakespeare. This downloader deliberately
-fetches only enough documents to reach --target-chars instead of attempting
+fetches only enough documents to reach ``--target-chars`` instead of attempting
 to download the multi-terabyte dataset.
 """
 
@@ -25,7 +25,7 @@ REDPAJAMA_BASE_URL = "https://data.together.xyz/redpajama-data-v2/v1.0.0"
 REDPAJAMA_DEFAULT_SNAPSHOT = "2023-06"
 REDPAJAMA_DEFAULT_LANGUAGE = "en"
 REDPAJAMA_DEFAULT_PARTITION = "head_middle"
-REDPAJAMA_DEFAULT_MAX_DOCUMENTS = 20
+REDPAJAMA_DEFAULT_MAX_DOCUMENTS = None
 
 
 def _download(url: str, timeout: int = 60) -> bytes:
@@ -232,7 +232,7 @@ def main() -> None:
         "--max-documents",
         type=int,
         default=REDPAJAMA_DEFAULT_MAX_DOCUMENTS,
-        help="Maximum number of documents to use (default: 20)",
+        help="Optional maximum number of documents to use (default: unlimited)",
     )
     parser.add_argument("--seed", type=int, default=1337)
     args = parser.parse_args()
