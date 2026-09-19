@@ -29,6 +29,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--grad-clip", type=float, default=1.0)
     # Raised from 32 → 256. Character-level models need more room to form words.
     parser.add_argument("--sequence-length", type=int, default=256)
+    parser.add_argument(
+        "--window-stride",
+        type=int,
+        default=None,
+        help="Token stride between training windows (default: sequence length; use 1 for fully overlapping windows).",
+    )
     parser.add_argument("--d-model", type=int, default=128)
     parser.add_argument("--heads", type=int, default=4)
     parser.add_argument("--layers", type=int, default=4)
@@ -57,6 +63,8 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.sequence_length < 1:
         raise ValueError("--sequence-length must be positive")
+    if args.window_stride is not None and args.window_stride < 1:
+        raise ValueError("--window-stride must be positive")
     if args.d_model < 1 or args.heads < 1 or args.layers < 1:
         raise ValueError("model dimensions must be positive")
     if args.d_model % args.heads != 0:
@@ -89,7 +97,12 @@ def main(argv: list[str] | None = None) -> int:
         vocab_size=args.vocab_size,
         max_tokens=config.max_tokens,
     )
-    dataset = TokenWindowDataset(tokens, sequence_length=args.sequence_length)
+    window_stride = args.window_stride if args.window_stride is not None else args.sequence_length
+    dataset = TokenWindowDataset(
+        tokens,
+        sequence_length=args.sequence_length,
+        stride=window_stride,
+    )
     validation_loader = None
     if config.validation_split > 0.0:
         validation_size = max(1, int(len(dataset) * config.validation_split))
