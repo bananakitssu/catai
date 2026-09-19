@@ -5,10 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
+# (d_model, n_heads, n_layers)
 MODEL_PRESETS: dict[str, tuple[int, int, int]] = {
-    "tiny": (128, 4, 4),
-    "small": (256, 8, 8),
-    "base": (512, 8, 12),
+    "tiny": (128, 4, 4),       # ~0.8–1M params (depends on vocab)
+    "small": (256, 8, 8),      # a few million
+    "base": (512, 8, 12),      # tens of millions
+    "medium": (768, 12, 16),   # larger experimental size
 }
 
 
