@@ -154,7 +154,8 @@ def download_redpajama(
                 break
 
             processed_shards += 1
-            url = f"{REDPAJAMA_BASE_URL}/documents/{shard_id}.json.gz"
+            shard_path = shard_id if shard_id.endswith(".json.gz") else f"{shard_id}.json.gz"
+            url = f"{REDPAJAMA_BASE_URL}/documents/{shard_path}"
             try:
                 texts = _extract_texts(_download(url))
             except Exception as exc:
