@@ -1,4 +1,29 @@
-from catai.tokenizer import BPETokenizer, EOS_TOKEN, UNK_TOKEN
+from catai.tokenizer import BPETokenizer, CharTokenizer, EOS_TOKEN, UNK_TOKEN, PRINTABLE_ASCII
+
+
+def test_char_fixed_vocab_can_spell_unseen_names():
+    """A name that never appeared in training text must still be encodable."""
+    tokenizer = CharTokenizer.from_text("the cat sat on the mat")
+    name = "BTDPE"
+    encoded = tokenizer.encode(name)
+    assert tokenizer.decode(encoded) == name
+    # Every character should be a real token, not UNK.
+    assert tokenizer.unk_token_id not in encoded
+
+
+def test_char_default_covers_printable_ascii():
+    tokenizer = CharTokenizer.default()
+    for ch in PRINTABLE_ASCII:
+        assert ch in tokenizer.vocabulary
+    assert tokenizer.vocabulary[-2:] == (UNK_TOKEN, EOS_TOKEN)
+
+
+def test_char_unknown_unicode_becomes_unk():
+    tokenizer = CharTokenizer.default()
+    encoded = tokenizer.encode("hello 🐈")
+    assert tokenizer.unk_token_id is not None
+    assert tokenizer.unk_token_id in encoded
+    assert tokenizer.decode(encoded).endswith("�")
 
 
 def test_bpe_round_trip():

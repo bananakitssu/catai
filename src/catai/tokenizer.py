@@ -9,10 +9,35 @@ from dataclasses import dataclass
 EOS_TOKEN = "<EOS>"
 UNK_TOKEN = "<UNK>"
 
+# Fixed base vocabulary so the model can compose any string from known
+# characters even if the full word never appeared in the training corpus.
+# This is the key property that makes character-level useful for inventing
+# names, codes, etc.
+PRINTABLE_ASCII = (
+    "\t\n\r"
+    + " !\"#$%&'()*+,-./0123456789:;<=>?@"
+    + "ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`"
+    + "abcdefghijklmnopqrstuvwxyz{|}~"
+)
+
+
+def _fixed_char_vocabulary(extra: str = "") -> tuple[str, ...]:
+    """Build a stable character vocabulary from printable ASCII + extras."""
+    chars = set(PRINTABLE_ASCII)
+    chars.update(extra)
+    # Keep a deterministic order: printable ASCII first, then any extras, then specials.
+    ordered = [c for c in PRINTABLE_ASCII if c in chars]
+    extras = sorted(c for c in chars if c not in PRINTABLE_ASCII)
+    return tuple(ordered + extras + [UNK_TOKEN, EOS_TOKEN])
+
 
 @dataclass(frozen=True)
 class CharTokenizer:
-    """Maps characters plus special tokens to integer token IDs."""
+    """Maps characters plus special tokens to integer token IDs.
+
+    Prefer the fixed printable-ASCII vocabulary so the model can always
+    spell arbitrary names/codes from known characters.
+    """
 
     vocabulary: tuple[str, ...]
 
@@ -59,9 +84,20 @@ class CharTokenizer:
 
     @classmethod
     def from_text(cls, text: str) -> "CharTokenizer":
+        """Build a tokenizer that always includes printable ASCII.
+
+        Any additional characters present in *text* are also kept so the
+        vocabulary is never smaller than the fixed base. This preserves the
+        ability to invent unseen names while still covering the training data.
+        """
         if not text:
             raise ValueError("training text must not be empty")
-        return cls(tuple(sorted(set(text))) + (UNK_TOKEN, EOS_TOKEN))
+        return cls(_fixed_char_vocabulary(extra=text))
+
+    @classmethod
+    def default(cls) -> "CharTokenizer":
+        """Return a tokenizer with only the fixed printable-ASCII vocabulary."""
+        return cls(_fixed_char_vocabulary())
 
 
 @dataclass(frozen=True)
@@ -144,8 +180,9 @@ class BPETokenizer:
         if vocab_size < 3:
             raise ValueError("vocab_size must be at least 3")
 
+        # Start from the fixed printable set so the base symbols are complete.
         symbols = list(text)
-        base_vocabulary = set(symbols)
+        base_vocabulary = set(PRINTABLE_ASCII) | set(symbols)
         special_count = 2
         if len(base_vocabulary) + special_count >= vocab_size:
             vocabulary = tuple(sorted(base_vocabulary)) + (UNK_TOKEN, EOS_TOKEN)

@@ -27,7 +27,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--learning-rate", type=float, default=3e-4)
     parser.add_argument("--grad-clip", type=float, default=1.0)
-    parser.add_argument("--sequence-length", type=int, default=32)
+    # Raised from 32 → 256. Character-level models need more room to form words.
+    parser.add_argument("--sequence-length", type=int, default=256)
     parser.add_argument("--d-model", type=int, default=128)
     parser.add_argument("--heads", type=int, default=4)
     parser.add_argument("--layers", type=int, default=4)
