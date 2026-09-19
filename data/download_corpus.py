@@ -64,7 +64,9 @@ def _extract_texts(payload: bytes) -> tuple[list[str], int]:
         if not isinstance(record, dict):
             continue
 
-        text = record.get("text")
+        # RedPajama-V2 document records store the training text in
+        # ``raw_content`` (not ``text``).
+        text = record.get("raw_content")
         if isinstance(text, str) and text.strip():
             texts.append(text)
 
