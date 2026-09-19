@@ -52,7 +52,10 @@ def _extract_texts(payload: bytes) -> tuple[list[str], int]:
     texts: list[str] = []
     invalid_records = 0
 
-    for line_number, line in enumerate(raw.splitlines(), start=1):
+    # JSONL records are delimited by actual newline characters. Do not use
+    # ``splitlines()`` here because it also splits on Unicode separators that
+    # may legitimately occur inside ``raw_content``.
+    for line in raw.split("\n"):
         if not line.strip():
             continue
         try:
