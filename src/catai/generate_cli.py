@@ -19,9 +19,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--checkpoint", required=True, help="Path to a CatAI checkpoint.")
     parser.add_argument("--prompt", required=True, help="Text prompt to continue.")
     parser.add_argument("--max-new-tokens", type=int, default=50)
-    parser.add_argument("--temperature", type=float, default=1.0)
-    parser.add_argument("--top-k", type=int, default=None)
-    parser.add_argument("--repetition-penalty", type=float, default=1.1)
+    # More sensible defaults for a small / partially-trained model.
+    parser.add_argument("--temperature", type=float, default=0.8)
+    parser.add_argument("--top-k", type=int, default=40)
+    parser.add_argument("--repetition-penalty", type=float, default=1.05)
     parser.add_argument("--no-repeat-ngram-size", type=int, default=3)
     parser.add_argument("--device", default=None)
     return parser
