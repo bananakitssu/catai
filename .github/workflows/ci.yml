@@ -36,8 +36,21 @@ jobs:
           cache-dependency-path: pyproject.toml
       - name: Install CatAI
         run: python -m pip install -e .
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-redpajama-v2-100m-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 100000000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-redpajama-v2-100m-${{ hashFiles('data/download_corpus.py') }}
       - name: Train model
         run: |
           python -m catai \

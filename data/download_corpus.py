@@ -12,6 +12,7 @@ import argparse
 import gzip
 import json
 import random
+import time
 from pathlib import Path
 from urllib.request import Request, urlopen
 
@@ -58,6 +59,34 @@ def _extract_text(payload: bytes) -> str:
     raise ValueError("RedPajama document did not contain a string 'text' field")
 
 
+def _print_progress(
+    characters: int,
+    target_chars: int,
+    documents: int,
+    processed_documents: int,
+    total_documents: int,
+    started_at: float,
+    width: int = 28,
+) -> None:
+    """Print a CI-friendly progress bar on its own log line."""
+    ratio = min(characters / target_chars, 1.0)
+    filled = int(ratio * width)
+    bar = "=" * filled + "-" * (width - filled)
+    elapsed = max(time.monotonic() - started_at, 1e-9)
+    rate = characters / elapsed
+    remaining = max(target_chars - characters, 0)
+    eta = remaining / rate if rate > 0 else None
+    eta_text = f"{eta:.0f}s" if eta is not None else "n/a"
+
+    print(
+        f"[{bar}] {ratio * 100:6.2f}% | "
+        f"{characters:,}/{target_chars:,} chars | "
+        f"{documents:,} docs used | "
+        f"{processed_documents:,}/{total_documents:,} docs scanned | "
+        f"{rate / 1_000_000:.2f}M chars/s | ETA {eta_text}"
+    )
+
+
 def download_redpajama(
     output: Path,
     target_chars: int,
@@ -93,15 +122,24 @@ def download_redpajama(
 
     characters = 0
     documents = 0
+    processed_documents = 0
     failures = 0
+    started_at = time.monotonic()
+
+    print(
+        f"Starting corpus download: target={target_chars:,} characters, "
+        f"documents={len(document_ids):,}, "
+        f"max-documents={max_documents or '∞'}"
+    )
 
     with output.open("w", encoding="utf-8") as destination:
         for document_id in document_ids:
             if characters >= target_chars:
                 break
-            if max_documents is not None and documents >= max_documents:
+            if max_documents is not None and processed_documents >= max_documents:
                 break
 
+            processed_documents += 1
             url = f"{REDPAJAMA_BASE_URL}/documents/{document_id}.json.gz"
             try:
                 text = _extract_text(_download(url))
@@ -109,10 +147,26 @@ def download_redpajama(
                 failures += 1
                 if failures <= 10:
                     print(f"Skipping document {document_id}: {exc}")
+                _print_progress(
+                    characters,
+                    target_chars,
+                    documents,
+                    processed_documents,
+                    len(document_ids),
+                    started_at,
+                )
                 continue
 
             text = text.strip()
             if not text:
+                _print_progress(
+                    characters,
+                    target_chars,
+                    documents,
+                    processed_documents,
+                    len(document_ids),
+                    started_at,
+                )
                 continue
 
             remaining = target_chars - characters
@@ -121,9 +175,13 @@ def download_redpajama(
             characters += min(len(text), remaining)
             documents += 1
 
-            print(
-                f"Collected {characters:,}/{target_chars:,} characters "
-                f"from {documents:,}/{max_documents or '∞'} documents"
+            _print_progress(
+                characters,
+                target_chars,
+                documents,
+                processed_documents,
+                len(document_ids),
+                started_at,
             )
 
     if characters == 0:
