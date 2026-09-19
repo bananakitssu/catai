@@ -2,7 +2,7 @@
 """Download a configurable slice of RedPajama-V2 for CatAI experiments.
 
 RedPajama-V2 is much larger than Tiny Shakespeare. This downloader deliberately
-fetches only enough documents to reach ``--target-chars`` instead of attempting
+fetches only enough documents to reach --target-chars instead of attempting
 to download the multi-terabyte dataset.
 """
 
@@ -46,25 +46,37 @@ def download_tiny_shakespeare(output: Path) -> None:
     print(f"Downloaded {len(text):,} characters to {output}")
 
 
-def _extract_text(payload: bytes) -> str:
-    """Extract document text from a RedPajama-V2 gzip-compressed JSON file."""
+def _extract_texts(payload: bytes) -> list[str]:
+    """Extract text fields from every JSONL record in a RedPajama shard."""
     raw = gzip.decompress(payload).decode("utf-8")
-    record = json.loads(raw)
+    texts: list[str] = []
 
-    if isinstance(record, dict):
+    for line_number, line in enumerate(raw.splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                f"invalid JSONL at line {line_number}: {exc}"
+            ) from exc
+
+        if not isinstance(record, dict):
+            continue
+
         text = record.get("text")
-        if isinstance(text, str):
-            return text
+        if isinstance(text, str) and text.strip():
+            texts.append(text)
 
-    raise ValueError("RedPajama document did not contain a string 'text' field")
+    return texts
 
 
 def _print_progress(
     characters: int,
     target_chars: int,
     documents: int,
-    processed_documents: int,
-    total_documents: int,
+    processed_shards: int,
+    total_shards: int,
     started_at: float,
     width: int = 28,
 ) -> None:
@@ -82,7 +94,7 @@ def _print_progress(
         f"[{bar}] {ratio * 100:6.2f}% | "
         f"{characters:,}/{target_chars:,} chars | "
         f"{documents:,} docs used | "
-        f"{processed_documents:,}/{total_documents:,} docs scanned | "
+        f"{processed_shards:,}/{total_shards:,} shards | "
         f"{rate / 1_000_000:.2f}M chars/s | ETA {eta_text}"
     )
 
@@ -98,12 +110,14 @@ def download_redpajama(
 ) -> None:
     """Download RedPajama-V2 documents until the target size is reached.
 
-    RedPajama publishes listings containing document IDs. Individual compressed
-    documents are fetched only until enough text has been collected, so this
-    does not attempt to download an entire ~1 TB snapshot.
+    RedPajama publishes listings containing shard IDs. Each compressed shard
+    contains many JSONL document records, so a shard is fetched and its records
+    are consumed until the character/document target is reached.
     """
     if target_chars <= 0:
         raise ValueError("--target-chars must be greater than zero")
+    if max_documents is not None and max_documents <= 0:
+        raise ValueError("--max-documents must be greater than zero")
 
     output.parent.mkdir(parents=True, exist_ok=True)
 
@@ -112,75 +126,74 @@ def download_redpajama(
     print(f"Fetching RedPajama-V2 listing: {listings_url}")
 
     listing = _download(listings_url).decode("utf-8")
-    document_ids = [line.strip() for line in listing.splitlines() if line.strip()]
-    if not document_ids:
+    shard_ids = [line.strip() for line in listing.splitlines() if line.strip()]
+    if not shard_ids:
         raise RuntimeError("RedPajama listing was empty")
 
     # Deterministic sampling gives different parts of the huge listing while
     # keeping CI runs reproducible.
-    random.Random(seed).shuffle(document_ids)
+    random.Random(seed).shuffle(shard_ids)
 
     characters = 0
     documents = 0
-    processed_documents = 0
+    processed_shards = 0
     failures = 0
     started_at = time.monotonic()
 
     print(
         f"Starting corpus download: target={target_chars:,} characters, "
-        f"documents={len(document_ids):,}, "
+        f"shards={len(shard_ids):,}, "
         f"max-documents={max_documents or '∞'}"
     )
 
     with output.open("w", encoding="utf-8") as destination:
-        for document_id in document_ids:
+        for shard_id in shard_ids:
             if characters >= target_chars:
                 break
-            if max_documents is not None and processed_documents >= max_documents:
+            if max_documents is not None and documents >= max_documents:
                 break
 
-            processed_documents += 1
-            url = f"{REDPAJAMA_BASE_URL}/documents/{document_id}.json.gz"
+            processed_shards += 1
+            url = f"{REDPAJAMA_BASE_URL}/documents/{shard_id}.json.gz"
             try:
-                text = _extract_text(_download(url))
-            except Exception as exc:  # Keep one bad web document from killing a run.
+                texts = _extract_texts(_download(url))
+            except Exception as exc:
                 failures += 1
                 if failures <= 10:
-                    print(f"Skipping document {document_id}: {exc}")
+                    print(f"Skipping shard {shard_id}: {exc}")
                 _print_progress(
                     characters,
                     target_chars,
                     documents,
-                    processed_documents,
-                    len(document_ids),
+                    processed_shards,
+                    len(shard_ids),
                     started_at,
                 )
                 continue
 
-            text = text.strip()
-            if not text:
-                _print_progress(
-                    characters,
-                    target_chars,
-                    documents,
-                    processed_documents,
-                    len(document_ids),
-                    started_at,
-                )
-                continue
+            for text in texts:
+                if characters >= target_chars:
+                    break
+                if max_documents is not None and documents >= max_documents:
+                    break
 
-            remaining = target_chars - characters
-            destination.write(text[:remaining])
-            destination.write("\n\n")
-            characters += min(len(text), remaining)
-            documents += 1
+                text = text.strip()
+                if not text:
+                    continue
+
+                remaining = target_chars - characters
+                chunk = text[:remaining]
+                destination.write(chunk)
+                destination.write("\n\n")
+                characters += len(chunk)
+                documents += 1
 
             _print_progress(
                 characters,
                 target_chars,
                 documents,
-                processed_documents,
-                len(document_ids),
+                processed_shards,
+                len(shard_ids),
                 started_at,
             )
 
@@ -189,7 +202,7 @@ def download_redpajama(
 
     print(
         f"Downloaded {characters:,} characters from RedPajama-V2 "
-        f"({documents:,} documents, {failures:,} skipped) to {output}"
+        f"({documents:,} documents, {failures:,} skipped shards) to {output}"
     )
 
 
@@ -219,7 +232,7 @@ def main() -> None:
         "--max-documents",
         type=int,
         default=REDPAJAMA_DEFAULT_MAX_DOCUMENTS,
-        help="Maximum number of documents to download (default: 20)",
+        help="Maximum number of documents to use (default: 20)",
     )
     parser.add_argument("--seed", type=int, default=1337)
     args = parser.parse_args()
