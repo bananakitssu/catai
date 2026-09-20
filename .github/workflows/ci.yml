@@ -52,17 +52,17 @@ jobs:
         with:
           path: data/corpus.txt
           key: catai-corpus-redpajama-v2-100m-${{ hashFiles('data/download_corpus.py') }}
-      - name: Train model
+      - name: Train base model
         run: |
           python -m catai \
             --corpus data/corpus.txt \
             --checkpoint catai.pt \
             --epochs 1 \
-            --batch-size 32 \
-            --sequence-length 64 \
-            --d-model 32 \
-            --heads 4 \
-            --layers 2 \
+            --batch-size 16 \
+            --sequence-length 256 \
+            --model-size base \
+            --max-tokens 10000000 \
+            --validation-split 0.05 \
             --device cpu
       - name: Generate text
         run: |

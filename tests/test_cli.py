@@ -15,6 +15,12 @@ def test_parser_accepts_training_options():
             "--d-model", "32",
             "--heads", "2",
             "--layers", "1",
+            "--model-size", "base",
+            "--tokenizer", "char",
+            "--vocab-size", "128",
+            "--max-tokens", "1000",
+            "--validation-split", "0.05",
+            "--patience", "2",
             "--device", "cpu",
             "--window-stride", "8",
         ]
@@ -29,7 +35,14 @@ def test_parser_accepts_training_options():
     assert args.d_model == 32
     assert args.heads == 2
     assert args.layers == 1
+    assert args.model_size == "base"
+    assert args.tokenizer == "char"
+    assert args.vocab_size == 128
+    assert args.max_tokens == 1000
+    assert args.validation_split == 0.05
+    assert args.patience == 2
     assert args.device == "cpu"
+    assert args.window_stride == 8
 
 
 def test_parser_requires_corpus():
@@ -53,6 +66,12 @@ def test_parser_defaults_are_stable():
     assert args.d_model == 128
     assert args.heads == 4
     assert args.layers == 4
+    assert args.model_size == "tiny"
+    assert args.tokenizer == "char"
+    assert args.vocab_size == 256
+    assert args.max_tokens is None
+    assert args.validation_split == 0.0
+    assert args.patience is None
     assert args.device is None
     assert args.window_stride is None
 
