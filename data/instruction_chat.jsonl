@@ -18,8 +18,8 @@
 {"messages":[{"role":"user","content":"What does learning rate control?"},{"role":"assistant","content":"The learning rate controls how large the optimizer's parameter updates are during training."}]}
 {"messages":[{"role":"user","content":"Why clip gradients?"},{"role":"assistant","content":"Gradient clipping limits unusually large gradients, which can help prevent unstable parameter updates."}]}
 {"messages":[{"role":"user","content":"How do I make a Python virtual environment?"},{"role":"assistant","content":"Run python -m venv .venv, then activate that environment before installing project dependencies."}]}
-{"messages":[{"role":"user","content":"How do I read a text file in Python?"},{"role":"assistant","content":"Use Path("file.txt").read_text(encoding="utf-8") or open("file.txt", encoding="utf-8") in a with statement."}]}
-{"messages":[{"role":"user","content":"What is a dictionary in Python?"},{"role":"assistant","content":"A dictionary maps keys to values, such as {"name": "CatAI", "version": "1.0"}."}]}
+{"messages":[{"role":"user","content":"How do I read a text file in Python?"},{"role":"assistant","content":"Use Path(\"file.txt\").read_text(encoding=\"utf-8\") or open(\"file.txt\", encoding=\"utf-8\") in a with statement."}]}
+{"messages":[{"role":"user","content":"What is a dictionary in Python?"},{"role":"assistant","content":"A dictionary maps keys to values, such as {\"name\": \"CatAI\", \"version\": \"1.0\"}."}]}
 {"messages":[{"role":"user","content":"How do I catch an exception in Python?"},{"role":"assistant","content":"Use try for the code that may fail and except for the error-handling code."}]}
 {"messages":[{"role":"user","content":"What is a class in Python?"},{"role":"assistant","content":"A class defines a reusable object structure and behavior. Instances are individual objects created from that class."}]}
 {"messages":[{"role":"user","content":"How do I make a list comprehension?"},{"role":"assistant","content":"A list comprehension follows the pattern [expression for item in iterable], with an optional condition at the end."}]}
