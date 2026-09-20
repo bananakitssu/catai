@@ -87,8 +87,9 @@ class ChatSupervisedDataset(Dataset[dict[str, torch.Tensor]]):
         for messages in examples:
             token_ids, train_mask = chat_token_stream(messages, tokenizer)
             target_length = sequence_length + 1
-            token_ids = token_ids[:target_length]
-            train_mask = train_mask[:target_length]
+            if len(token_ids) > target_length:
+                token_ids = token_ids[-target_length:]
+                train_mask = train_mask[-target_length:]
 
             if len(token_ids) < target_length:
                 padding = target_length - len(token_ids)
