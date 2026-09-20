@@ -94,3 +94,20 @@ def test_sft_train_step_updates_parameters():
         not torch.equal(old, new)
         for old, new in zip(before, model.parameters())
     )
+
+
+def test_chat_dataset_preserves_assistant_targets_when_truncated():
+    tokenizer = CharTokenizer.default()
+    dataset = ChatSupervisedDataset(
+        [
+            [
+                {"role": "user", "content": "hello"},
+                {"role": "assistant", "content": "hi"},
+            ]
+        ],
+        tokenizer,
+        sequence_length=12,
+    )
+
+    sample = dataset[0]
+    assert torch.any(sample["labels"] != IGNORE_INDEX)
