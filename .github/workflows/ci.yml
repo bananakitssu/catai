@@ -27,7 +27,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     needs: test
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -54,24 +54,7 @@ jobs:
           key: catai-corpus-redpajama-v2-100m-${{ hashFiles('data/download_corpus.py') }}
       - name: Train base model
         run: |
-          python -m catai \
-            --corpus data/corpus.txt \
-            --checkpoint catai.pt \
-            --epochs 1 \
-            --batch-size 16 \
-            --sequence-length 256 \
-            --model-size base \
-            --max-tokens 10000000 \
-            --validation-split 0.05 \
-            --device cpu
+          python -m catai             --corpus data/corpus.txt             --checkpoint catai.pt             --epochs 1             --batch-size 16             --sequence-length 256             --model-size base             --max-tokens 10000000             --validation-split 0.05             --device cpu
       - name: Generate text
         run: |
-          python -m catai.generate_cli \
-            --checkpoint catai.pt \
-            --prompt "The cat" \
-            --max-new-tokens 200 \
-            --temperature 0.7 \
-            --top-k 40 \
-            --repetition-penalty 1.1 \
-            --no-repeat-ngram-size 3 \
-            --device cpu
+          python -m catai.generate_cli             --checkpoint catai.pt             --prompt "The cat"             --max-new-tokens 200             --temperature 0.7             --top-k 40             --repetition-penalty 1.1             --no-repeat-ngram-size 3             --device cpu
