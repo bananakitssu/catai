@@ -42,10 +42,10 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-redpajama-v2-50docs-100m-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-redpajama-v2-100m-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
-        run: python data/download_corpus.py --output data/corpus.txt --target-chars 100000000 --max-documents 50
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 100000000
       - name: Save corpus cache
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
