@@ -51,7 +51,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-redpajama-v2-100m-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-redpajama-v2-50docs-100m-${{ hashFiles('data/download_corpus.py') }}
       - name: Train base model
         run: |
           python -m catai \
