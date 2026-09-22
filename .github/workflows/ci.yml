@@ -27,8 +27,28 @@ jobs:
           cache-dependency-path: pyproject.toml
       - name: Install test dependencies
         run: python -m pip install --upgrade pip pytest
+      - name: Disk usage before CatAI install
+        run: |
+          echo "=== Filesystem ==="
+          df -h /
+          echo
+          echo "=== Relevant directories ==="
+          du -sh "$HOME" "$GITHUB_WORKSPACE" "$RUNNER_TOOL_CACHE" "$RUNNER_TEMP" 2>/dev/null || true
+          echo
+          echo "=== pip cache ==="
+          du -sh "$HOME/.cache/pip" 2>/dev/null || true
       - name: Install CatAI
         run: python -m pip install -e .
+      - name: Disk usage after CatAI install
+        run: |
+          echo "=== Filesystem ==="
+          df -h /
+          echo
+          echo "=== Relevant directories ==="
+          du -sh "$HOME" "$GITHUB_WORKSPACE" "$RUNNER_TOOL_CACHE" "$RUNNER_TEMP" 2>/dev/null || true
+          echo
+          echo "=== pip cache ==="
+          du -sh "$HOME/.cache/pip" 2>/dev/null || true
       - name: Run tests
         run: python -m pytest -q
 
@@ -44,8 +64,28 @@ jobs:
           python-version: "3.12"
           cache: "pip"
           cache-dependency-path: pyproject.toml
+      - name: Disk usage before CatAI install
+        run: |
+          echo "=== Filesystem ==="
+          df -h /
+          echo
+          echo "=== Relevant directories ==="
+          du -sh "$HOME" "$GITHUB_WORKSPACE" "$RUNNER_TOOL_CACHE" "$RUNNER_TEMP" 2>/dev/null || true
+          echo
+          echo "=== pip cache ==="
+          du -sh "$HOME/.cache/pip" 2>/dev/null || true
       - name: Install CatAI
         run: python -m pip install -e .
+      - name: Disk usage after CatAI install
+        run: |
+          echo "=== Filesystem ==="
+          df -h /
+          echo
+          echo "=== Relevant directories ==="
+          du -sh "$HOME" "$GITHUB_WORKSPACE" "$RUNNER_TOOL_CACHE" "$RUNNER_TEMP" 2>/dev/null || true
+          echo
+          echo "=== pip cache ==="
+          du -sh "$HOME/.cache/pip" 2>/dev/null || true
 
       - name: Restore corpus cache
         id: corpus-cache
