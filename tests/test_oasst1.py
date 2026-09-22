@@ -1,11 +1,72 @@
 from __future__ import annotations
 
 import gzip
+import io
 import json
 import urllib.error
 import urllib.request
 
 from catai.oasst1 import PERSONALITY_SYSTEM_PROMPT, convert_dataset, download_dataset
+
+
+class MemoryPath:
+    def __init__(self, name: str = "output"):
+        self.name = name
+        self.data: bytes | None = None
+        self.parent = self
+
+    def mkdir(self, parents: bool = False, exist_ok: bool = False) -> None:
+        return None
+
+    def with_name(self, name: str) -> "MemoryPath":
+        return self._partial if name.endswith(".part") else self
+
+    def open(self, mode: str):
+        assert mode == "wb"
+        return _MemoryWriter(self)
+
+    def replace(self, target: "MemoryPath") -> None:
+        target.data = self.data
+        self.data = None
+
+    def unlink(self) -> None:
+        self.data = None
+
+    def exists(self) -> bool:
+        return self.data is not None
+
+    def read_bytes(self) -> bytes:
+        assert self.data is not None
+        return self.data
+
+
+class _MemoryWriter:
+    def __init__(self, path: MemoryPath):
+        self.path = path
+        self.buffer = io.BytesIO()
+
+    def __enter__(self) -> "_MemoryWriter":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> bool:
+        if exc_type is None:
+            self.path.data = self.buffer.getvalue()
+        return False
+
+    def write(self, data: bytes) -> int:
+        return self.buffer.write(data)
+
+
+def _memory_output() -> MemoryPath:
+    output = MemoryPath("oasst1_ready.trees.jsonl.gz")
+    output._partial = MemoryPath(output.name + ".part")
+    return output
+
+
+def _attach_partial(output: MemoryPath) -> MemoryPath:
+    output._partial = MemoryPath(output.name + ".part")
+    output.with_name = lambda name: output._partial if name.endswith(".part") else output
+    return output
 
 
 def test_convert_oasst1_tree_to_catai_jsonl(tmp_path):
@@ -100,8 +161,8 @@ def test_convert_oasst1_filters_non_english_paths(tmp_path):
     assert output.read_text(encoding="utf-8") == ""
 
 
-def test_download_dataset_retries_http_429_and_honors_retry_after(tmp_path, monkeypatch):
-    output = tmp_path / "oasst1_ready.trees.jsonl.gz"
+def test_download_dataset_retries_http_429_and_honors_retry_after(monkeypatch):
+    output = _attach_partial(MemoryPath())
     calls = 0
     sleeps: list[float] = []
 
@@ -138,11 +199,11 @@ def test_download_dataset_retries_http_429_and_honors_retry_after(tmp_path, monk
     assert calls == 3
     assert sleeps == [2.0, 2.0]
     assert output.read_bytes() == b"oasst1"
-    assert not output.with_name(output.name + ".part").exists()
+    assert not output._partial.exists()
 
 
-def test_download_dataset_does_not_retry_non_retryable_http_error(tmp_path, monkeypatch):
-    output = tmp_path / "oasst1_ready.trees.jsonl.gz"
+def test_download_dataset_does_not_retry_non_retryable_http_error(monkeypatch):
+    output = _attach_partial(MemoryPath())
     calls = 0
 
     def fake_urlopen(request, timeout):
@@ -167,4 +228,4 @@ def test_download_dataset_does_not_retry_non_retryable_http_error(tmp_path, monk
 
     assert calls == 1
     assert not output.exists()
-    assert not output.with_name(output.name + ".part").exists()
+    assert not output._partial.exists()
