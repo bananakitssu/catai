@@ -81,13 +81,17 @@ jobs:
         run: |
           python data/download_oasst1.py             --source data/oasst1_ready.trees.jsonl.gz             --output data/oasst1_chat.jsonl             --max-examples "${{ inputs.chat_examples || '5000' }}"             --keep-source
 
+      - name: Merge CatAI personality examples
+        run: cat data/instruction_chat.jsonl data/oasst1_chat.jsonl > data/chat_sft.jsonl
+
       - name: Validate chat dataset
         run: |
           python - <<'PY'
           from catai.chat_dataset import load_chat_dataset
-          examples = load_chat_dataset("data/oasst1_chat.jsonl")
+          examples = load_chat_dataset("data/chat_sft.jsonl")
           print(f"validated {len(examples):,} chat examples")
           print(f"first message roles: {[message['role'] for message in examples[0]]}")
+          print(f"last message roles: {[message['role'] for message in examples[-1]]}")
           PY
 
       - name: Save OASST1 source cache
@@ -99,7 +103,7 @@ jobs:
 
       - name: Supervised fine-tuning (SFT)
         run: |
-          python -m catai.sft_cli             --base-checkpoint catai.pt             --dataset data/oasst1_chat.jsonl             --checkpoint catai-sft.pt             --epochs "${{ inputs.sft_epochs || '1' }}"             --batch-size 16             --learning-rate 1e-5             --grad-clip 1.0             --validation-split 0.05             --patience 2             --sequence-length 256             --seed 42             --device cpu
+          python -m catai.sft_cli             --base-checkpoint catai.pt             --dataset data/chat_sft.jsonl             --checkpoint catai-sft.pt             --epochs "${{ inputs.sft_epochs || '1' }}"             --batch-size 16             --learning-rate 1e-5             --grad-clip 1.0             --validation-split 0.05             --patience 2             --sequence-length 256             --seed 42             --device cpu
 
       - name: Generate chat response
         run: |
