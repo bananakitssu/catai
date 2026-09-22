@@ -38,3 +38,26 @@ python -m catai.generate_cli --checkpoint catai.pt --prompt "The cat"
 ```
 
 For better quality, prefer real text (e.g. RedPajama / books / code) over pure synthetic templates, and train longer with a validation split.
+
+## OASST1 chat dataset
+
+CatAI's supervised fine-tuning loader already accepts chat JSONL with a `messages`
+array. The OASST1 converter downloads the ready-for-export conversation trees,
+keeps English paths by default, maps OASST1's `prompter` role to CatAI's
+`user` role, and adds CatAI's personality system message to every example.
+
+Generate the dataset with:
+
+```bash
+python data/download_oasst1.py --output data/oasst1_chat.jsonl
+```
+
+For a smaller experiment:
+
+```bash
+python data/download_oasst1.py --max-trees 100 --max-examples 1000
+```
+
+The generated dataset and downloaded source archive are ignored by Git. The
+OASST1 ready export contains 10,364 trees and 88,838 messages and is licensed
+under Apache-2.0.
