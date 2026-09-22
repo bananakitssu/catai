@@ -1,3 +1,4 @@
 # Generated OASST1 data (downloaded/expanded locally, not source-controlled)
 data/oasst1_ready.trees.jsonl.gz
 data/oasst1_chat.jsonl
+data/chat_sft.jsonl
