@@ -5,6 +5,15 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      chat_examples:
+        description: "Maximum OASST1 chat examples for SFT"
+        required: false
+        default: "5000"
+      sft_epochs:
+        description: "SFT epochs"
+        required: false
+        default: "1"
 
 jobs:
   test:
@@ -37,6 +46,7 @@ jobs:
           cache-dependency-path: pyproject.toml
       - name: Install CatAI
         run: python -m pip install -e .
+
       - name: Restore corpus cache
         id: corpus-cache
         uses: actions/cache/restore@v4
@@ -52,26 +62,45 @@ jobs:
         with:
           path: data/corpus.txt
           key: catai-corpus-redpajama-v2-100m-${{ hashFiles('data/download_corpus.py') }}
+
       - name: Train base model
         run: |
-          python -m catai \
-            --corpus data/corpus.txt \
-            --checkpoint catai.pt \
-            --epochs 1 \
-            --batch-size 16 \
-            --sequence-length 256 \
-            --model-size base \
-            --max-tokens 10000000 \
-            --validation-split 0.05 \
-            --device cpu
-      - name: Generate text
+          python -m catai             --corpus data/corpus.txt             --checkpoint catai.pt             --epochs 1             --batch-size 16             --sequence-length 256             --model-size base             --max-tokens 10000000             --validation-split 0.05             --device cpu
+
+      - name: Generate base text
         run: |
-          python -m catai.generate_cli \
-            --checkpoint catai.pt \
-            --prompt "The cat" \
-            --max-new-tokens 200 \
-            --temperature 0.7 \
-            --top-k 40 \
-            --repetition-penalty 1.1 \
-            --no-repeat-ngram-size 3 \
-            --device cpu
+          python -m catai.generate_cli             --checkpoint catai.pt             --prompt "The cat"             --max-new-tokens 200             --temperature 0.7             --top-k 40             --repetition-penalty 1.1             --no-repeat-ngram-size 3             --device cpu
+
+      - name: Restore OASST1 source cache
+        id: oasst-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/oasst1_ready.trees.jsonl.gz
+          key: catai-oasst1-ready-v1
+      - name: Build OASST1 CatAI chat dataset
+        run: |
+          python data/download_oasst1.py             --source data/oasst1_ready.trees.jsonl.gz             --output data/oasst1_chat.jsonl             --max-examples "${{ inputs.chat_examples || '5000' }}"             --keep-source
+
+      - name: Validate chat dataset
+        run: |
+          python - <<'PY'
+          from catai.chat_dataset import load_chat_dataset
+          examples = load_chat_dataset("data/oasst1_chat.jsonl")
+          print(f"validated {len(examples):,} chat examples")
+          print(f"first message roles: {[message['role'] for message in examples[0]]}")
+          PY
+
+      - name: Save OASST1 source cache
+        if: steps.oasst-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/oasst1_ready.trees.jsonl.gz
+          key: catai-oasst1-ready-v1
+
+      - name: Supervised fine-tuning (SFT)
+        run: |
+          python -m catai.sft_cli             --base-checkpoint catai.pt             --dataset data/oasst1_chat.jsonl             --checkpoint catai-sft.pt             --epochs "${{ inputs.sft_epochs || '1' }}"             --batch-size 16             --learning-rate 1e-5             --grad-clip 1.0             --validation-split 0.05             --patience 2             --sequence-length 256             --seed 42             --device cpu
+
+      - name: Generate chat response
+        run: |
+          python -m catai.generate_cli             --checkpoint catai-sft.pt             --prompt "<|system|>\\nYou are CatAI, a friendly cat-themed conversational AI. Be helpful, clear, concise, and playful when appropriate.\\n<|user|>\\nHello!\\n<|assistant|>\\n"             --max-new-tokens 160             --temperature 0.8             --top-k 40             --repetition-penalty 1.1             --no-repeat-ngram-size 3             --device cpu
