@@ -167,6 +167,9 @@ def test_download_dataset_retries_http_429_and_honors_retry_after(monkeypatch):
     sleeps: list[float] = []
 
     class Response:
+        def __init__(self):
+            self.read_once = False
+
         def __enter__(self):
             return self
 
@@ -174,6 +177,9 @@ def test_download_dataset_retries_http_429_and_honors_retry_after(monkeypatch):
             return False
 
         def read(self, _size):
+            if self.read_once:
+                return b""
+            self.read_once = True
             return b"oasst1"
 
     def fake_urlopen(request, timeout):
