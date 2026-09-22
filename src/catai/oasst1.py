@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import email.utils
 import gzip
 import json
+import socket
+import time
+import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
@@ -21,20 +26,108 @@ PERSONALITY_SYSTEM_PROMPT = (
     "them into every response. Be honest when uncertain and never invent facts."
 )
 
+DOWNLOAD_MAX_ATTEMPTS = 6
+DOWNLOAD_INITIAL_BACKOFF = 15.0
+DOWNLOAD_MAX_BACKOFF = 300.0
+RETRYABLE_HTTP_STATUS = frozenset({429, 500, 502, 503, 504})
+
+
+def _retry_after_seconds(error: urllib.error.HTTPError) -> float | None:
+    """Return a server-requested retry delay when Retry-After is present."""
+    value = error.headers.get("Retry-After")
+    if value is None:
+        return None
+
+    try:
+        return max(0.0, float(value))
+    except ValueError:
+        pass
+
+    try:
+        retry_at = email.utils.parsedate_to_datetime(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+    if retry_at.tzinfo is None:
+        retry_at = retry_at.replace(tzinfo=timezone.utc)
+
+    return max(0.0, (retry_at - datetime.now(timezone.utc)).total_seconds())
+
+
+def _download_retry_delay(
+    attempt: int, error: urllib.error.HTTPError | None = None
+) -> float:
+    """Choose a bounded retry delay, honoring Retry-After when available."""
+    if error is not None:
+        retry_after = _retry_after_seconds(error)
+        if retry_after is not None:
+            return min(retry_after, DOWNLOAD_MAX_BACKOFF)
+
+    return min(
+        DOWNLOAD_INITIAL_BACKOFF * (2 ** (attempt - 1)),
+        DOWNLOAD_MAX_BACKOFF,
+    )
+
+
+def _is_retryable_http_error(error: urllib.error.HTTPError) -> bool:
+    return error.code in RETRYABLE_HTTP_STATUS
+
 
 def download_dataset(url: str, output: Path) -> None:
-    """Download OASST1's ready-for-export conversation trees."""
+    """Download OASST1's ready-for-export conversation trees with retries."""
     output.parent.mkdir(parents=True, exist_ok=True)
+    partial = output.with_name(output.name + ".part")
+
     request = urllib.request.Request(
         url,
-        headers={"User-Agent": "CatAI-oasst1-converter/1.0"},
+        headers={"User-Agent": "CatAI-oasst1-converter/1.1"},
     )
-    with urllib.request.urlopen(request, timeout=120) as response, output.open("wb") as destination:
-        while True:
-            chunk = response.read(1024 * 1024)
-            if not chunk:
-                break
-            destination.write(chunk)
+
+    try:
+        for attempt in range(1, DOWNLOAD_MAX_ATTEMPTS + 1):
+            try:
+                with urllib.request.urlopen(request, timeout=120) as response, partial.open(
+                    "wb"
+                ) as destination:
+                    while True:
+                        chunk = response.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        destination.write(chunk)
+
+                partial.replace(output)
+                return
+
+            except urllib.error.HTTPError as error:
+                if not _is_retryable_http_error(error):
+                    raise
+                if attempt == DOWNLOAD_MAX_ATTEMPTS:
+                    raise
+
+                delay = _download_retry_delay(attempt, error)
+                print(
+                    f"OASST1 download hit HTTP {error.code}; "
+                    f"retrying in {delay:.0f}s "
+                    f"(attempt {attempt}/{DOWNLOAD_MAX_ATTEMPTS})..."
+                )
+                time.sleep(delay)
+
+            except (urllib.error.URLError, TimeoutError, socket.timeout):
+                if attempt == DOWNLOAD_MAX_ATTEMPTS:
+                    raise
+
+                delay = _download_retry_delay(attempt)
+                print(
+                    "OASST1 download failed due to a network error; "
+                    f"retrying in {delay:.0f}s "
+                    f"(attempt {attempt}/{DOWNLOAD_MAX_ATTEMPTS})..."
+                )
+                time.sleep(delay)
+    finally:
+        try:
+            partial.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def _role(role: object) -> str | None:
