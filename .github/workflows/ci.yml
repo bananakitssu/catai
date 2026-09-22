@@ -18,13 +18,13 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      PIP_NO_CACHE_DIR: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
-          cache-dependency-path: pyproject.toml
       - name: Install test dependencies
         run: python -m pip install --upgrade pip pytest
       - name: Disk usage before CatAI install
@@ -33,7 +33,7 @@ jobs:
           df -h /
           echo
           echo "=== Relevant directories ==="
-          du -sh "$HOME" "$GITHUB_WORKSPACE" "$RUNNER_TOOL_CACHE" "$RUNNER_TEMP" 2>/dev/null || true
+          du -sh "$HOME" "$GITHUB_WORKSPACE" "$RUNNER_TOOL_CACHE" "$RUNNER_TEMP" /tmp 2>/dev/null || true
           echo
           echo "=== pip cache ==="
           du -sh "$HOME/.cache/pip" 2>/dev/null || true
@@ -45,12 +45,37 @@ jobs:
           df -h /
           echo
           echo "=== Relevant directories ==="
-          du -sh "$HOME" "$GITHUB_WORKSPACE" "$RUNNER_TOOL_CACHE" "$RUNNER_TEMP" 2>/dev/null || true
+          du -sh "$HOME" "$GITHUB_WORKSPACE" "$RUNNER_TOOL_CACHE" "$RUNNER_TEMP" /tmp 2>/dev/null || true
           echo
           echo "=== pip cache ==="
           du -sh "$HOME/.cache/pip" 2>/dev/null || true
-      - name: Run tests
-        run: python -m pytest -q
+      - name: Run tests with disk monitor
+        shell: bash
+        run: |
+          set -o pipefail
+
+          python -m pytest -q &
+          test_pid=$!
+
+          (
+            while kill -0 "$test_pid" 2>/dev/null; do
+              echo
+              echo "=== Disk monitor $(date -u '+%Y-%m-%d %H:%M:%S UTC') ==="
+              df -h /
+              echo "--- selected directories ---"
+              du -sh /tmp "$HOME" "$GITHUB_WORKSPACE" "$RUNNER_TEMP" "$RUNNER_TOOL_CACHE" 2>/dev/null || true
+              sleep 30
+            done
+          ) &
+          monitor_pid=$!
+
+          wait "$test_pid"
+          test_status=$?
+
+          kill "$monitor_pid" 2>/dev/null || true
+          wait "$monitor_pid" 2>/dev/null || true
+
+          exit "$test_status"
 
   generate:
     if: github.event_name == 'workflow_dispatch'
