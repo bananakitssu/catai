@@ -181,4 +181,12 @@ jobs:
 
       - name: Generate chat response
         run: |
-          python -m catai.generate_cli             --checkpoint catai-sft.pt             --prompt "<|system|>\\nYou are CatAI, a friendly cat-themed conversational AI. Be helpful, clear, concise, and playful when appropriate.\\n<|user|>\\nHello!\\n<|assistant|>\\n"             --max-new-tokens 160             --temperature 0.8             --top-k 40             --repetition-penalty 1.1             --no-repeat-ngram-size 3             --device cpu
+          python -m catai.generate_cli \
+            --checkpoint catai-sft.pt \
+            --prompt <|system|>\\nYou are CatAI, a friendly cat-themed conversational AI. Be helpful, clear, concise, and playful when appropriate.\\n<|user|>\\nHello!\\n<|assistant|>\\n' \
+            --max-new-tokens 160 \
+            --temperature 0.8 \
+            --top-k 40 \
+            --repetition-penalty 1.1 \
+            --no-repeat-ngram-size 3 \
+            --device cpu
