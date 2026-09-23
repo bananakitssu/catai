@@ -211,6 +211,12 @@ def convert_path(path: tuple[dict[str, object], ...]) -> dict[str, list[dict[str
     if any(left == right for left, right in zip(roles, roles[1:])):
         return None
 
+    # SFT examples must represent a completed exchange. A path ending in a
+    # user message has no desired response for that final prompt, and long
+    # examples can otherwise have all assistant targets truncated out.
+    if roles[-1] != "assistant":
+        return None
+
     return {"messages": messages}
 
 
