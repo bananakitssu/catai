@@ -161,6 +161,44 @@ def test_convert_oasst1_filters_non_english_paths(tmp_path):
     assert output.read_text(encoding="utf-8") == ""
 
 
+def test_convert_oasst1_rejects_incomplete_user_ending_path(tmp_path):
+    source = tmp_path / "trees.jsonl.gz"
+    output = tmp_path / "chat.jsonl"
+
+    tree = {
+        "prompt": {
+            "text": "Hello",
+            "role": "prompter",
+            "lang": "en",
+            "replies": [
+                {
+                    "text": "Hi!",
+                    "role": "assistant",
+                    "lang": "en",
+                    "replies": [
+                        {
+                            "text": "Thanks!",
+                            "role": "prompter",
+                            "lang": "en",
+                            "replies": [],
+                        }
+                    ],
+                }
+            ],
+        }
+    }
+
+    with gzip.open(source, "wt", encoding="utf-8") as handle:
+        handle.write(json.dumps(tree) + "\n")
+
+    trees, examples = convert_dataset(
+        source, output, language="en", max_trees=None, max_examples=None
+    )
+
+    assert (trees, examples) == (1, 0)
+    assert output.read_text(encoding="utf-8") == ""
+
+
 def test_download_dataset_retries_http_429_and_honors_retry_after(monkeypatch):
     output = _attach_partial(MemoryPath())
     calls = 0
