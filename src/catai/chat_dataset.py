@@ -34,6 +34,8 @@ def validate_messages(messages: object) -> list[ChatMessage]:
 
     if not any(message["role"] == "assistant" for message in normalized):
         raise ValueError("chat example must contain an assistant message")
+    if normalized[-1]["role"] != "assistant":
+        raise ValueError("chat example must end with an assistant message")
     return normalized
 
 
