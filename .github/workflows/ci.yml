@@ -112,6 +112,45 @@ jobs:
           echo "=== pip cache ==="
           du -sh "$HOME/.cache/pip" 2>/dev/null || true
 
+      - name: Restore OASST1 source cache
+        id: oasst-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/oasst1_ready.trees.jsonl.gz
+          key: catai-oasst1-ready-v1
+      - name: Build OASST1 CatAI chat dataset
+        run: |
+          python data/download_oasst1.py             --source data/oasst1_ready.trees.jsonl.gz             --output data/oasst1_chat.jsonl             --max-examples "${{ inputs.chat_examples || '5000' }}"             --keep-source
+
+      - name: Merge CatAI personality examples
+        run: cat data/instruction_chat.jsonl data/oasst1_chat.jsonl > data/chat_sft.jsonl
+
+      - name: Validate chat dataset before base training
+        run: |
+          python - <<'PY'
+          from catai.chat_dataset import load_chat_dataset
+          from catai.sft import ChatSupervisedDataset
+          from catai.tokenizer import CharTokenizer
+
+          examples = load_chat_dataset("data/chat_sft.jsonl")
+          dataset = ChatSupervisedDataset(
+              examples,
+              CharTokenizer.default(),
+              sequence_length=256,
+          )
+          print(f"validated {len(examples):,} chat examples")
+          print(f"preflight constructed {len(dataset):,} SFT examples")
+          print(f"first message roles: {[message['role'] for message in examples[0]]}")
+          print(f"last message roles: {[message['role'] for message in examples[-1]]}")
+          PY
+
+      - name: Save OASST1 source cache
+        if: steps.oasst-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/oasst1_ready.trees.jsonl.gz
+          key: catai-oasst1-ready-v1
+
       - name: Restore corpus cache
         id: corpus-cache
         uses: actions/cache/restore@v4
@@ -135,36 +174,6 @@ jobs:
       - name: Generate base text
         run: |
           python -m catai.generate_cli             --checkpoint catai.pt             --prompt "The cat"             --max-new-tokens 200             --temperature 0.7             --top-k 40             --repetition-penalty 1.1             --no-repeat-ngram-size 3             --device cpu
-
-      - name: Restore OASST1 source cache
-        id: oasst-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: data/oasst1_ready.trees.jsonl.gz
-          key: catai-oasst1-ready-v1
-      - name: Build OASST1 CatAI chat dataset
-        run: |
-          python data/download_oasst1.py             --source data/oasst1_ready.trees.jsonl.gz             --output data/oasst1_chat.jsonl             --max-examples "${{ inputs.chat_examples || '5000' }}"             --keep-source
-
-      - name: Merge CatAI personality examples
-        run: cat data/instruction_chat.jsonl data/oasst1_chat.jsonl > data/chat_sft.jsonl
-
-      - name: Validate chat dataset
-        run: |
-          python - <<'PY'
-          from catai.chat_dataset import load_chat_dataset
-          examples = load_chat_dataset("data/chat_sft.jsonl")
-          print(f"validated {len(examples):,} chat examples")
-          print(f"first message roles: {[message['role'] for message in examples[0]]}")
-          print(f"last message roles: {[message['role'] for message in examples[-1]]}")
-          PY
-
-      - name: Save OASST1 source cache
-        if: steps.oasst-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: data/oasst1_ready.trees.jsonl.gz
-          key: catai-oasst1-ready-v1
 
       - name: Supervised fine-tuning (SFT)
         run: |
