@@ -24,6 +24,10 @@ def test_validate_messages_accepts_chat_roles():
         [{"role": "user", "content": "Hello"}],
         [{"role": "developer", "content": "Hello"}],
         [{"role": "assistant", "content": ""}],
+        [
+            {"role": "assistant", "content": "A response"},
+            {"role": "user", "content": "A follow-up without a response"},
+        ],
     ],
 )
 def test_validate_messages_rejects_invalid_examples(messages):
