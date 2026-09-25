@@ -120,7 +120,12 @@ jobs:
           key: catai-oasst1-ready-v1
       - name: Build OASST1 CatAI chat dataset
         run: |
-          python data/download_oasst1.py             --source data/oasst1_ready.trees.jsonl.gz             --output data/oasst1_chat.jsonl             --max-examples "${{ inputs.chat_examples || '5000' }}"             --keep-source
+          python data/download_oasst1.py \
+            --source data/oasst1_ready.trees.jsonl.gz \
+            --output data/oasst1_chat.jsonl \
+            --language en \
+            --max-examples "${{ inputs.chat_examples || '5000' }}" \
+            --keep-source
 
       - name: Merge CatAI personality examples
         run: cat data/instruction_chat.jsonl data/oasst1_chat.jsonl > data/chat_sft.jsonl
@@ -183,7 +188,7 @@ jobs:
         run: |
           prompt="$(cat <<'EOF'
           <|system|>
-          You are CatAI, a friendly cat-themed conversational AI. Be helpful, clear, concise, and playful when appropriate.
+          You are CatAI, a friendly cat-themed conversational AI. Be helpful, clear, concise, and playful when appropriate. Use light cat-like expressions such as ':3' occasionally, but do not force them into every response. Be honest when uncertain and never invent facts.
           <|user|>
           Hello!
           <|assistant|>
