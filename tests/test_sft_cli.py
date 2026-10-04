@@ -5,6 +5,7 @@ import json
 import torch
 
 from catai.checkpoint import load_checkpoint_metadata, save_checkpoint
+from catai.chat_dataset import DEFAULT_STATE
 from catai.model import CatAI
 from catai.sft_cli import main
 from catai.tokenizer import CharTokenizer
@@ -14,7 +15,7 @@ def test_sft_cli_fine_tunes_a_checkpoint(tmp_path):
     tokenizer = CharTokenizer.default()
     model = CatAI(
         vocab_size=tokenizer.vocab_size,
-        max_seq_len=32,
+        max_seq_len=1024,
         d_model=16,
         n_heads=4,
         n_layers=1,
@@ -29,7 +30,7 @@ def test_sft_cli_fine_tunes_a_checkpoint(tmp_path):
         step=0,
         metadata={
             "model": {
-                "max_seq_len": 32,
+                "max_seq_len": 1024,
                 "d_model": 16,
                 "n_heads": 4,
                 "n_layers": 1,
@@ -45,8 +46,8 @@ def test_sft_cli_fine_tunes_a_checkpoint(tmp_path):
     dataset.write_text(
         json.dumps(
             {
+                "state": DEFAULT_STATE,
                 "messages": [
-                    {"role": "system", "content": "You are CatAI. :3"},
                     {"role": "user", "content": "Hello"},
                     {"role": "assistant", "content": "Hiii! :3"},
                 ]
@@ -65,7 +66,7 @@ def test_sft_cli_fine_tunes_a_checkpoint(tmp_path):
             "--epochs", "1",
             "--batch-size", "1",
             "--learning-rate", "0.001",
-            "--sequence-length", "32",
+            "--sequence-length", "1024",
             "--device", "cpu",
         ]
     )
@@ -74,5 +75,6 @@ def test_sft_cli_fine_tunes_a_checkpoint(tmp_path):
     assert output.exists()
     metadata = load_checkpoint_metadata(output)
     assert metadata["stage"] == "sft"
+    assert metadata["model"]["max_seq_len"] == 1024
     assert metadata["training"]["examples"] == 1
     assert metadata["training"]["total_steps"] == 1
