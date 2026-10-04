@@ -182,7 +182,7 @@ jobs:
 
       - name: Supervised fine-tuning (SFT)
         run: |
-          python -m catai.sft_cli             --base-checkpoint catai.pt             --dataset data/chat_sft.jsonl             --checkpoint catai-sft.pt             --epochs "${{ inputs.sft_epochs || '2' }}"             --batch-size 16             --learning-rate 2e-5             --grad-clip 1.0             --validation-split 0.05             --patience 2             --sequence-length 1024             --seed 42             --device cpu
+          python -m catai.sft_cli             --base-checkpoint catai.pt             --dataset data/chat_sft.jsonl             --checkpoint catai-sft.pt             --epochs "${{ inputs.sft_epochs || '2' }}"             --batch-size 2             --learning-rate 2e-5             --grad-clip 1.0             --validation-split 0.05             --patience 2             --sequence-length 1024             --seed 42             --device cpu
 
       - name: Generate chat response
         run: |
