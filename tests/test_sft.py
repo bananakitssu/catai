@@ -1,5 +1,6 @@
 import torch
 
+from catai.chat_dataset import DEFAULT_STATE, state_system_message
 from catai.model import CatAI
 from catai.sft import (
     IGNORE_INDEX,
@@ -211,3 +212,24 @@ def test_chat_dataset_requires_state(tmp_path):
     import pytest
     with pytest.raises(ValueError, match="missing required state"):
         load_chat_dataset(path)
+
+
+def test_chat_dataset_preserves_state_system_prompt_when_truncated():
+    tokenizer = CharTokenizer.default()
+    messages = [
+        state_system_message(DEFAULT_STATE),
+        {"role": "user", "content": "Hello"},
+        {"role": "assistant", "content": "Hiii! :3"},
+    ]
+    dataset = ChatSupervisedDataset(
+        [messages],
+        tokenizer,
+        sequence_length=768,
+    )
+
+    sample = dataset[0]
+    expected_prefix = tokenizer.encode(
+        "<|system|>\n" + state_system_message(DEFAULT_STATE)["content"] + "\n"
+    )
+    assert sample["input_ids"][: len(expected_prefix)].tolist() == expected_prefix
+    assert torch.any(sample["labels"] != IGNORE_INDEX)
