@@ -186,13 +186,22 @@ jobs:
 
       - name: Generate chat response
         run: |
-          prompt="$(cat <<'EOF'
-          <|system|>
-          You are CatAI, a friendly cat-themed conversational AI. Be helpful, clear, concise, and playful when appropriate. Use light cat-like expressions such as ':3' occasionally, but do not force them into every response. Be honest when uncertain and never invent facts.
-          <|user|>
-          Hello!
-          <|assistant|>
-          EOF
+          prompt="$(python - <<'PY'
+          import json
+          from pathlib import Path
+
+          from catai.chat_dataset import state_system_message
+          from catai.sft import ROLE_HEADER
+
+          record = json.loads(Path("data/instruction_chat.jsonl").read_text(encoding="utf-8").splitlines()[0])
+          messages = [
+              state_system_message(record["state"]),
+              {"role": "user", "content": "Hello!"},
+          ]
+          for message in messages:
+              print(ROLE_HEADER.format(role=message["role"]) + message["content"] + "\\n", end="")
+          print(ROLE_HEADER.format(role="assistant"), end="")
+          PY
           )"
           python -m catai.generate_cli \
             --checkpoint catai-sft.pt \
