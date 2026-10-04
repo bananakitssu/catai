@@ -148,7 +148,8 @@ def test_chat_dataset_loads_and_validates_structured_state(tmp_path):
 
     examples = load_chat_dataset(path)
     assert examples[0][0]["role"] == "system"
-    assert examples[0][0]["content"].startswith("CatAI internal state:")
+    assert examples[0][0]["content"].startswith("You are CatAI, a friendly cat-themed conversational AI.")
+    assert "CatAI internal state:" in examples[0][0]["content"]
     assert '"happiness":0.7' in examples[0][0]["content"]
 
 
