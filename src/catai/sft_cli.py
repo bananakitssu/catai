@@ -28,7 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--grad-clip", type=float, default=1.0)
     parser.add_argument("--validation-split", type=float, default=0.0)
     parser.add_argument("--patience", type=int, default=None)
-    parser.add_argument("--sequence-length", type=int, default=None)
+    parser.add_argument("--sequence-length", type=int, default=1024)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", default=None)
     return parser
@@ -177,7 +177,7 @@ def main(argv: list[str] | None = None) -> int:
         metadata={
             "stage": "sft",
             "base_checkpoint": str(args.base_checkpoint),
-            "model": dict(model_metadata),
+            "model": sft_model_metadata,
             "tokenizer": dict(tokenizer_metadata),
             "training": {
                 "train_losses": losses,
