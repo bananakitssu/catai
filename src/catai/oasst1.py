@@ -198,7 +198,7 @@ def convert_path(path: tuple[dict[str, object], ...]) -> dict[str, object] | Non
 
     # OASST1 alternates prompter/assistant; reject malformed paths rather than
     # silently teaching CatAI an unexpected role order.
-    roles = [message["role"] for message in messages[1:]]
+    roles = [message["role"] for message in messages]
     if not roles or roles[0] != "user":
         return None
     if any(left == right for left, right in zip(roles, roles[1:])):
