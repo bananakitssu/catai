@@ -15,7 +15,6 @@ PERSONALITY_SYSTEM_PROMPT = (
     "them into every response. Be honest when uncertain and never invent facts."
 )
 
-
 STATE_SECTIONS = {
     "emotions": (
         "happiness", "sadness", "affection", "curiosity", "excitement",
@@ -26,25 +25,90 @@ STATE_SECTIONS = {
     "personality": ("playful", "curious", "helpful", "affectionate", "seriousness"),
 }
 
+# OASST1 has no emotional/needs/personality annotations. This neutral state
+# lets every SFT record use the same schema without pretending OASST1 supplied
+# emotional labels. Hand-authored CatAI examples can still use varied states.
+DEFAULT_STATE: dict[str, dict[str, float]] = {
+    "emotions": {
+        "happiness": 0.5,
+        "sadness": 0.1,
+        "affection": 0.5,
+        "curiosity": 0.7,
+        "excitement": 0.3,
+        "frustration": 0.1,
+        "anger": 0.0,
+        "fear": 0.1,
+        "calmness": 0.6,
+        "confidence": 0.7,
+        "loneliness": 0.1,
+        "playfulness": 0.4,
+    },
+    "needs": {
+        "social_connection": 0.5,
+        "stimulation": 0.5,
+        "task_completion": 0.6,
+        "rest": 0.5,
+    },
+    "personality": {
+        "playful": 0.9,
+        "curious": 0.85,
+        "helpful": 0.8,
+        "affectionate": 0.9,
+        "seriousness": 0.3,
+    },
+}
+
 
 class ChatMessage(TypedDict):
     role: str
     content: str
 
 
+def default_state() -> dict[str, dict[str, float]]:
+    """Return a fresh copy of CatAI's neutral/default state."""
+    return {section: dict(values) for section, values in DEFAULT_STATE.items()}
+
+
 def validate_state(state: object) -> dict[str, dict[str, float]]:
-    """Validate CatAI's normalized 0..1 emotional/needs/personality state."""
+    """Validate the complete CatAI 0..1 state schema."""
     if not isinstance(state, dict):
         raise ValueError("state must be an object")
 
+    expected_sections = set(STATE_SECTIONS)
+    actual_sections = set(state)
+    if actual_sections != expected_sections:
+        missing = sorted(expected_sections - actual_sections)
+        extra = sorted(actual_sections - expected_sections)
+        details: list[str] = []
+        if missing:
+            details.append(f"missing sections: {missing}")
+        if extra:
+            details.append(f"unexpected sections: {extra}")
+        raise ValueError("state has invalid sections (" + "; ".join(details) + ")")
+
     normalized: dict[str, dict[str, float]] = {}
     for section, fields in STATE_SECTIONS.items():
-        values = state.get(section)
+        values = state[section]
         if not isinstance(values, dict):
             raise ValueError(f"state.{section} must be an object")
+
+        expected_fields = set(fields)
+        actual_fields = set(values)
+        if actual_fields != expected_fields:
+            missing = sorted(expected_fields - actual_fields)
+            extra = sorted(actual_fields - expected_fields)
+            details = []
+            if missing:
+                details.append(f"missing fields: {missing}")
+            if extra:
+                details.append(f"unexpected fields: {extra}")
+            raise ValueError(
+                f"state.{section} has invalid fields (" + "; ".join(details) + ")"
+            )
+
         section_values: dict[str, float] = {}
         for field in fields:
-            value = values.get(field)
+            value = values[field]
             if not isinstance(value, (int, float)) or isinstance(value, bool):
                 raise ValueError(f"state.{section}.{field} must be a number")
             value = float(value)
@@ -91,14 +155,11 @@ def validate_messages(messages: object) -> list[ChatMessage]:
 
 
 def load_chat_dataset(path: str | Path, *, encoding: str = "utf-8") -> list[list[ChatMessage]]:
-    """Load and validate a JSONL instruction/chat dataset.
-
-    A record may contain a structured state object. When present, it is
-    rendered into a system message so SFT learns to condition responses on
-    CatAI's internal state without changing the chat message schema.
-    """
+    """Load and validate a state-conditioned JSONL instruction/chat dataset."""
     examples: list[list[ChatMessage]] = []
-    for line_number, line in enumerate(Path(path).read_text(encoding=encoding).splitlines(), start=1):
+    for line_number, line in enumerate(
+        Path(path).read_text(encoding=encoding).splitlines(), start=1
+    ):
         if not line.strip():
             continue
         try:
@@ -107,10 +168,11 @@ def load_chat_dataset(path: str | Path, *, encoding: str = "utf-8") -> list[list
             raise ValueError(f"invalid JSON on line {line_number}") from exc
         if not isinstance(record, dict):
             raise ValueError(f"line {line_number} must contain a JSON object")
+        if "state" not in record:
+            raise ValueError(f"line {line_number} is missing required state")
+        state = validate_state(record["state"])
         messages = validate_messages(record.get("messages"))
-        if "state" in record:
-            state = validate_state(record["state"])
-            messages = [state_system_message(state), *messages]
+        messages = [state_system_message(state), *messages]
         examples.append(messages)
 
     if not examples:
