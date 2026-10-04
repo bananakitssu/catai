@@ -6,7 +6,8 @@ import json
 import urllib.error
 import urllib.request
 
-from catai.oasst1 import PERSONALITY_SYSTEM_PROMPT, convert_dataset, download_dataset
+from catai.chat_dataset import DEFAULT_STATE
+from catai.oasst1 import convert_dataset, download_dataset
 
 
 class MemoryPath:
@@ -118,11 +119,8 @@ def test_convert_oasst1_tree_to_catai_jsonl(tmp_path):
 
     assert (trees, examples) == (1, 1)
     record = json.loads(output.read_text(encoding="utf-8"))
-    assert record["messages"][0] == {
-        "role": "system",
-        "content": PERSONALITY_SYSTEM_PROMPT,
-    }
-    assert record["messages"][1:] == [
+    assert record["state"] == DEFAULT_STATE
+    assert record["messages"] == [
         {"role": "user", "content": "Hello!"},
         {"role": "assistant", "content": "Hi there!"},
         {"role": "user", "content": "How are you?"},
