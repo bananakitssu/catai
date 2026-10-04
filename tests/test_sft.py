@@ -111,3 +111,80 @@ def test_chat_dataset_preserves_assistant_targets_when_truncated():
 
     sample = dataset[0]
     assert torch.any(sample["labels"] != IGNORE_INDEX)
+
+
+def test_chat_dataset_loads_and_validates_structured_state(tmp_path):
+    from catai.chat_dataset import load_chat_dataset
+
+    state = {
+        "emotions": {
+            "happiness": 0.7, "sadness": 0.1, "affection": 0.9,
+            "curiosity": 0.8, "excitement": 0.6, "frustration": 0.1,
+            "anger": 0.0, "fear": 0.0, "calmness": 0.5,
+            "confidence": 0.8, "loneliness": 0.1, "playfulness": 0.9,
+        },
+        "needs": {
+            "social_connection": 0.8, "stimulation": 0.7,
+            "task_completion": 0.6, "rest": 0.2,
+        },
+        "personality": {
+            "playful": 0.9, "curious": 0.85, "helpful": 0.8,
+            "affectionate": 0.9, "seriousness": 0.3,
+        },
+    }
+    import json
+
+    path = tmp_path / "state.jsonl"
+    path.write_text(
+        json.dumps({
+            "state": state,
+            "messages": [
+                {"role": "user", "content": "hello"},
+                {"role": "assistant", "content": "hiii! :3"},
+            ],
+        }) + "\n",
+        encoding="utf-8",
+    )
+
+    examples = load_chat_dataset(path)
+    assert examples[0][0]["role"] == "system"
+    assert examples[0][0]["content"].startswith("CatAI internal state:")
+    assert '"happiness":0.7' in examples[0][0]["content"]
+
+
+def test_chat_dataset_rejects_out_of_range_state(tmp_path):
+    from catai.chat_dataset import load_chat_dataset
+
+    state = {
+        "emotions": {
+            "happiness": 1.2, "sadness": 0.1, "affection": 0.9,
+            "curiosity": 0.8, "excitement": 0.6, "frustration": 0.1,
+            "anger": 0.0, "fear": 0.0, "calmness": 0.5,
+            "confidence": 0.8, "loneliness": 0.1, "playfulness": 0.9,
+        },
+        "needs": {
+            "social_connection": 0.8, "stimulation": 0.7,
+            "task_completion": 0.6, "rest": 0.2,
+        },
+        "personality": {
+            "playful": 0.9, "curious": 0.85, "helpful": 0.8,
+            "affectionate": 0.9, "seriousness": 0.3,
+        },
+    }
+    import json
+
+    path = tmp_path / "bad-state.jsonl"
+    path.write_text(
+        json.dumps({
+            "state": state,
+            "messages": [
+                {"role": "user", "content": "hello"},
+                {"role": "assistant", "content": "hi"},
+            ],
+        }) + "\n",
+        encoding="utf-8",
+    )
+
+    import pytest
+    with pytest.raises(ValueError, match="between 0 and 1"):
+        load_chat_dataset(path)
