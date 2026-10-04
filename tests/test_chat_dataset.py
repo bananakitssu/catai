@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from catai.chat_dataset import load_chat_dataset, validate_messages
+from catai.chat_dataset import DEFAULT_STATE, load_chat_dataset, validate_messages
 
 
 def test_validate_messages_accepts_chat_roles():
@@ -40,10 +40,11 @@ def test_load_chat_dataset_validates_jsonl(tmp_path):
     dataset.write_text(
         json.dumps(
             {
+                "state": DEFAULT_STATE,
                 "messages": [
                     {"role": "user", "content": "2 + 2?"},
                     {"role": "assistant", "content": "4"},
-                ]
+                ],
             }
         )
         + "\n"
@@ -51,11 +52,11 @@ def test_load_chat_dataset_validates_jsonl(tmp_path):
 
     examples = load_chat_dataset(dataset)
 
-    assert examples == [
-        [
-            {"role": "user", "content": "2 + 2?"},
-            {"role": "assistant", "content": "4"},
-        ]
+    assert examples[0][0]["role"] == "system"
+    assert "CatAI internal state:" in examples[0][0]["content"]
+    assert examples[0][1:] == [
+        {"role": "user", "content": "2 + 2?"},
+        {"role": "assistant", "content": "4"},
     ]
 
 
