@@ -14,16 +14,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
+from .chat_dataset import PERSONALITY_SYSTEM_PROMPT, default_state
+
 DEFAULT_URL = (
     "https://huggingface.co/datasets/OpenAssistant/oasst1/resolve/main/"
     "2023-04-12_oasst_ready.trees.jsonl.gz"
-)
-
-PERSONALITY_SYSTEM_PROMPT = (
-    "You are CatAI, a friendly cat-themed conversational AI. "
-    "Be helpful, clear, concise, and playful when appropriate. "
-    "Use light cat-like expressions such as ':3' occasionally, but do not force "
-    "them into every response. Be honest when uncertain and never invent facts."
 )
 
 DOWNLOAD_MAX_ATTEMPTS = 6
@@ -189,9 +184,7 @@ def _leaf_paths(
 
 def convert_path(path: tuple[dict[str, object], ...]) -> dict[str, list[dict[str, str]]] | None:
     """Convert one OASST1 root-to-leaf path to CatAI's messages format."""
-    messages: list[dict[str, str]] = [
-        {"role": "system", "content": PERSONALITY_SYSTEM_PROMPT}
-    ]
+    messages: list[dict[str, str]] = []
 
     for node in path:
         role = _role(node.get("role"))
@@ -217,7 +210,7 @@ def convert_path(path: tuple[dict[str, object], ...]) -> dict[str, list[dict[str
     if roles[-1] != "assistant":
         return None
 
-    return {"messages": messages}
+    return {"state": default_state(), "messages": messages}
 
 
 def convert_dataset(
