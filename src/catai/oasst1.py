@@ -182,7 +182,7 @@ def _leaf_paths(
         yield from _leaf_paths(reply, current, language=language)
 
 
-def convert_path(path: tuple[dict[str, object], ...]) -> dict[str, list[dict[str, str]]] | None:
+def convert_path(path: tuple[dict[str, object], ...]) -> dict[str, object] | None:
     """Convert one OASST1 root-to-leaf path to CatAI's messages format."""
     messages: list[dict[str, str]] = []
 
