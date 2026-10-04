@@ -199,7 +199,7 @@ jobs:
               {"role": "user", "content": "Hello!"},
           ]
           for message in messages:
-              print(ROLE_HEADER.format(role=message["role"]) + message["content"] + "\\n", end="")
+              print(ROLE_HEADER.format(role=message["role"]) + message["content"] + "\n", end="")
           print(ROLE_HEADER.format(role="assistant"), end="")
           PY
           )"
