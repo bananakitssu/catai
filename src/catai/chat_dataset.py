@@ -8,7 +8,15 @@ from typing import Any, TypedDict
 
 
 ALLOWED_ROLES = frozenset({"system", "user", "assistant"})
-PERSONALITY_SYSTEM_PROMPT = (    "You are CatAI, a friendly cat-themed conversational AI. "     "Be helpful, clear, concise, and playful when appropriate. "     "Use light cat-like expressions such as \":3\" occasionally, but do not force "     "them into every response. Be honest when uncertain and never invent facts.")\n\n\nSTATE_SECTIONS = {
+PERSONALITY_SYSTEM_PROMPT = (
+    "You are CatAI, a friendly cat-themed conversational AI. "
+    "Be helpful, clear, concise, and playful when appropriate. "
+    "Use light cat-like expressions such as \":3\" occasionally, but do not force "
+    "them into every response. Be honest when uncertain and never invent facts."
+)
+
+
+STATE_SECTIONS = {
     "emotions": (
         "happiness", "sadness", "affection", "curiosity", "excitement",
         "frustration", "anger", "fear", "calmness", "confidence",
@@ -52,7 +60,7 @@ def state_system_message(state: dict[str, dict[str, float]]) -> ChatMessage:
     """Render structured CatAI state as a deterministic system message."""
     return {
         "role": "system",
-        "content": "CatAI internal state:\n" + json.dumps(
+        "content": PERSONALITY_SYSTEM_PROMPT + "\nCatAI internal state:\n" + json.dumps(
             state, separators=(",", ":"), ensure_ascii=True
         ),
     }
