@@ -87,9 +87,33 @@ class ChatSupervisedDataset(Dataset[dict[str, torch.Tensor]]):
         for messages in examples:
             token_ids, train_mask = chat_token_stream(messages, tokenizer)
             target_length = sequence_length + 1
+
+            # State-conditioned chats place the canonical system prompt first.
+            # Preserve that prefix when trimming long examples so the model
+            # never silently loses its emotional state/personality context.
+            system_prefix_length = 0
+            for message in messages:
+                if message.get("role") != "system":
+                    break
+                system_prefix_length += len(encode(ROLE_HEADER.format(role="system")))
+                system_prefix_length += len(encode(message["content"]))
+                system_prefix_length += len(encode("\n"))
+
+            if system_prefix_length > target_length:
+                raise ValueError(
+                    "sequence_length is too short for the system state prompt"
+                )
+
             if len(token_ids) > target_length:
-                token_ids = token_ids[-target_length:]
-                train_mask = train_mask[-target_length:]
+                tail_length = target_length - system_prefix_length
+                token_ids = (
+                    token_ids[:system_prefix_length]
+                    + token_ids[-tail_length:]
+                )
+                train_mask = (
+                    train_mask[:system_prefix_length]
+                    + train_mask[-tail_length:]
+                )
 
             if len(token_ids) < target_length:
                 padding = target_length - len(token_ids)
