@@ -41,10 +41,17 @@ For better quality, prefer real text (e.g. RedPajama / books / code) over pure s
 
 ## OASST1 chat dataset
 
-CatAI's supervised fine-tuning loader already accepts chat JSONL with a `messages`
-array. The OASST1 converter downloads the ready-for-export conversation trees,
-keeps English paths by default, maps OASST1's `prompter` role to CatAI's
-`user` role, and adds CatAI's personality system message to every example.
+CatAI's supervised fine-tuning loader uses state-conditioned chat JSONL. Each
+record must contain a `state` object plus a `messages` array. The loader
+validates the complete state schema, then renders the state together with
+CatAI's canonical personality system prompt before SFT.
+
+The OASST1 converter downloads the ready-for-export conversation trees, keeps
+English paths by default, maps OASST1's `prompter` role to CatAI's `user`
+role, and emits the same required `state` + `messages` record shape. OASST1
+does not provide CatAI emotion/needs/personality annotations, so its converted
+examples receive CatAI's explicit neutral/default state rather than invented
+OASST emotion labels.
 
 Generate the dataset with:
 
