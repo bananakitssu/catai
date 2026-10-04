@@ -80,6 +80,9 @@ class ChatSupervisedDataset(Dataset[dict[str, torch.Tensor]]):
 
         eos_token_id = getattr(tokenizer, "eos_token_id", None)
         pad_token_id = int(eos_token_id) if eos_token_id is not None else 0
+        encode = getattr(tokenizer, "encode", None)
+        if not callable(encode):
+            raise TypeError("tokenizer must provide an encode method")
 
         self.inputs: list[torch.Tensor] = []
         self.labels: list[torch.Tensor] = []
