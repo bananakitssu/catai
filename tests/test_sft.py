@@ -189,3 +189,25 @@ def test_chat_dataset_rejects_out_of_range_state(tmp_path):
     import pytest
     with pytest.raises(ValueError, match="between 0 and 1"):
         load_chat_dataset(path)
+
+
+
+def test_chat_dataset_requires_state(tmp_path):
+    from catai.chat_dataset import load_chat_dataset
+
+    import json
+
+    path = tmp_path / "missing-state.jsonl"
+    path.write_text(
+        json.dumps({
+            "messages": [
+                {"role": "user", "content": "hello"},
+                {"role": "assistant", "content": "hi"},
+            ],
+        }) + "\n",
+        encoding="utf-8",
+    )
+
+    import pytest
+    with pytest.raises(ValueError, match="missing required state"):
+        load_chat_dataset(path)
