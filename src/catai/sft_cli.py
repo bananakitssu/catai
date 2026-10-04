@@ -167,6 +167,9 @@ def main(argv: list[str] | None = None) -> int:
                     break
 
     elapsed = max(time.perf_counter() - started_at, 1e-9)
+    sft_model_metadata = dict(model_metadata)
+    sft_model_metadata["max_seq_len"] = sequence_length
+
     save_checkpoint(
         args.checkpoint,
         model,
