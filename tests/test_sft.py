@@ -1,6 +1,6 @@
 import torch
 
-from catai.chat_dataset import DEFAULT_STATE, state_system_message
+from catai.chat_dataset import ASSISTANT_OUTPUT_ROLES, DEFAULT_STATE, state_system_message
 from catai.model import CatAI
 from catai.sft import (
     IGNORE_INDEX,
@@ -25,6 +25,23 @@ def test_chat_token_stream_masks_non_assistant_tokens():
     assert len(tokens) == len(mask)
     assert any(mask)
     assert all(not enabled for enabled in mask[:10])
+
+
+@pytest.mark.parametrize("role", sorted(ASSISTANT_OUTPUT_ROLES))
+def test_chat_token_stream_trains_extended_assistant_roles(role):
+    tokenizer = CharTokenizer.default()
+    tokens, mask = chat_token_stream(
+        [
+            {"role": "user", "content": "Hello"},
+            {"role": role, "content": "generated output"},
+        ],
+        tokenizer,
+    )
+
+    assert len(tokens) == len(mask)
+    assert any(mask)
+    user_prefix = tokenizer.encode("<|user|>\nHello\n")
+    assert all(not enabled for enabled in mask[: len(user_prefix)])
 
 
 def test_chat_dataset_returns_fixed_length_masked_labels():

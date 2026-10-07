@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from catai.chat_dataset import DEFAULT_STATE, load_chat_dataset, validate_messages
+from catai.chat_dataset import ALLOWED_ROLES, ASSISTANT_OUTPUT_ROLES, DEFAULT_STATE, load_chat_dataset, validate_messages
 
 
 def test_validate_messages_accepts_chat_roles():
@@ -15,6 +15,16 @@ def test_validate_messages_accepts_chat_roles():
     )
 
     assert messages[-1] == {"role": "assistant", "content": "Hi!"}
+
+
+def test_validate_messages_accepts_extended_roles():
+    for role in sorted(ALLOWED_ROLES):
+        messages = [{"role": role, "content": f"content from {role}"}]
+        if role not in ASSISTANT_OUTPUT_ROLES:
+            messages.append({"role": "assistant", "content": "follow-up"})
+
+        normalized = validate_messages(messages)
+        assert normalized[0]["role"] == role
 
 
 @pytest.mark.parametrize(

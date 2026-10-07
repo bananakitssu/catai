@@ -124,6 +124,8 @@ def main(argv: list[str] | None = None) -> int:
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
     losses: list[float] = []
+    total_batches = len(loader)
+    progress_interval = max(1, total_batches // 10)
     validation_losses: list[float] = []
     best_validation_loss = float("inf")
     stale_epochs = 0
@@ -134,7 +136,7 @@ def main(argv: list[str] | None = None) -> int:
         total_loss = 0.0
         batches = 0
         print(f"epoch {epoch + 1}/{args.epochs}", flush=True)
-        for batch in loader:
+        for batch_index, batch in enumerate(loader, start=1):
             batch_input_ids = batch["input_ids"].to(device)
             batch_labels = batch["labels"].to(device)
             total_loss += sft_train_step(
@@ -146,6 +148,19 @@ def main(argv: list[str] | None = None) -> int:
             )
             batches += 1
             total_steps += 1
+            if batch_index % progress_interval == 0 or batch_index == total_batches:
+                elapsed = max(time.perf_counter() - started_at, 1e-9)
+                completed_batches = (epoch * total_batches) + batch_index
+                total_training_batches = args.epochs * total_batches
+                remaining_batches = max(0, total_training_batches - completed_batches)
+                seconds_per_batch = elapsed / completed_batches
+                eta_seconds = remaining_batches * seconds_per_batch
+                print(
+                    f"  batch {batch_index}/{total_batches} "
+                    f"loss={total_loss / batches:.4f} "
+                    f"ETA={eta_seconds:.0f}s",
+                    flush=True,
+                )
 
         if batches == 0:
             raise ValueError("training dataset produced no batches")

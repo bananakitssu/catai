@@ -7,7 +7,35 @@ from pathlib import Path
 from typing import Any, TypedDict
 
 
-ALLOWED_ROLES = frozenset({"system", "user", "assistant"})
+BASE_ROLES = frozenset({"system", "user", "assistant"})
+EXTENDED_ROLES = frozenset({
+    "file",
+    "moderator",
+    "tool_call:assistant",
+    "tool_call:result->assistant",
+    "system-1",
+    "mcp_tool_call:assistant",
+    "mcp_tool_call:result->assistant",
+    "error",
+    "tool_call:error",
+    "mcp_tool_call:error",
+})
+MULTI_AI_ROLES = frozenset({
+    "assistant:Gemini",
+    "assistant:Claude",
+    "assistant:ChatGPT",
+    "assistant:Qwen",
+    "assistant:DeepSeek",
+})
+ALLOWED_ROLES = frozenset(BASE_ROLES | EXTENDED_ROLES | MULTI_AI_ROLES)
+ASSISTANT_OUTPUT_ROLES = frozenset(
+    {"assistant", "tool_call:assistant", "mcp_tool_call:assistant"} | MULTI_AI_ROLES
+)
+
+
+def is_assistant_output_role(role: str) -> bool:
+    """Return whether a role represents AI-generated output that SFT should train."""
+    return role in ASSISTANT_OUTPUT_ROLES
 PERSONALITY_SYSTEM_PROMPT = (
     "You are CatAI, a friendly cat-themed conversational AI. "
     "Be helpful, clear, concise, and playful when appropriate. "

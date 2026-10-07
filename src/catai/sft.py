@@ -33,7 +33,7 @@ def chat_token_stream(
     for message in messages:
         role = message.get("role")
         content = message.get("content")
-        if role not in {"system", "user", "assistant"}:
+        if role not in ALLOWED_ROLES:
             raise ValueError(f"unsupported message role: {role!r}")
         if not isinstance(content, str) or not content.strip():
             raise ValueError("message content must be a non-empty string")
@@ -46,15 +46,15 @@ def chat_token_stream(
         train_mask.extend([False] * len(header_tokens))
 
         token_ids.extend(content_tokens)
-        train_mask.extend([role == "assistant"] * len(content_tokens))
+        train_mask.extend([is_assistant_output_role(role)] * len(content_tokens))
 
         token_ids.extend(newline_tokens)
-        train_mask.extend([role == "assistant"] * len(newline_tokens))
+        train_mask.extend([is_assistant_output_role(role)] * len(newline_tokens))
         last_role = role
 
     if eos_token_id is not None:
         token_ids.append(int(eos_token_id))
-        train_mask.append(last_role == "assistant")
+        train_mask.append(is_assistant_output_role(last_role))
 
     if not token_ids:
         raise ValueError("chat messages must encode to at least one token")

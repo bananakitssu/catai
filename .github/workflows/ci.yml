@@ -13,7 +13,7 @@ on:
       sft_epochs:
         description: "SFT epochs"
         required: false
-        default: "2"
+        default: "1"
 
 jobs:
   test:
@@ -77,7 +77,7 @@ jobs:
 
           exit "$test_status"
 
-  generate:
+  base_training:
     if: github.event_name == 'workflow_dispatch'
     needs: test
     runs-on: ubuntu-latest
@@ -180,10 +180,79 @@ jobs:
         run: |
           python -m catai.generate_cli             --checkpoint catai.pt             --prompt "The cat"             --max-new-tokens 200             --temperature 0.7             --top-k 40             --repetition-penalty 1.1             --no-repeat-ngram-size 3             --device cpu
 
+      - name: Upload base checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-checkpoint
+          path: catai.pt
+          retention-days: 7
+
+  sft:
+    if: github.event_name == 'workflow_dispatch'
+    needs: base_training
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI
+        run: python -m pip install -e .
+      - name: Download base checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-checkpoint
+          path: .
+      - name: Restore OASST1 source cache
+        id: oasst-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/oasst1_ready.trees.jsonl.gz
+          key: catai-oasst1-ready-v1
+      - name: Build OASST1 CatAI chat dataset
+        run: |
+          python data/download_oasst1.py \
+            --source data/oasst1_ready.trees.jsonl.gz \
+            --output data/oasst1_chat.jsonl \
+            --language en \
+            --max-examples "\${{ inputs.chat_examples || '5000' }}" \
+            --keep-source
+      - name: Merge CatAI personality examples
+        run: cat data/instruction_chat.jsonl data/oasst1_chat.jsonl > data/chat_sft.jsonl
+      - name: Validate chat dataset before SFT
+        run: |
+          python - <<'PY'
+          from catai.chat_dataset import load_chat_dataset
+          from catai.sft import ChatSupervisedDataset
+          from catai.tokenizer import CharTokenizer
+
+          examples = load_chat_dataset("data/chat_sft.jsonl")
+          dataset = ChatSupervisedDataset(
+              examples,
+              CharTokenizer.default(),
+              sequence_length=768,
+          )
+          print(f"validated {len(examples):,} chat examples")
+          print(f"preflight constructed {len(dataset):,} SFT examples")
+          PY
       - name: Supervised fine-tuning (SFT)
         run: |
-          python -m catai.sft_cli             --base-checkpoint catai.pt             --dataset data/chat_sft.jsonl             --checkpoint catai-sft.pt             --epochs "${{ inputs.sft_epochs || '2' }}"             --batch-size 2             --learning-rate 2e-5             --grad-clip 1.0             --validation-split 0.05             --patience 2             --sequence-length 1024             --seed 42             --device cpu
-
+          python -m catai.sft_cli \
+            --base-checkpoint catai.pt \
+            --dataset data/chat_sft.jsonl \
+            --checkpoint catai-sft.pt \
+            --epochs "\${{ inputs.sft_epochs || '1' }}" \
+            --batch-size 2 \
+            --learning-rate 2e-5 \
+            --grad-clip 1.0 \
+            --validation-split 0.05 \
+            --patience 2 \
+            --sequence-length 768 \
+            --seed 42 \
+            --device cpu
       - name: Generate chat response
         run: |
           prompt="$(python - <<'PY'
