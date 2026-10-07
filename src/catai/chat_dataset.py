@@ -175,10 +175,10 @@ def validate_messages(messages: object) -> list[ChatMessage]:
             raise ValueError("message content must be a non-empty string")
         normalized.append({"role": role, "content": content})
 
-    if not any(message["role"] == "assistant" for message in normalized):
-        raise ValueError("chat example must contain an assistant message")
-    if normalized[-1]["role"] != "assistant":
-        raise ValueError("chat example must end with an assistant message")
+    if not any(message["role"] in ASSISTANT_OUTPUT_ROLES for message in normalized):
+        raise ValueError("chat example must contain an assistant output message")
+    if normalized[-1]["role"] not in ASSISTANT_OUTPUT_ROLES:
+        raise ValueError("chat example must end with an assistant output message")
     return normalized
 
 
