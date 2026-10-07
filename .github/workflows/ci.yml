@@ -218,7 +218,7 @@ jobs:
             --source data/oasst1_ready.trees.jsonl.gz \
             --output data/oasst1_chat.jsonl \
             --language en \
-            --max-examples "\${{ inputs.chat_examples || '5000' }}" \
+            --max-examples "${{ inputs.chat_examples || '5000' }}" \
             --keep-source
       - name: Merge CatAI personality examples
         run: cat data/instruction_chat.jsonl data/oasst1_chat.jsonl > data/chat_sft.jsonl
@@ -244,7 +244,7 @@ jobs:
             --base-checkpoint catai.pt \
             --dataset data/chat_sft.jsonl \
             --checkpoint catai-sft.pt \
-            --epochs "\${{ inputs.sft_epochs || '1' }}" \
+            --epochs "${{ inputs.sft_epochs || '1' }}" \
             --batch-size 2 \
             --learning-rate 2e-5 \
             --grad-clip 1.0 \
