@@ -1,3 +1,5 @@
+import pytest
+
 import torch
 
 from catai.chat_dataset import ASSISTANT_OUTPUT_ROLES, DEFAULT_STATE, state_system_message
