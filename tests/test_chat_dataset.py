@@ -25,6 +25,7 @@ def test_validate_messages_accepts_extended_roles():
 
         normalized = validate_messages(messages)
         assert normalized[0]["role"] == role
+        assert normalized[-1]["role"] in ASSISTANT_OUTPUT_ROLES
 
 
 @pytest.mark.parametrize(
