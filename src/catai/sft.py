@@ -8,6 +8,8 @@ import torch
 from torch import nn
 from torch.utils.data import Dataset
 
+from catai.chat_dataset import ALLOWED_ROLES, is_assistant_output_role
+
 
 IGNORE_INDEX = -100
 ROLE_HEADER = "<|{role}|>\n"
