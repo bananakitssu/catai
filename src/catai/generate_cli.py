@@ -22,8 +22,8 @@ def build_parser() -> argparse.ArgumentParser:
     # More sensible defaults for a small / partially-trained model.
     parser.add_argument("--temperature", type=float, default=0.8)
     parser.add_argument("--top-k", type=int, default=40)
-    parser.add_argument("--repetition-penalty", type=float, default=1.05)
-    parser.add_argument("--no-repeat-ngram-size", type=int, default=3)
+    parser.add_argument("--repetition-penalty", type=float, default=1.0)
+    parser.add_argument("--no-repeat-ngram-size", type=int, default=0)
     parser.add_argument("--device", default=None)
     return parser
 
