@@ -34,6 +34,7 @@ def generate(
         raise ValueError("eos_token_id outside vocabulary")
 
     was_training = model.training
+    prompt_length = tokens.size(1)
     model.eval()
     try:
         with torch.no_grad():
@@ -45,7 +46,14 @@ def generate(
 
                 if repetition_penalty > 1.0:
                     for batch_index in range(result.size(0)):
-                        seen = torch.unique(context[batch_index])
+                        # Penalize repetition in the generated reply, not in the
+                        # prompt. With character tokenization, a long system
+                        # prompt contains most letters and would otherwise
+                        # suppress ordinary English characters from the start.
+                        generated_tokens = result[batch_index, prompt_length:]
+                        if generated_tokens.numel() == 0:
+                            continue
+                        seen = torch.unique(generated_tokens)
                         if eos_token_id is not None:
                             seen = seen[seen != eos_token_id]
                         seen_logits = logits[batch_index, seen]
@@ -66,7 +74,10 @@ def generate(
                     for batch_index in range(result.size(0)):
                         if finished[batch_index]:
                             continue
-                        sequence = context[batch_index].tolist()
+                        # N-gram blocking is likewise restricted to generated
+                        # text; prompt n-grams should not prohibit normal words
+                        # in the answer.
+                        sequence = result[batch_index, prompt_length:].tolist()
                         if len(sequence) >= no_repeat_ngram_size - 1:
                             prefix = tuple(sequence[-(no_repeat_ngram_size - 1) :])
                             banned = {
