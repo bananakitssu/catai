@@ -31,3 +31,55 @@ def test_generate_validates_arguments():
             pass
         else:
             raise AssertionError("generate should reject invalid arguments")
+
+
+
+class FixedLogitModel(torch.nn.Module):
+    """Tiny deterministic model for testing generation filters."""
+
+    def __init__(self, logits, context_length=16):
+        super().__init__()
+        self.register_buffer("fixed_logits", torch.tensor(logits, dtype=torch.float32))
+        self.vocab_size = len(logits)
+        self.context_length = context_length
+
+    def forward(self, tokens):
+        return self.fixed_logits.view(1, 1, -1).expand(tokens.size(0), tokens.size(1), -1)
+
+
+def test_repetition_penalty_does_not_penalize_tokens_only_in_prompt():
+    model = FixedLogitModel([0.0, 2.0, 1.9, 0.0])
+    prompt = torch.tensor([[1, 3]])
+
+    result = generate(
+        model,
+        prompt,
+        max_new_tokens=1,
+        temperature=1.0,
+        top_k=1,
+        repetition_penalty=1.1,
+        no_repeat_ngram_size=0,
+    )
+
+    # Token 1 is present in the prompt but should not be penalized before
+    # the model has generated any reply tokens.
+    assert result[0, -1].item() == 1
+
+
+def test_no_repeat_ngram_does_not_block_ngrams_only_in_prompt():
+    model = FixedLogitModel([0.0, 0.0, 0.0, 5.0])
+    prompt = torch.tensor([[1, 2, 3]])
+
+    result = generate(
+        model,
+        prompt,
+        max_new_tokens=1,
+        temperature=1.0,
+        top_k=1,
+        repetition_penalty=1.0,
+        no_repeat_ngram_size=3,
+    )
+
+    # The first generated character may complete an n-gram seen in the
+    # prompt; only repetition within the reply should be blocked.
+    assert result[0, -1].item() == 3
