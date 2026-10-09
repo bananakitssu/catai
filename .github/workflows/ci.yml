@@ -178,7 +178,7 @@ jobs:
 
       - name: Generate base text
         run: |
-          python -m catai.generate_cli             --checkpoint catai.pt             --prompt "The cat"             --max-new-tokens 200             --temperature 0.7             --top-k 40             --repetition-penalty 1.1             --no-repeat-ngram-size 3             --device cpu
+          python -m catai.generate_cli             --checkpoint catai.pt             --prompt "The cat"             --max-new-tokens 200             --temperature 0.7             --top-k 40             --repetition-penalty 1.0             --no-repeat-ngram-size 0             --device cpu
 
       - name: Upload base checkpoint
         uses: actions/upload-artifact@v4
@@ -278,6 +278,6 @@ jobs:
             --max-new-tokens 160 \
             --temperature 0.8 \
             --top-k 40 \
-            --repetition-penalty 1.1 \
-            --no-repeat-ngram-size 3 \
+            --repetition-penalty 1.0 \
+            --no-repeat-ngram-size 0 \
             --device cpu
