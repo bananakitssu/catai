@@ -12,8 +12,8 @@ def generate(
     tokens: torch.Tensor,
     max_new_tokens: int,
     temperature: float = 1.0,
-    repetition_penalty: float = 1.1,
-    no_repeat_ngram_size: int = 3,
+    repetition_penalty: float = 1.0,
+    no_repeat_ngram_size: int = 0,
     eos_token_id: int | None = None,
     top_k: int | None = None,
 ) -> torch.Tensor:
