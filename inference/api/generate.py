@@ -68,7 +68,7 @@ class handler(BaseHTTPRequestHandler):
                 temperature=body.get("temperature", 0.8),
                 top_k=body.get("top_k", 40),
             )
-        except ValueError as exc:
+        except (TypeError, ValueError) as exc:
             self._json({"error": str(exc)}, 400)
             return
         except Exception:
