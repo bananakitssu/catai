@@ -51,9 +51,11 @@ def _required_env(name: str) -> str:
 def _b2_client():
     endpoint = _required_env("B2_ENDPOINT_URL").rstrip("/")
     parsed = urlparse(endpoint)
-    if parsed.scheme != "https" or not parsed.hostname or not parsed.hostname.endswith("backblazeb2.com"):
+    if parsed.scheme != "https" or not parsed.hostname:
         raise RuntimeError("B2_ENDPOINT_URL must be an HTTPS Backblaze S3 endpoint")
     region_match = re.match(r"^s3\.([a-z0-9-]+)\.backblazeb2\.com$", parsed.hostname)
+    if region_match is None:
+        raise RuntimeError("B2_ENDPOINT_URL must use the exact s3.<region>.backblazeb2.com hostname")
     region = os.environ.get("B2_REGION", "").strip() or (region_match.group(1) if region_match else "")
     if not region:
         raise RuntimeError("B2_REGION is required when it cannot be inferred from B2_ENDPOINT_URL")
@@ -194,6 +196,16 @@ def _scheduled_evict(expected_last_used: float) -> None:
         if _MODEL is not None and _LAST_USED == expected_last_used and time.monotonic() - _LAST_USED >= IDLE_SECONDS:
             _evict_locked()
         _EVICT_TIMER = None
+
+
+def _touch_model_locked() -> None:
+    global _LAST_USED, _EVICT_TIMER
+    _LAST_USED = time.monotonic()
+    if _EVICT_TIMER is not None:
+        _EVICT_TIMER.cancel()
+    _EVICT_TIMER = threading.Timer(IDLE_SECONDS, _scheduled_evict, args=(_LAST_USED,))
+    _EVICT_TIMER.daemon = True
+    _EVICT_TIMER.start()
 
 
 def _load_model_locked() -> dict[str, Any]:
@@ -343,6 +355,9 @@ def generate(messages: list[dict[str, str]], *, max_new_tokens: int = DEFAULT_MA
     with _LOCK:
         _evict_if_idle_locked(now)
         loaded = _load_model_locked()
+        # Schedule eviction before processing so exceptions/timeouts still leave
+        # the temporary copy eligible for cleanup after the idle deadline.
+        _touch_model_locked()
         metadata = loaded["metadata"]
         model_meta = metadata["model"]
         context_length = int(model_meta["max_seq_len"])
@@ -365,12 +380,7 @@ def generate(messages: list[dict[str, str]], *, max_new_tokens: int = DEFAULT_MA
                 break
             generated.append(next_token)
         text = decode(generated)
-        _LAST_USED = time.monotonic()
-        if _EVICT_TIMER is not None:
-            _EVICT_TIMER.cancel()
-        _EVICT_TIMER = threading.Timer(IDLE_SECONDS, _scheduled_evict, args=(_LAST_USED,))
-        _EVICT_TIMER.daemon = True
-        _EVICT_TIMER.start()
+        _touch_model_locked()
         return {
             "text": text,
             "model": "catai-sft",
