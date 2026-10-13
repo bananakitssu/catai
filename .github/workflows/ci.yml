@@ -26,7 +26,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test dependencies
-        run: python -m pip install --upgrade pip pytest
+        run: python -m pip install --upgrade pip pytest 'boto3>=1.34,<2'
       - name: Disk usage before CatAI install
         run: |
           echo "=== Filesystem ==="
@@ -49,6 +49,9 @@ jobs:
           echo
           echo "=== pip cache ==="
           du -sh "$HOME/.cache/pip" 2>/dev/null || true
+      - name: Compile CatAI inference sources
+        run: python -m compileall -q inference scripts/export_inference.py tests
+
       - name: Run tests with disk monitor
         shell: bash
         run: |
@@ -84,6 +87,25 @@ jobs:
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
+      - name: Verify B2 publisher secrets before expensive training
+        env:
+          B2_KEY_ID: ${{ secrets.B2_KEY_ID }}
+          B2_APPLICATION_KEY: ${{ secrets.B2_APPLICATION_KEY }}
+          B2_BUCKET_NAME: ${{ secrets.B2_BUCKET_NAME }}
+          B2_ENDPOINT_URL: ${{ secrets.B2_ENDPOINT_URL }}
+          B2_REGION: ${{ secrets.B2_REGION }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in B2_KEY_ID B2_APPLICATION_KEY B2_BUCKET_NAME B2_ENDPOINT_URL B2_REGION; do
+            if [[ -z "${!name:-}" ]]; then missing+=("$name"); fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            printf 'Missing GitHub Actions secrets: %s\n' "${missing[*]}" >&2
+            echo 'Add the B2 secrets listed in inference/README.md before starting a full training run.' >&2
+            exit 1
+          fi
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -281,3 +303,111 @@ jobs:
             --repetition-penalty 1.0 \
             --no-repeat-ngram-size 0 \
             --device cpu
+
+
+      - name: Export inference-only NumPy bundle
+        run: python scripts/export_inference.py --checkpoint catai-sft.pt --output catai-sft.npz
+
+      - name: Publish checkpoints to Backblaze B2
+        env:
+          AWS_ACCESS_KEY_ID: \${{ secrets.B2_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: \${{ secrets.B2_APPLICATION_KEY }}
+          B2_BUCKET_NAME: \${{ secrets.B2_BUCKET_NAME }}
+          B2_ENDPOINT_URL: \${{ secrets.B2_ENDPOINT_URL }}
+          B2_REGION: \${{ secrets.B2_REGION }}
+          MODEL_REVISION: \${{ github.sha }}
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --no-cache-dir 'boto3>=1.34,<2'
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          import boto3
+          from botocore.config import Config
+
+          bucket = os.environ["B2_BUCKET_NAME"]
+          endpoint = os.environ["B2_ENDPOINT_URL"].rstrip("/")
+          region = os.environ["B2_REGION"]
+          client = boto3.client(
+              "s3",
+              endpoint_url=endpoint,
+              region_name=region,
+              aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
+              aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
+              config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
+          )
+
+          # Keep the original training checkpoint for future fine-tuning.
+          source = Path("catai-sft.pt")
+          source_key = "ai/models/catai-sft.pt"
+          client.upload_file(
+              str(source), bucket, source_key,
+              ExtraArgs={"ContentType": "application/octet-stream"},
+          )
+          source_head = client.head_object(Bucket=bucket, Key=source_key)
+          if source_head["ContentLength"] != source.stat().st_size:
+              raise SystemExit("B2 source checkpoint upload size verification failed")
+
+          # Publish each inference bundle under an immutable versioned key.
+          bundle = Path("catai-sft.npz")
+          digest = hashlib.sha256()
+          with bundle.open("rb") as stream:
+              for chunk in iter(lambda: stream.read(4 * 1024 * 1024), b""):
+                  digest.update(chunk)
+          sha256 = digest.hexdigest()
+          revision = os.environ["MODEL_REVISION"]
+          model_key = f"ai/models/releases/{revision}/catai-sft.npz"
+          client.upload_file(
+              str(bundle), bucket, model_key,
+              ExtraArgs={"ContentType": "application/octet-stream"},
+          )
+          head = client.head_object(Bucket=bucket, Key=model_key)
+          if head["ContentLength"] != bundle.stat().st_size:
+              raise SystemExit("B2 inference bundle upload size verification failed")
+          remote = client.get_object(Bucket=bucket, Key=model_key)
+          remote_digest = hashlib.sha256()
+          remote_size = 0
+          for chunk in iter(lambda: remote["Body"].read(4 * 1024 * 1024), b""):
+              remote_digest.update(chunk)
+              remote_size += len(chunk)
+          if remote_size != bundle.stat().st_size or remote_digest.hexdigest() != sha256:
+              raise SystemExit("B2 inference bundle remote SHA-256 verification failed")
+
+          # The active manifest is the final write: a failed upload never makes
+          # an incomplete artifact the live model.
+          manifest = {
+              "format": "catai-active-model",
+              "format_version": 1,
+              "object_key": model_key,
+              "sha256": sha256,
+              "bytes": bundle.stat().st_size,
+              "revision": revision,
+              "source_checkpoint_key": source_key,
+              "published_at": datetime.now(timezone.utc).isoformat(),
+          }
+          client.put_object(
+              Bucket=bucket,
+              Key="ai/models/current.json",
+              Body=json.dumps(manifest, separators=(",", ":")).encode("utf-8"),
+              ContentType="application/json",
+              CacheControl="no-store",
+          )
+          verified = client.get_object(Bucket=bucket, Key="ai/models/current.json")
+          round_trip = json.loads(verified["Body"].read().decode("utf-8"))
+          if round_trip.get("sha256") != sha256 or round_trip.get("object_key") != model_key:
+              raise SystemExit("B2 active model manifest verification failed")
+          print(f"Published source checkpoint: s3://{bucket}/{source_key} ({source.stat().st_size:,} bytes)")
+          print(f"Published inference model: s3://{bucket}/{model_key} ({bundle.stat().st_size:,} bytes)")
+          print("Verified and activated the new CatAI model manifest.")
+          PY
+
+      - name: Preserve trained checkpoint as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-sft-checkpoint
+          path: catai-sft.pt
+          retention-days: 7
