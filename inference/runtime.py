@@ -56,9 +56,10 @@ def _b2_client():
     region_match = re.match(r"^s3\.([a-z0-9-]+)\.backblazeb2\.com$", parsed.hostname)
     if region_match is None:
         raise RuntimeError("B2_ENDPOINT_URL must use the exact s3.<region>.backblazeb2.com hostname")
-    region = os.environ.get("B2_REGION", "").strip() or (region_match.group(1) if region_match else "")
-    if not region:
-        raise RuntimeError("B2_REGION is required when it cannot be inferred from B2_ENDPOINT_URL")
+    endpoint_region = region_match.group(1)
+    region = os.environ.get("B2_REGION", "").strip() or endpoint_region
+    if region != endpoint_region:
+        raise RuntimeError("B2_REGION must match the region in B2_ENDPOINT_URL")
     return boto3.client(
         "s3",
         endpoint_url=endpoint,
@@ -87,7 +88,10 @@ def _download_active_bundle() -> dict[str, Any]:
     client = _b2_client()
 
     response = client.get_object(Bucket=bucket, Key=manifest_key)
-    raw_manifest = response["Body"].read(64 * 1024 + 1)
+    try:
+        raw_manifest = response["Body"].read(64 * 1024 + 1)
+    finally:
+        response["Body"].close()
     if len(raw_manifest) > 64 * 1024:
         raise RuntimeError("Active model manifest is too large")
     manifest = json.loads(raw_manifest.decode("utf-8"))
