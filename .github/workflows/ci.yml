@@ -368,6 +368,14 @@ jobs:
           head = client.head_object(Bucket=bucket, Key=model_key)
           if head["ContentLength"] != bundle.stat().st_size:
               raise SystemExit("B2 inference bundle upload size verification failed")
+          remote = client.get_object(Bucket=bucket, Key=model_key)
+          remote_digest = hashlib.sha256()
+          remote_size = 0
+          for chunk in iter(lambda: remote["Body"].read(4 * 1024 * 1024), b""):
+              remote_digest.update(chunk)
+              remote_size += len(chunk)
+          if remote_size != bundle.stat().st_size or remote_digest.hexdigest() != sha256:
+              raise SystemExit("B2 inference bundle remote SHA-256 verification failed")
 
           # The active manifest is the final write: a failed upload never makes
           # an incomplete artifact the live model.
