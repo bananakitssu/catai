@@ -274,8 +274,6 @@ def _rotate_half(values: np.ndarray) -> np.ndarray:
 
 
 def _forward(weights: dict[str, np.ndarray], model: dict[str, Any], tokens: list[int]) -> np.ndarray:
-    vocab_size = len(model["tokenizer"]["vocabulary"]) if "tokenizer" in model else None
-    del vocab_size
     d_model = int(model["d_model"])
     n_heads = int(model["n_heads"])
     n_layers = int(model["n_layers"])
