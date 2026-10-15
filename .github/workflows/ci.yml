@@ -106,6 +106,30 @@ jobs:
             echo 'Add the B2 secrets listed in inference/README.md before starting a full training run.' >&2
             exit 1
           fi
+          python3 - <<'PY'
+          import os
+          from urllib.parse import urlsplit
+
+          endpoint = os.environ["B2_ENDPOINT_URL"].strip().strip("\\\"'")
+          if "://" not in endpoint:
+              endpoint = "https://" + endpoint
+          parsed = urlsplit(endpoint)
+          if (
+              parsed.scheme.lower() != "https"
+              or not parsed.hostname
+              or parsed.username
+              or parsed.password
+              or parsed.query
+              or parsed.fragment
+              or parsed.path not in ("", "/")
+          ):
+              raise SystemExit(
+                  "Invalid B2_ENDPOINT_URL secret. Set it to the HTTPS S3 API base URL, "
+                  "for example https://s3.us-east-005.backblazeb2.com. "
+                  "The configured value was not printed."
+              )
+          print("B2 endpoint format validated (value hidden).")
+          PY
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -325,12 +349,33 @@ jobs:
           import os
           from datetime import datetime, timezone
           from pathlib import Path
+          from urllib.parse import urlsplit
 
           import boto3
           from botocore.config import Config
 
           bucket = os.environ["B2_BUCKET_NAME"]
-          endpoint = os.environ["B2_ENDPOINT_URL"].rstrip("/")
+          # Accept a bare B2 S3 hostname as well as a full URL, and remove
+          # accidental surrounding whitespace/quotes from copied secret values.
+          raw_endpoint = os.environ["B2_ENDPOINT_URL"].strip().strip("\\\"'")
+          if "://" not in raw_endpoint:
+              raw_endpoint = "https://" + raw_endpoint
+          parsed_endpoint = urlsplit(raw_endpoint)
+          if (
+              parsed_endpoint.scheme.lower() != "https"
+              or not parsed_endpoint.hostname
+              or parsed_endpoint.username
+              or parsed_endpoint.password
+              or parsed_endpoint.query
+              or parsed_endpoint.fragment
+              or parsed_endpoint.path not in ("", "/")
+          ):
+              raise SystemExit(
+                  "Invalid B2_ENDPOINT_URL secret. Use the HTTPS S3 API base URL, "
+                  "for example https://s3.us-east-005.backblazeb2.com. "
+                  "The configured value was not printed."
+              )
+          endpoint = f"https://{parsed_endpoint.netloc}"
           region = os.environ["B2_REGION"]
           client = boto3.client(
               "s3",
