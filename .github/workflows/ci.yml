@@ -122,7 +122,7 @@ jobs:
           import os
           from urllib.parse import urlsplit
 
-          endpoint = os.environ["B2_ENDPOINT_URL"].strip().strip("\\\"'")
+          endpoint = os.environ["B2_ENDPOINT_URL"].strip().strip(chr(34) + chr(39))
           if "://" not in endpoint:
               endpoint = "https://" + endpoint
           parsed = urlsplit(endpoint)
@@ -286,7 +286,7 @@ jobs:
           import os
           from urllib.parse import urlsplit
 
-          endpoint = os.environ["B2_ENDPOINT_URL"].strip().strip("\\\\"'")
+          endpoint = os.environ["B2_ENDPOINT_URL"].strip().strip(chr(34) + chr(39))
           if "://" not in endpoint:
               endpoint = "https://" + endpoint
           parsed = urlsplit(endpoint)
@@ -433,7 +433,7 @@ jobs:
           bucket = os.environ["B2_BUCKET_NAME"]
           # Accept a bare B2 S3 hostname as well as a full URL, and remove
           # accidental surrounding whitespace/quotes from copied secret values.
-          raw_endpoint = os.environ["B2_ENDPOINT_URL"].strip().strip("\\\"'")
+          raw_endpoint = os.environ["B2_ENDPOINT_URL"].strip().strip(chr(34) + chr(39))
           if "://" not in raw_endpoint:
               raw_endpoint = "https://" + raw_endpoint
           parsed_endpoint = urlsplit(raw_endpoint)
