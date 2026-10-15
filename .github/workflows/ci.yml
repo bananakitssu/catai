@@ -14,6 +14,18 @@ on:
         description: "SFT epochs"
         required: false
         default: "1"
+      training_mode:
+        description: "Full retraining or reuse a prior base checkpoint for SFT-only iteration"
+        type: choice
+        options:
+          - full
+          - sft_only
+        required: true
+        default: full
+      base_checkpoint_run_id:
+        description: "For sft_only: Actions run ID containing the catai-base-checkpoint artifact"
+        required: false
+        default: ""
 
 jobs:
   test:
@@ -81,7 +93,7 @@ jobs:
           exit "$test_status"
 
   base_training:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -234,12 +246,66 @@ jobs:
           retention-days: 7
 
   sft:
-    if: github.event_name == 'workflow_dispatch'
-    needs: base_training
+    # In SFT-only mode, base_training is intentionally skipped. Explicitly
+    # allow this job to proceed when tests passed and a prior run is selected.
+    if: >-
+      always() &&
+      github.event_name == 'workflow_dispatch' &&
+      needs.test.result == 'success' &&
+      (needs.base_training.result == 'success' || inputs.training_mode == 'sft_only')
+    needs: [test, base_training]
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
+      - name: Validate SFT-only inputs and B2 publishing configuration
+        shell: bash
+        env:
+          TRAINING_MODE: ${{ inputs.training_mode }}
+          BASE_CHECKPOINT_RUN_ID: ${{ inputs.base_checkpoint_run_id }}
+          B2_KEY_ID: ${{ secrets.B2_KEY_ID }}
+          B2_APPLICATION_KEY: ${{ secrets.B2_APPLICATION_KEY }}
+          B2_BUCKET_NAME: ${{ secrets.B2_BUCKET_NAME }}
+          B2_ENDPOINT_URL: ${{ secrets.B2_ENDPOINT_URL }}
+          B2_REGION: ${{ secrets.B2_REGION }}
+        run: |
+          set -euo pipefail
+          if [[ "$TRAINING_MODE" == "sft_only" && ! "$BASE_CHECKPOINT_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "SFT-only mode needs base_checkpoint_run_id: the Actions run ID that has the catai-base-checkpoint artifact." >&2
+            exit 1
+          fi
+          missing=()
+          for name in B2_KEY_ID B2_APPLICATION_KEY B2_BUCKET_NAME B2_ENDPOINT_URL B2_REGION; do
+            if [[ -z "${!name:-}" ]]; then missing+=("$name"); fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            printf 'Missing GitHub Actions secrets: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+          python3 - <<'PY'
+          import os
+          from urllib.parse import urlsplit
+
+          endpoint = os.environ["B2_ENDPOINT_URL"].strip().strip("\\\\"'")
+          if "://" not in endpoint:
+              endpoint = "https://" + endpoint
+          parsed = urlsplit(endpoint)
+          if (
+              parsed.scheme.lower() != "https"
+              or not parsed.hostname
+              or parsed.username
+              or parsed.password
+              or parsed.query
+              or parsed.fragment
+              or parsed.path not in ("", "/")
+          ):
+              raise SystemExit(
+                  "Invalid B2_ENDPOINT_URL secret. Use the HTTPS S3 API base URL, "
+                  "for example https://s3.us-east-005.backblazeb2.com. "
+                  "The configured value was not printed."
+              )
+          print("B2 endpoint format validated (value hidden).")
+          PY
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -247,7 +313,17 @@ jobs:
           cache-dependency-path: pyproject.toml
       - name: Install CatAI
         run: python -m pip install -e .
-      - name: Download base checkpoint
+      - name: Download base checkpoint from selected prior run
+        if: inputs.training_mode == 'sft_only'
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-checkpoint
+          path: .
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.base_checkpoint_run_id }}
+      - name: Download base checkpoint from this run
+        if: inputs.training_mode == 'full'
         uses: actions/download-artifact@v4
         with:
           name: catai-base-checkpoint
