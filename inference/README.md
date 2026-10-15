@@ -11,8 +11,9 @@ Configure these in the inference Vercel project (Production and Preview as
 appropriate):
 
 - \`CATAI_API_SECRET\`: long random bearer secret shared only with Banana Data Center.
-- \`B2_ENDPOINT_URL\`: HTTPS S3-compatible endpoint, e.g.
-  \`https://s3.us-east-005.backblazeb2.com\`.
+- \`B2_ENDPOINT_URL\`: Backblaze S3-compatible endpoint. The runtime accepts
+  either the bare hostname \`s3.us-east-005.backblazeb2.com\` or the full URL
+  \`https://s3.us-east-005.backblazeb2.com\`; do not include bucket/object paths.
 - \`B2_REGION\`: region matching the B2 endpoint, e.g. \`us-east-005\`.
 - \`B2_KEY_ID\`: restricted Backblaze application key ID with read access to the model bucket.
 - \`B2_APPLICATION_KEY\`: matching restricted application key.

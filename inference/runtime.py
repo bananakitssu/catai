@@ -10,6 +10,7 @@ from __future__ import annotations
 import atexit
 import gc
 import hashlib
+import logging
 import json
 import os
 import re
@@ -49,20 +50,38 @@ def _required_env(name: str) -> str:
 
 
 def _b2_client():
-    endpoint = _required_env("B2_ENDPOINT_URL").rstrip("/")
+    # Accept either a complete HTTPS URL or the bare S3 hostname copied from
+    # the Backblaze dashboard/GitHub Actions secret. Normalize both the same
+    # way the publisher does, including accidental surrounding quote marks.
+    endpoint = _required_env("B2_ENDPOINT_URL").strip().strip(chr(34) + chr(39)).strip()
+    if "://" not in endpoint:
+        endpoint = "https://" + endpoint
     parsed = urlparse(endpoint)
-    if parsed.scheme != "https" or not parsed.hostname:
-        raise RuntimeError("B2_ENDPOINT_URL must be an HTTPS Backblaze S3 endpoint")
-    region_match = re.match(r"^s3\.([a-z0-9-]+)\.backblazeb2\.com$", parsed.hostname)
+    if (
+        parsed.scheme.lower() != "https"
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+        or parsed.path not in ("", "/")
+    ):
+        raise RuntimeError(
+            "B2_ENDPOINT_URL must be an HTTPS Backblaze S3 URL or a bare "
+            "s3.<region>.backblazeb2.com hostname"
+        )
+    region_match = re.fullmatch(r"s3\.([a-z0-9-]+)\.backblazeb2\.com", parsed.hostname.lower())
     if region_match is None:
         raise RuntimeError("B2_ENDPOINT_URL must use the exact s3.<region>.backblazeb2.com hostname")
     endpoint_region = region_match.group(1)
     region = os.environ.get("B2_REGION", "").strip() or endpoint_region
     if region != endpoint_region:
         raise RuntimeError("B2_REGION must match the region in B2_ENDPOINT_URL")
+    # Use a clean API root with no copied trailing slash.
+    endpoint_url = f"https://{parsed.netloc}"
     return boto3.client(
         "s3",
-        endpoint_url=endpoint,
+        endpoint_url=endpoint_url,
         region_name=region,
         aws_access_key_id=_required_env("B2_KEY_ID"),
         aws_secret_access_key=_required_env("B2_APPLICATION_KEY"),
@@ -138,6 +157,11 @@ def _download_active_bundle() -> dict[str, Any]:
             weights["lm_head.weight"] = weights["token_embedding.weight"]
         _validate_shapes(weights, model_meta, tokenizer_meta)
         os.replace(partial, MODEL_FILE)
+        logging.getLogger(__name__).info(
+            "Loaded CatAI inference bundle revision=%s bytes=%d",
+            actual_hash[:12],
+            actual_size,
+        )
         return {
             "weights": weights,
             "metadata": metadata,

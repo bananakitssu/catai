@@ -16,6 +16,41 @@ from catai.model import CatAI
 from catai.tokenizer import CharTokenizer
 from export_inference import export_checkpoint
 import runtime as inference_runtime
+import pytest
+
+
+@pytest.mark.parametrize(
+    ("configured_endpoint", "expected_endpoint"),
+    [
+        ("s3.us-east-005.backblazeb2.com", "https://s3.us-east-005.backblazeb2.com"),
+        ("https://s3.us-east-005.backblazeb2.com/", "https://s3.us-east-005.backblazeb2.com"),
+        ('"s3.us-east-005.backblazeb2.com"', "https://s3.us-east-005.backblazeb2.com"),
+        ("'https://s3.us-east-005.backblazeb2.com/'", "https://s3.us-east-005.backblazeb2.com"),
+    ],
+)
+def test_b2_client_normalizes_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+    configured_endpoint: str,
+    expected_endpoint: str,
+) -> None:
+    monkeypatch.setenv("B2_ENDPOINT_URL", configured_endpoint)
+    monkeypatch.setenv("B2_REGION", "us-east-005")
+    monkeypatch.setenv("B2_KEY_ID", "test-key-id")
+    monkeypatch.setenv("B2_APPLICATION_KEY", "test-application-key")
+    captured: dict[str, object] = {}
+
+    def fake_client(service: str, **kwargs: object) -> object:
+        captured["service"] = service
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(inference_runtime.boto3, "client", fake_client)
+
+    inference_runtime._b2_client()
+
+    assert captured["service"] == "s3"
+    assert captured["endpoint_url"] == expected_endpoint
+    assert captured["region_name"] == "us-east-005"
 
 
 def _metadata(model: CatAI) -> dict:

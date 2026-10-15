@@ -3,11 +3,14 @@ from __future__ import annotations
 
 import hmac
 import json
+import logging
 import os
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlsplit
 
 from runtime import generate, health
+
+logger = logging.getLogger(__name__)
 
 MAX_BODY_BYTES = 64 * 1024
 
@@ -72,7 +75,8 @@ class handler(BaseHTTPRequestHandler):
             self._json({"error": str(exc)}, 400)
             return
         except Exception:
-            # Never return B2 errors, local paths, or credentials to callers.
+            # Keep details in server logs for diagnosis, never in the API response.
+            logger.exception("CatAI inference failed while loading the model or generating")
             self._json({"error": "CatAI inference failed"}, 502)
             return
         self._json(result, 200)
