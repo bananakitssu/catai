@@ -12,7 +12,7 @@ from runtime import generate, generate_stream, health
 
 logger = logging.getLogger(__name__)
 
-MAX_BODY_BYTES = 64 * 1024
+MAX_BODY_BYTES = 256 * 1024
 
 
 class handler(BaseHTTPRequestHandler):
@@ -54,7 +54,7 @@ class handler(BaseHTTPRequestHandler):
             self._json({"error": "Invalid Content-Length"}, 400)
             return
         if length < 2 or length > MAX_BODY_BYTES:
-            self._json({"error": "Request body must be between 2 bytes and 64 KiB"}, 413)
+            self._json({"error": "Request body must be between 2 bytes and 256 KiB"}, 413)
             return
         try:
             body = json.loads(self.rfile.read(length).decode("utf-8"))
