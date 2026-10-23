@@ -271,3 +271,15 @@ def test_download_dataset_does_not_retry_non_retryable_http_error(monkeypatch):
     assert calls == 1
     assert not output.exists()
     assert not output._partial.exists()
+
+
+def test_convert_path_filters_short_final_assistant_reply():
+    from catai.oasst1 import convert_path
+
+    path = (
+        {"text": "Explain this concept", "role": "prompter", "lang": "en"},
+        {"text": "Okay.", "role": "assistant", "lang": "en"},
+    )
+
+    assert convert_path(path, min_assistant_chars=20) is None
+    assert convert_path(path, min_assistant_chars=0) is not None
