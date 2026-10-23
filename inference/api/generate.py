@@ -8,7 +8,7 @@ import os
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlsplit
 
-from runtime import generate, health
+from runtime import generate, generate_stream, health
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +63,38 @@ class handler(BaseHTTPRequestHandler):
             return
         if not isinstance(body, dict):
             self._json({"error": "JSON body must be an object"}, 400)
+            return
+        if body.get("stream") is True:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache, no-transform")
+            self.send_header("X-Accel-Buffering", "no")
+            self.end_headers()
+            try:
+                for event in generate_stream(
+                    body.get("messages"),
+                    max_new_tokens=body.get("max_new_tokens", 160),
+                    temperature=body.get("temperature", 0.8),
+                    top_k=body.get("top_k", 40),
+                ):
+                    payload = json.dumps(event, separators=(",", ":"), ensure_ascii=True)
+                    self.wfile.write(f"event: {event['event']}\ndata: {payload}\n\n".encode("utf-8"))
+                    self.wfile.flush()
+            except (TypeError, ValueError) as exc:
+                payload = json.dumps({"error": str(exc)}, separators=(",", ":"), ensure_ascii=True)
+                try:
+                    self.wfile.write(f"event: error\ndata: {payload}\n\n".encode("utf-8"))
+                    self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+            except Exception:
+                logger.exception("CatAI inference failed while streaming")
+                payload = json.dumps({"error": "CatAI inference failed"}, separators=(",", ":"))
+                try:
+                    self.wfile.write(f"event: error\ndata: {payload}\n\n".encode("utf-8"))
+                    self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
             return
         try:
             result = generate(
