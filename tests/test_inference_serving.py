@@ -168,3 +168,36 @@ def test_generate_stream_yields_incremental_text_and_accepts_file_role(
     assert events[-1]["event"] == "done"
     assert events[-1]["text"] == "hi"
     assert events[-1]["model"] == "purr-1.0"
+
+
+def test_generate_stream_does_not_emit_whitespace_only_deltas(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tokenizer = CharTokenizer.default()
+    vocabulary = list(tokenizer.vocabulary)
+    lookup = {token: index for index, token in enumerate(vocabulary)}
+    generated_tokens = iter([lookup[" "], lookup[" "], lookup["h"], lookup["i"]])
+    loaded = {
+        "weights": {},
+        "metadata": {
+            "model": {"max_seq_len": 768, "d_model": 16, "n_heads": 4, "n_layers": 1},
+            "tokenizer": {"type": "char", "vocabulary": vocabulary},
+        },
+        "sha256": "b" * 64,
+    }
+    monkeypatch.setattr(inference_runtime, "_evict_if_idle_locked", lambda now: None)
+    monkeypatch.setattr(inference_runtime, "_load_model_locked", lambda: loaded)
+    monkeypatch.setattr(inference_runtime, "_touch_model_locked", lambda: None)
+    monkeypatch.setattr(inference_runtime, "_forward", lambda weights, model, tokens: np.zeros(len(vocabulary), dtype=np.float32))
+    monkeypatch.setattr(inference_runtime, "_sample", lambda *args: next(generated_tokens))
+
+    events = list(inference_runtime.generate_stream(
+        [{"role": "user", "content": "Say hi."}],
+        max_new_tokens=4,
+        chunk_tokens=1,
+    ))
+    deltas = [event["text"] for event in events if event["event"] == "delta"]
+
+    assert deltas
+    assert all(delta.strip() for delta in deltas)
+    assert "".join(deltas) == "  hi"
