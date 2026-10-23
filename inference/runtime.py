@@ -405,6 +405,8 @@ def generate_stream(
         rng = np.random.default_rng()
         generated: list[int] = []
         sent_chars = 0
+        leading_whitespace = ""
+        has_visible_text = False
         for _ in range(int(max_new_tokens)):
             context = (input_tokens + generated)[-context_length:]
             logits = _forward(loaded["weights"], model_meta, context)
@@ -415,14 +417,27 @@ def generate_stream(
             if len(generated) % int(chunk_tokens) == 0:
                 current_text = decode(generated)
                 delta = current_text[sent_chars:]
-                if delta:
-                    yield {"event": "delta", "text": delta}
-                    sent_chars = len(current_text)
+                sent_chars = len(current_text)
+                if not delta:
+                    continue
+                if not has_visible_text:
+                    leading_whitespace += delta
+                    if not leading_whitespace.strip():
+                        continue
+                    delta = leading_whitespace
+                    leading_whitespace = ""
+                    has_visible_text = True
+                yield {"event": "delta", "text": delta}
 
         text = decode(generated)
         delta = text[sent_chars:]
         if delta:
-            yield {"event": "delta", "text": delta}
+            if not has_visible_text:
+                leading_whitespace += delta
+                if leading_whitespace.strip():
+                    yield {"event": "delta", "text": leading_whitespace}
+            else:
+                yield {"event": "delta", "text": delta}
         _touch_model_locked()
         yield {
             "event": "done",
