@@ -8,11 +8,11 @@ import os
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlsplit
 
-from runtime import generate, health
+from runtime import generate, generate_stream, health
 
 logger = logging.getLogger(__name__)
 
-MAX_BODY_BYTES = 64 * 1024
+MAX_BODY_BYTES = 256 * 1024
 
 
 class handler(BaseHTTPRequestHandler):
@@ -54,7 +54,7 @@ class handler(BaseHTTPRequestHandler):
             self._json({"error": "Invalid Content-Length"}, 400)
             return
         if length < 2 or length > MAX_BODY_BYTES:
-            self._json({"error": "Request body must be between 2 bytes and 64 KiB"}, 413)
+            self._json({"error": "Request body must be between 2 bytes and 256 KiB"}, 413)
             return
         try:
             body = json.loads(self.rfile.read(length).decode("utf-8"))
@@ -63,6 +63,38 @@ class handler(BaseHTTPRequestHandler):
             return
         if not isinstance(body, dict):
             self._json({"error": "JSON body must be an object"}, 400)
+            return
+        if body.get("stream") is True:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache, no-transform")
+            self.send_header("X-Accel-Buffering", "no")
+            self.end_headers()
+            try:
+                for event in generate_stream(
+                    body.get("messages"),
+                    max_new_tokens=body.get("max_new_tokens", 160),
+                    temperature=body.get("temperature", 0.8),
+                    top_k=body.get("top_k", 40),
+                ):
+                    payload = json.dumps(event, separators=(",", ":"), ensure_ascii=True)
+                    self.wfile.write(f"event: {event['event']}\ndata: {payload}\n\n".encode("utf-8"))
+                    self.wfile.flush()
+            except (TypeError, ValueError) as exc:
+                payload = json.dumps({"error": str(exc)}, separators=(",", ":"), ensure_ascii=True)
+                try:
+                    self.wfile.write(f"event: error\ndata: {payload}\n\n".encode("utf-8"))
+                    self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+            except Exception:
+                logger.exception("CatAI inference failed while streaming")
+                payload = json.dumps({"error": "CatAI inference failed"}, separators=(",", ":"))
+                try:
+                    self.wfile.write(f"event: error\ndata: {payload}\n\n".encode("utf-8"))
+                    self.wfile.flush()
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
             return
         try:
             result = generate(

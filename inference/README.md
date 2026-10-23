@@ -59,6 +59,12 @@ POST to \`/api/generate\` with a private bearer token:
 }
 \`\`\`
 
+When \`stream: true\` is included, the endpoint returns Server-Sent Events:
+\`delta\` events contain incremental text, \`done\` carries the final result and model
+metadata, and \`error\` describes a generation failure. The regular JSON response
+remains available when streaming is not requested. The runtime accepts \`file\`
+messages for uploaded text and code content.
+
 The response contains \`text\`, \`model_revision\`, \`tokens_in\`,
 \`tokens_out\`, and \`context_limit\`. The endpoint does not save conversations;
 Banana Data Center owns the authenticated conversation history in Upstash.

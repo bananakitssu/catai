@@ -18,7 +18,7 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 from urllib.parse import urlparse
 
 import boto3
@@ -357,14 +357,21 @@ def _sample(logits: np.ndarray, temperature: float, top_k: int, rng: np.random.G
     return int(rng.choice(logits.size, p=probabilities))
 
 
-def generate(messages: list[dict[str, str]], *, max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS,
-             temperature: float = 0.8, top_k: int = 40) -> dict[str, Any]:
+def generate_stream(
+    messages: list[dict[str, str]],
+    *,
+    max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS,
+    temperature: float = 0.8,
+    top_k: int = 40,
+    chunk_tokens: int = 4,
+) -> Iterator[dict[str, Any]]:
+    """Yield small text deltas followed by final generation metadata."""
     global _LAST_USED, _EVICT_TIMER
     if not isinstance(messages, list) or not messages or len(messages) > MAX_PROMPT_MESSAGES:
         raise ValueError(f"messages must contain between 1 and {MAX_PROMPT_MESSAGES} entries")
     clean_messages = []
     for message in messages:
-        if not isinstance(message, dict) or message.get("role") not in ("system", "user", "assistant"):
+        if not isinstance(message, dict) or message.get("role") not in ("system", "user", "assistant", "file"):
             raise ValueError("each message must have a supported role")
         content = message.get("content")
         if not isinstance(content, str) or not content.strip() or len(content) > 12000:
@@ -376,13 +383,12 @@ def generate(messages: list[dict[str, str]], *, max_new_tokens: int = DEFAULT_MA
         raise ValueError("temperature must be between 0.05 and 2.0")
     if not 1 <= int(top_k) <= 256:
         raise ValueError("top_k must be between 1 and 256")
+    if not 1 <= int(chunk_tokens) <= 16:
+        raise ValueError("chunk_tokens must be between 1 and 16")
 
-    now = time.monotonic()
     with _LOCK:
-        _evict_if_idle_locked(now)
+        _evict_if_idle_locked(time.monotonic())
         loaded = _load_model_locked()
-        # Schedule eviction before processing so exceptions/timeouts still leave
-        # the temporary copy eligible for cleanup after the idle deadline.
         _touch_model_locked()
         metadata = loaded["metadata"]
         model_meta = metadata["model"]
@@ -398,6 +404,7 @@ def generate(messages: list[dict[str, str]], *, max_new_tokens: int = DEFAULT_MA
 
         rng = np.random.default_rng()
         generated: list[int] = []
+        sent_chars = 0
         for _ in range(int(max_new_tokens)):
             context = (input_tokens + generated)[-context_length:]
             logits = _forward(loaded["weights"], model_meta, context)
@@ -405,16 +412,49 @@ def generate(messages: list[dict[str, str]], *, max_new_tokens: int = DEFAULT_MA
             if eos is not None and next_token == eos:
                 break
             generated.append(next_token)
+            if len(generated) % int(chunk_tokens) == 0:
+                current_text = decode(generated)
+                delta = current_text[sent_chars:]
+                if delta:
+                    yield {"event": "delta", "text": delta}
+                    sent_chars = len(current_text)
+
         text = decode(generated)
+        delta = text[sent_chars:]
+        if delta:
+            yield {"event": "delta", "text": delta}
         _touch_model_locked()
-        return {
+        yield {
+            "event": "done",
             "text": text,
-            "model": "catai-sft",
+            "model": "purr-1.0",
             "model_revision": loaded["sha256"][:12],
             "tokens_in": len(input_tokens),
             "tokens_out": len(generated),
             "context_limit": context_length,
         }
+
+
+def generate(
+    messages: list[dict[str, str]],
+    *,
+    max_new_tokens: int = DEFAULT_MAX_NEW_TOKENS,
+    temperature: float = 0.8,
+    top_k: int = 40,
+) -> dict[str, Any]:
+    """Compatibility wrapper that collects a streamed generation."""
+    final: dict[str, Any] | None = None
+    for event in generate_stream(
+        messages,
+        max_new_tokens=max_new_tokens,
+        temperature=temperature,
+        top_k=top_k,
+    ):
+        if event.get("event") == "done":
+            final = event
+    if final is None:
+        raise RuntimeError("CatAI generation did not finish")
+    return {key: value for key, value in final.items() if key != "event"}
 
 
 def health() -> dict[str, Any]:
