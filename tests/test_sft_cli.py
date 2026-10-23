@@ -57,11 +57,28 @@ def test_sft_cli_fine_tunes_a_checkpoint(tmp_path):
         encoding="utf-8",
     )
 
+    personality_dataset = tmp_path / "personality.jsonl"
+    personality_dataset.write_text(
+        json.dumps(
+            {
+                "state": DEFAULT_STATE,
+                "messages": [
+                    {"role": "user", "content": "Say hello like a cat."},
+                    {"role": "assistant", "content": "*ears perk up* Hello! :3"},
+                ],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
     output = tmp_path / "sft.pt"
     exit_code = main(
         [
             "--base-checkpoint", str(base_checkpoint),
             "--dataset", str(dataset),
+            "--personality-dataset", str(personality_dataset),
+            "--personality-ratio", "0.5",
             "--checkpoint", str(output),
             "--epochs", "1",
             "--batch-size", "1",
@@ -76,5 +93,8 @@ def test_sft_cli_fine_tunes_a_checkpoint(tmp_path):
     metadata = load_checkpoint_metadata(output)
     assert metadata["stage"] == "sft"
     assert metadata["model"]["max_seq_len"] == 1024
-    assert metadata["training"]["examples"] == 1
-    assert metadata["training"]["total_steps"] == 1
+    assert metadata["training"]["examples"] == 2
+    assert metadata["training"]["base_examples"] == 1
+    assert metadata["training"]["personality_examples"] == 1
+    assert metadata["training"]["personality_ratio"] == 0.5
+    assert metadata["training"]["total_steps"] == 2

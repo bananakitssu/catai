@@ -6,7 +6,12 @@ import argparse
 import time
 
 import torch
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import (
+    ConcatDataset,
+    DataLoader,
+    WeightedRandomSampler,
+    random_split,
+)
 
 from .chat_dataset import load_chat_dataset
 from .checkpoint import load_checkpoint, load_checkpoint_metadata, save_checkpoint
@@ -20,7 +25,18 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the supervised fine-tuning argument parser."""
     parser = argparse.ArgumentParser(description="Fine-tune a CatAI checkpoint on chat data.")
     parser.add_argument("--base-checkpoint", required=True, help="Pretrained CatAI checkpoint.")
-    parser.add_argument("--dataset", required=True, help="JSONL instruction/chat dataset.")
+    parser.add_argument("--dataset", required=True, help="Base chat dataset JSONL, such as OASST1.")
+    parser.add_argument(
+        "--personality-dataset",
+        default=None,
+        help="Optional curated CatAI dataset to upsample separately from the base chat data.",
+    )
+    parser.add_argument(
+        "--personality-ratio",
+        type=float,
+        default=0.25,
+        help="Target share of training samples drawn from --personality-dataset (0 < ratio < 1).",
+    )
     parser.add_argument("--checkpoint", default="catai-sft.pt", help="Fine-tuned checkpoint output path.")
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--batch-size", type=int, default=4)
@@ -75,6 +91,8 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--sequence-length must be positive")
     if args.seed < 0:
         raise ValueError("--seed must be non-negative")
+    if not 0.0 < args.personality_ratio < 1.0:
+        raise ValueError("--personality-ratio must be greater than 0 and less than 1")
 
     metadata = load_checkpoint_metadata(args.base_checkpoint)
     model_metadata = metadata.get("model")
@@ -100,27 +118,101 @@ def main(argv: list[str] | None = None) -> int:
     model.to(device)
     base_step = load_checkpoint(args.base_checkpoint, model, map_location=device)
 
-    examples = load_chat_dataset(args.dataset)
-    dataset = ChatSupervisedDataset(examples, tokenizer, sequence_length)
-    validation_loader = None
+    base_examples = load_chat_dataset(args.dataset)
+    base_dataset = ChatSupervisedDataset(
+        base_examples, tokenizer, sequence_length
+    )
+    personality_dataset = None
+    personality_examples_count = 0
 
-    if args.validation_split > 0.0:
-        validation_size = max(1, int(len(dataset) * args.validation_split))
-        train_size = len(dataset) - validation_size
-        if train_size < 1:
-            raise ValueError("validation_split leaves no training samples")
-        train_dataset, validation_dataset = random_split(
-            dataset,
-            [train_size, validation_size],
+    if args.personality_dataset:
+        personality_examples = load_chat_dataset(args.personality_dataset)
+        personality_examples_count = len(personality_examples)
+        personality_dataset = ChatSupervisedDataset(
+            personality_examples, tokenizer, sequence_length
+        )
+        dataset = ConcatDataset([base_dataset, personality_dataset])
+    else:
+        dataset = base_dataset
+
+    validation_loader = None
+    if personality_dataset is not None:
+        base_validation_size = (
+            max(1, int(len(base_dataset) * args.validation_split))
+            if args.validation_split > 0.0
+            else 0
+        )
+        personality_validation_size = (
+            max(1, int(len(personality_dataset) * args.validation_split))
+            if args.validation_split > 0.0
+            else 0
+        )
+        if base_validation_size >= len(base_dataset):
+            raise ValueError("validation_split leaves no base training samples")
+        if personality_validation_size >= len(personality_dataset):
+            raise ValueError("validation_split leaves no personality training samples")
+
+        if args.validation_split > 0.0:
+            base_train, base_validation = random_split(
+                base_dataset,
+                [len(base_dataset) - base_validation_size, base_validation_size],
+                generator=torch.Generator().manual_seed(args.seed),
+            )
+            personality_train, personality_validation = random_split(
+                personality_dataset,
+                [
+                    len(personality_dataset) - personality_validation_size,
+                    personality_validation_size,
+                ],
+                generator=torch.Generator().manual_seed(args.seed + 1),
+            )
+            validation_dataset = ConcatDataset(
+                [base_validation, personality_validation]
+            )
+            validation_loader = DataLoader(
+                validation_dataset, batch_size=args.batch_size, shuffle=False
+            )
+        else:
+            base_train = base_dataset
+            personality_train = personality_dataset
+            validation_dataset = None
+
+        train_dataset = ConcatDataset([base_train, personality_train])
+        base_weight = (1.0 - args.personality_ratio) / len(base_train)
+        personality_weight = args.personality_ratio / len(personality_train)
+        weights = (
+            [base_weight] * len(base_train)
+            + [personality_weight] * len(personality_train)
+        )
+        sampler = WeightedRandomSampler(
+            weights,
+            num_samples=len(train_dataset),
+            replacement=True,
             generator=torch.Generator().manual_seed(args.seed),
         )
+        loader = DataLoader(
+            train_dataset, batch_size=args.batch_size, sampler=sampler
+        )
     else:
-        train_dataset = dataset
-        validation_dataset = None
+        if args.validation_split > 0.0:
+            validation_size = max(1, int(len(dataset) * args.validation_split))
+            train_size = len(dataset) - validation_size
+            if train_size < 1:
+                raise ValueError("validation_split leaves no training samples")
+            train_dataset, validation_dataset = random_split(
+                dataset,
+                [train_size, validation_size],
+                generator=torch.Generator().manual_seed(args.seed),
+            )
+        else:
+            train_dataset = dataset
+            validation_dataset = None
 
-    loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    if validation_dataset is not None:
-        validation_loader = DataLoader(validation_dataset, batch_size=args.batch_size, shuffle=False)
+        loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+        if validation_dataset is not None:
+            validation_loader = DataLoader(
+                validation_dataset, batch_size=args.batch_size, shuffle=False
+            )
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
     losses: list[float] = []
@@ -206,6 +298,13 @@ def main(argv: list[str] | None = None) -> int:
                 "seed": args.seed,
                 "total_steps": total_steps,
                 "examples": len(dataset),
+                "base_examples": len(base_examples),
+                "personality_examples": personality_examples_count,
+                "personality_ratio": (
+                    args.personality_ratio
+                    if personality_dataset is not None
+                    else None
+                ),
                 "tokens_per_example": sequence_length,
                 "seconds": elapsed,
             },
