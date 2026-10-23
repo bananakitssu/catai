@@ -13,7 +13,7 @@ on:
       sft_epochs:
         description: "SFT epochs"
         required: false
-        default: "1"
+        default: "3"
       base_epochs:
         description: "Base-model pretraining epochs"
         required: false
@@ -127,8 +127,8 @@ jobs:
               )
           print("Experiment inputs validated.")
           PY
-      - name: Compile CatAI inference sources
-        run: python -m compileall -q inference scripts/export_inference.py tests
+      - name: Compile CatAI Python sources
+        run: python -m compileall -q inference scripts tests
 
       - name: Run tests with disk monitor
         shell: bash
@@ -505,35 +505,8 @@ jobs:
             --sequence-length "$SEQUENCE_LENGTH" \
             --seed 42 \
             --device cpu
-      - name: Generate chat response
-        run: |
-          prompt="$(python - <<'PY'
-          import json
-          from pathlib import Path
-
-          from catai.chat_dataset import state_system_message
-          from catai.sft import ROLE_HEADER
-
-          record = json.loads(Path("data/instruction_chat.jsonl").read_text(encoding="utf-8").splitlines()[0])
-          messages = [
-              state_system_message(record["state"]),
-              {"role": "user", "content": "Hello!"},
-          ]
-          for message in messages:
-              print(ROLE_HEADER.format(role=message["role"]) + message["content"] + "\n", end="")
-          print(ROLE_HEADER.format(role="assistant"), end="")
-          PY
-          )"
-          python -m catai.generate_cli \
-            --checkpoint catai-sft.pt \
-            --prompt "$prompt" \
-            --max-new-tokens 160 \
-            --temperature 0.8 \
-            --top-k 40 \
-            --repetition-penalty 1.0 \
-            --no-repeat-ngram-size 0 \
-            --device cpu
-
+      - name: Evaluate chat responses
+        run: python scripts/evaluate_chat.py --checkpoint catai-sft.pt --max-new-tokens 80 --temperature 0.65 --top-k 30 --repetition-penalty 1.05 --no-repeat-ngram-size 3 --device cpu
 
       - name: Export inference-only NumPy bundle
         run: python scripts/export_inference.py --checkpoint catai-sft.pt --output catai-sft.npz

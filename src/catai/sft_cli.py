@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import time
 
 import torch
@@ -220,6 +221,9 @@ def main(argv: list[str] | None = None) -> int:
     progress_interval = max(1, total_batches // 10)
     validation_losses: list[float] = []
     best_validation_loss = float("inf")
+    best_epoch = 0
+    best_model_state = None
+    best_optimizer_state = None
     stale_epochs = 0
     total_steps = 0
     started_at = time.perf_counter()
@@ -266,6 +270,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"epoch {epoch + 1}/{args.epochs}: val_loss={validation_loss:.4f}", flush=True)
             if validation_loss < best_validation_loss:
                 best_validation_loss = validation_loss
+                best_epoch = epoch + 1
+                best_model_state = copy.deepcopy(model.state_dict())
+                best_optimizer_state = copy.deepcopy(optimizer.state_dict())
                 stale_epochs = 0
             else:
                 stale_epochs += 1
@@ -273,7 +280,18 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"early stopping at epoch {epoch + 1}", flush=True)
                     break
 
+    if best_model_state is not None:
+        model.load_state_dict(best_model_state)
+        if best_optimizer_state is not None:
+            optimizer.load_state_dict(best_optimizer_state)
+        print(
+            f"restored best validation checkpoint from epoch {best_epoch}",
+            flush=True,
+        )
+
     elapsed = max(time.perf_counter() - started_at, 1e-9)
+    selected_epoch = best_epoch if best_epoch else len(losses)
+    selected_loss = losses[selected_epoch - 1]
     sft_model_metadata = dict(model_metadata)
     sft_model_metadata["max_seq_len"] = sequence_length
 
@@ -283,7 +301,7 @@ def main(argv: list[str] | None = None) -> int:
         optimizer,
         step=base_step + total_steps,
         epoch=len(losses),
-        loss=losses[-1],
+        loss=selected_loss,
         metadata={
             "stage": "sft",
             "base_checkpoint": str(args.base_checkpoint),
@@ -294,6 +312,8 @@ def main(argv: list[str] | None = None) -> int:
                 "validation_losses": validation_losses,
                 "validation_split": args.validation_split,
                 "best_validation_loss": best_validation_loss if validation_loader is not None else None,
+                "best_epoch": best_epoch if best_epoch else None,
+                "selected_epoch": selected_epoch,
                 "patience": args.patience,
                 "seed": args.seed,
                 "total_steps": total_steps,
