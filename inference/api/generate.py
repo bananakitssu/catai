@@ -76,6 +76,7 @@ class handler(BaseHTTPRequestHandler):
                     max_new_tokens=body.get("max_new_tokens", 160),
                     temperature=body.get("temperature", 0.8),
                     top_k=body.get("top_k", 40),
+                    chunk_tokens=2,
                 ):
                     payload = json.dumps(event, separators=(",", ":"), ensure_ascii=True)
                     self.wfile.write(f"event: {event['event']}\ndata: {payload}\n\n".encode("utf-8"))
