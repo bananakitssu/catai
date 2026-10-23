@@ -36,6 +36,20 @@ DEFAULT_SYSTEM_PROMPT = (
     "an action unless it actually succeeded. If you are uncertain, say so plainly."
 )
 
+SUPPORTED_MESSAGE_ROLES = frozenset({
+    "system",
+    "user",
+    "assistant",
+    "file",
+    "tool_call:assistant",
+    "tool_call:result->assistant",
+    "mcp_tool_call:assistant",
+    "mcp_tool_call:result->assistant",
+    "error",
+    "tool_call:error",
+    "mcp_tool_call:error",
+})
+
 _LOCK = threading.RLock()
 _MODEL: dict[str, Any] | None = None
 _LAST_USED = 0.0
@@ -371,7 +385,7 @@ def generate_stream(
         raise ValueError(f"messages must contain between 1 and {MAX_PROMPT_MESSAGES} entries")
     clean_messages = []
     for message in messages:
-        if not isinstance(message, dict) or message.get("role") not in ("system", "user", "assistant", "file"):
+        if not isinstance(message, dict) or message.get("role") not in SUPPORTED_MESSAGE_ROLES:
             raise ValueError("each message must have a supported role")
         content = message.get("content")
         if not isinstance(content, str) or not content.strip() or len(content) > 12000:
