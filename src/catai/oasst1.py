@@ -182,8 +182,14 @@ def _leaf_paths(
         yield from _leaf_paths(reply, current, language=language)
 
 
-def convert_path(path: tuple[dict[str, object], ...]) -> dict[str, object] | None:
-    """Convert one OASST1 root-to-leaf path to CatAI's messages format."""
+def convert_path(
+    path: tuple[dict[str, object], ...], *, min_assistant_chars: int = 0
+) -> dict[str, object] | None:
+    """Convert one OASST1 root-to-leaf path to CatAI's messages format.
+
+    Optionally reject paths whose final assistant answer is too short to be
+    useful as a supervised target. Intermediate short replies are preserved.
+    """
     messages: list[dict[str, str]] = []
 
     for node in path:
@@ -209,6 +215,8 @@ def convert_path(path: tuple[dict[str, object], ...]) -> dict[str, object] | Non
     # examples can otherwise have all assistant targets truncated out.
     if roles[-1] != "assistant":
         return None
+    if len(messages[-1]["content"].strip()) < min_assistant_chars:
+        return None
 
     return {"state": default_state(), "messages": messages}
 
@@ -220,11 +228,15 @@ def convert_dataset(
     language: str | None = "en",
     max_trees: int | None = None,
     max_examples: int | None = None,
+    min_assistant_chars: int = 0,
 ) -> tuple[int, int]:
     """Convert an OASST1 tree archive to CatAI JSONL.
 
     Returns (trees_seen, examples_written).
     """
+    if min_assistant_chars < 0:
+        raise ValueError("min_assistant_chars must be non-negative")
+
     output.parent.mkdir(parents=True, exist_ok=True)
     trees_seen = 0
     examples_written = 0
@@ -245,7 +257,7 @@ def convert_dataset(
                 continue
 
             for path in _leaf_paths(root, language=language):
-                converted = convert_path(path)
+                converted = convert_path(path, min_assistant_chars=min_assistant_chars)
                 if converted is None:
                     continue
 
@@ -281,6 +293,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-trees", type=int, default=None)
     parser.add_argument("--max-examples", type=int, default=None)
     parser.add_argument(
+        "--min-assistant-chars",
+        type=int,
+        default=0,
+        help="Skip paths whose final assistant answer is shorter than this many characters.",
+    )
+    parser.add_argument(
         "--keep-source",
         action="store_true",
         help="Keep the downloaded .jsonl.gz archive after conversion.",
@@ -295,6 +313,8 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--max-trees must be positive")
     if args.max_examples is not None and args.max_examples < 1:
         raise ValueError("--max-examples must be positive")
+    if args.min_assistant_chars < 0:
+        raise ValueError("--min-assistant-chars must be non-negative")
 
     language = None if args.language == "all" else args.language
 
@@ -308,6 +328,7 @@ def main(argv: list[str] | None = None) -> int:
         language=language,
         max_trees=args.max_trees,
         max_examples=args.max_examples,
+        min_assistant_chars=args.min_assistant_chars,
     )
 
     if not args.keep_source:
