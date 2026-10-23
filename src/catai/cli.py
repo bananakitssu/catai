@@ -41,6 +41,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model-size", choices=tuple(MODEL_PRESETS), default="tiny", help="Use a larger model preset.")
     parser.add_argument("--tokenizer", choices=("char", "bpe"), default="char")
     parser.add_argument("--vocab-size", type=int, default=256, help="Target vocabulary size for BPE.")
+    parser.add_argument(
+        "--tokenizer-sample-chars",
+        type=int,
+        default=250_000,
+        help="Number of leading corpus characters used to learn BPE merges.",
+    )
     parser.add_argument("--max-tokens", type=int, default=None, help="Cap the training token budget.")
     parser.add_argument("--validation-split", type=float, default=0.0)
     parser.add_argument("--patience", type=int, default=None, help="Early-stop after this many non-improving validation epochs.")
@@ -71,8 +77,10 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--d-model must be divisible by --heads")
     if args.seed < 0:
         raise ValueError("--seed must be non-negative")
-    if args.vocab_size < 2:
-        raise ValueError("--vocab-size must be at least 2")
+    if args.tokenizer == "bpe" and args.vocab_size < 3:
+        raise ValueError("--vocab-size must be at least 3")
+    if args.tokenizer_sample_chars < 1:
+        raise ValueError("--tokenizer-sample-chars must be positive")
 
     model_config = ModelConfig.from_preset(args.model_size)
     if args.model_size != "tiny":
@@ -96,8 +104,14 @@ def main(argv: list[str] | None = None) -> int:
         tokenizer_type=args.tokenizer,
         vocab_size=args.vocab_size,
         max_tokens=config.max_tokens,
+        tokenizer_sample_chars=args.tokenizer_sample_chars,
     )
     window_stride = args.window_stride if args.window_stride is not None else args.sequence_length
+    print(
+        f"tokenizer={args.tokenizer} vocab_size={tokenizer.vocab_size} "
+        f"encoded_tokens={len(tokens):,} sequence_length={args.sequence_length}",
+        flush=True,
+    )
     dataset = TokenWindowDataset(
         tokens,
         sequence_length=args.sequence_length,
@@ -219,7 +233,14 @@ def main(argv: list[str] | None = None) -> int:
             "tokenizer": {
                 "type": args.tokenizer,
                 "vocabulary": list(tokenizer.vocabulary),
-                **({"merges": [list(merge) for merge in tokenizer.merges]} if args.tokenizer == "bpe" else {}),
+                **(
+                    {
+                        "merges": [list(merge) for merge in tokenizer.merges],
+                        "training_sample_char_limit": args.tokenizer_sample_chars,
+                    }
+                    if args.tokenizer == "bpe"
+                    else {}
+                ),
             },
             "training": {
                 "train_losses": losses,

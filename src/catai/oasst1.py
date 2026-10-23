@@ -133,15 +133,21 @@ def _role(role: object) -> str | None:
     return None
 
 
-def _node_is_usable(node: object, language: str | None) -> bool:
+def _node_is_usable(
+    node: object,
+    language: str | None,
+    *,
+    max_assistant_rank: int | None = 1,
+) -> bool:
     if not isinstance(node, dict):
         return False
 
     text = node.get("text")
+    role = node.get("role")
     if not isinstance(text, str) or not text.strip():
         return False
 
-    if _role(node.get("role")) is None:
+    if _role(role) is None:
         return False
 
     if language is not None and node.get("lang") != language:
@@ -149,6 +155,67 @@ def _node_is_usable(node: object, language: str | None) -> bool:
 
     if node.get("deleted") is True or node.get("review_result") is False:
         return False
+
+    # Rank 0 is the preferred response. Keep unranked nodes because many
+    # otherwise usable messages do not have a preference rank.
+    rank = node.get("rank")
+    if (
+        role == "assistant"
+        and max_assistant_rank is not None
+        and isinstance(rank, int)
+        and not isinstance(rank, bool)
+        and rank > max_assistant_rank
+    ):
+        return False
+
+    labels = node.get("labels")
+    if isinstance(labels, dict):
+        # Ready-for-export data excludes deleted/spam messages, but its
+        # quality labels can still identify unsuitable replies.
+        for label_name in (
+            "spam",
+            "fails_task",
+            "lang_mismatch",
+            "pii",
+            "not_appropriate",
+            "hate_speech",
+            "sexual_content",
+            "toxicity",
+        ):
+            label = labels.get(label_name)
+            if not isinstance(label, dict):
+                continue
+            score = label.get("value")
+            count = label.get("count", 1)
+            if (
+                isinstance(score, (int, float))
+                and not isinstance(score, bool)
+                and isinstance(count, (int, float))
+                and count > 0
+                and score >= 0.5
+            ):
+                return False
+
+    # The export also carries automated Detoxify scores separately from human
+    # label aggregates. Reject only strongly flagged messages.
+    detoxify = node.get("detoxify")
+    if isinstance(detoxify, dict):
+        for score_name in (
+            "toxicity",
+            "severe_toxicity",
+            "obscene",
+            "identity_attack",
+            "insult",
+            "threat",
+            "sexual_explicit",
+        ):
+            score = detoxify.get(score_name)
+            if (
+                isinstance(score, (int, float))
+                and not isinstance(score, bool)
+                and score >= 0.5
+            ):
+                return False
 
     return True
 
@@ -158,12 +225,20 @@ def _leaf_paths(
     path: tuple[dict[str, object], ...] = (),
     *,
     language: str | None,
+    max_assistant_rank: int | None = 1,
+    max_depth: int = 4,
 ) -> Iterator[tuple[dict[str, object], ...]]:
-    """Yield every usable root-to-leaf path in one OASST1 tree."""
-    if not _node_is_usable(node, language):
+    """Yield usable, reasonably ranked paths capped to a shallow conversation."""
+    if not _node_is_usable(
+        node, language, max_assistant_rank=max_assistant_rank
+    ):
         return
 
     current = path + (node,)
+    if len(current) >= max_depth:
+        yield current
+        return
+
     replies = node.get("replies", [])
     if not isinstance(replies, list):
         replies = []
@@ -171,7 +246,10 @@ def _leaf_paths(
     usable_replies = [
         reply
         for reply in replies
-        if isinstance(reply, dict) and _node_is_usable(reply, language)
+        if isinstance(reply, dict)
+        and _node_is_usable(
+            reply, language, max_assistant_rank=max_assistant_rank
+        )
     ]
 
     if not usable_replies:
@@ -179,17 +257,19 @@ def _leaf_paths(
         return
 
     for reply in usable_replies:
-        yield from _leaf_paths(reply, current, language=language)
+        yield from _leaf_paths(
+            reply,
+            current,
+            language=language,
+            max_assistant_rank=max_assistant_rank,
+            max_depth=max_depth,
+        )
 
 
 def convert_path(
     path: tuple[dict[str, object], ...], *, min_assistant_chars: int = 0
 ) -> dict[str, object] | None:
-    """Convert one OASST1 root-to-leaf path to CatAI's messages format.
-
-    Optionally reject paths whose final assistant answer is too short to be
-    useful as a supervised target. Intermediate short replies are preserved.
-    """
+    """Convert a path to CatAI chat format, optionally filtering short final replies."""
     messages: list[dict[str, str]] = []
 
     for node in path:
@@ -228,6 +308,8 @@ def convert_dataset(
     language: str | None = "en",
     max_trees: int | None = None,
     max_examples: int | None = None,
+    max_assistant_rank: int | None = 1,
+    max_depth: int = 4,
     min_assistant_chars: int = 0,
 ) -> tuple[int, int]:
     """Convert an OASST1 tree archive to CatAI JSONL.
@@ -236,6 +318,10 @@ def convert_dataset(
     """
     if min_assistant_chars < 0:
         raise ValueError("min_assistant_chars must be non-negative")
+    if max_depth < 1:
+        raise ValueError("max_depth must be positive")
+    if max_assistant_rank is not None and max_assistant_rank < 0:
+        raise ValueError("max_assistant_rank must be non-negative")
 
     output.parent.mkdir(parents=True, exist_ok=True)
     trees_seen = 0
@@ -256,8 +342,15 @@ def convert_dataset(
             if not isinstance(root, dict):
                 continue
 
-            for path in _leaf_paths(root, language=language):
-                converted = convert_path(path, min_assistant_chars=min_assistant_chars)
+            for path in _leaf_paths(
+                root,
+                language=language,
+                max_assistant_rank=max_assistant_rank,
+                max_depth=max_depth,
+            ):
+                converted = convert_path(
+                    path, min_assistant_chars=min_assistant_chars
+                )
                 if converted is None:
                     continue
 
@@ -296,7 +389,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--min-assistant-chars",
         type=int,
         default=0,
-        help="Skip paths whose final assistant answer is shorter than this many characters.",
+        help="Skip paths whose final assistant reply is shorter than this many characters.",
+    )
+    parser.add_argument(
+        "--max-assistant-rank",
+        type=int,
+        default=1,
+        help="Keep assistant replies ranked this value or better; unranked replies are retained.",
+    )
+    parser.add_argument(
+        "--max-depth",
+        type=int,
+        default=4,
+        help="Maximum number of messages in each conversation path.",
     )
     parser.add_argument(
         "--keep-source",
@@ -315,6 +420,10 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--max-examples must be positive")
     if args.min_assistant_chars < 0:
         raise ValueError("--min-assistant-chars must be non-negative")
+    if args.max_assistant_rank < 0:
+        raise ValueError("--max-assistant-rank must be non-negative")
+    if args.max_depth < 1:
+        raise ValueError("--max-depth must be positive")
 
     language = None if args.language == "all" else args.language
 
@@ -328,6 +437,8 @@ def main(argv: list[str] | None = None) -> int:
         language=language,
         max_trees=args.max_trees,
         max_examples=args.max_examples,
+        max_assistant_rank=args.max_assistant_rank,
+        max_depth=args.max_depth,
         min_assistant_chars=args.min_assistant_chars,
     )
 

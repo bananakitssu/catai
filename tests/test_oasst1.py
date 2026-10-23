@@ -273,6 +273,68 @@ def test_download_dataset_does_not_retry_non_retryable_http_error(monkeypatch):
     assert not output._partial.exists()
 
 
+
+def test_converter_filters_low_rank_and_flagged_assistant_replies(tmp_path):
+    source = tmp_path / "trees.jsonl.gz"
+    output = tmp_path / "chat.jsonl"
+    tree = {
+        "prompt": {
+            "text": "Explain this briefly.",
+            "role": "prompter",
+            "lang": "en",
+            "replies": [
+                {
+                    "text": "This is a preferred, useful answer.",
+                    "role": "assistant",
+                    "lang": "en",
+                    "rank": 0,
+                    "labels": {"toxicity": {"value": 0.0, "count": 3}},
+                    "replies": [],
+                },
+                {
+                    "text": "This answer has a worse preference rank.",
+                    "role": "assistant",
+                    "lang": "en",
+                    "rank": 4,
+                    "replies": [],
+                },
+                {
+                    "text": "This answer is flagged as toxic.",
+                    "role": "assistant",
+                    "lang": "en",
+                    "rank": 1,
+                    "labels": {"toxicity": {"value": 0.9, "count": 3}},
+                    "replies": [],
+                },
+                {
+                    "text": "This answer has a strong automated toxicity score.",
+                    "role": "assistant",
+                    "lang": "en",
+                    "rank": 1,
+                    "detoxify": {"toxicity": 0.95},
+                    "replies": [],
+                },
+                {
+                    "text": "This answer fails the task.",
+                    "role": "assistant",
+                    "lang": "en",
+                    "rank": 1,
+                    "labels": {"fails_task": {"value": 0.9, "count": 3}},
+                    "replies": [],
+                },
+            ],
+        }
+    }
+    with gzip.open(source, "wt", encoding="utf-8") as handle:
+        handle.write(json.dumps(tree) + "\n")
+
+    trees, examples = convert_dataset(source, output)
+    assert (trees, examples) == (1, 1)
+    record = json.loads(output.read_text(encoding="utf-8"))
+    assert record["messages"][-1]["content"] == "This is a preferred, useful answer."
+
+
+
 def test_convert_path_filters_short_final_assistant_reply():
     from catai.oasst1 import convert_path
 

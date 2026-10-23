@@ -14,6 +14,35 @@ on:
         description: "SFT epochs"
         required: false
         default: "1"
+      base_epochs:
+        description: "Base-model pretraining epochs"
+        required: false
+        default: "1"
+      tokenizer:
+        description: "Tokenizer for a fresh base-model experiment"
+        type: choice
+        options:
+          - bpe
+          - char
+        required: true
+        default: bpe
+      sequence_length:
+        description: "Base and SFT sequence length"
+        type: choice
+        options:
+          - "512"
+          - "1024"
+        required: true
+        default: "512"
+      max_tokens:
+        description: "Base pretraining token budget; start at 5M for a measured BPE experiment"
+        required: false
+        default: "5000000"
+      publish_model:
+        description: "Publish this experiment to the live B2 model manifest"
+        type: boolean
+        required: true
+        default: false
       training_mode:
         description: "Full retraining or reuse a prior base checkpoint for SFT-only iteration"
         type: choice
@@ -61,6 +90,43 @@ jobs:
           echo
           echo "=== pip cache ==="
           du -sh "$HOME/.cache/pip" 2>/dev/null || true
+      - name: Validate training inputs
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          SFT_EPOCHS: ${{ inputs.sft_epochs || '1' }}
+          CHAT_EXAMPLES: ${{ inputs.chat_examples || '5000' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '5000000' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
+        run: |
+          python - <<'PY'
+          import os
+
+          def positive_int(name, maximum):
+              value = os.environ[name]
+              if not value.isdecimal():
+                  raise SystemExit(f"{name} must be a positive integer")
+              number = int(value)
+              if number < 1 or number > maximum:
+                  raise SystemExit(f"{name} must be between 1 and {maximum}")
+              return number
+
+          positive_int("BASE_EPOCHS", 5)
+          positive_int("SFT_EPOCHS", 10)
+          positive_int("CHAT_EXAMPLES", 50000)
+          positive_int("MAX_TOKENS", 100000000)
+          if os.environ["TOKENIZER"] not in {"bpe", "char"}:
+              raise SystemExit("TOKENIZER must be 'bpe' or 'char'")
+          if os.environ["SEQUENCE_LENGTH"] not in {"512", "1024"}:
+              raise SystemExit("SEQUENCE_LENGTH must be 512 or 1024")
+          if os.environ["TOKENIZER"] == "char" and os.environ["SEQUENCE_LENGTH"] != "1024":
+              raise SystemExit(
+                  "The character tokenizer needs a 1024-token context for CatAI's "
+                  "state prompt; use BPE for the 512-token experiment."
+              )
+          print("Experiment inputs validated.")
+          PY
       - name: Compile CatAI inference sources
         run: python -m compileall -q inference scripts/export_inference.py tests
 
@@ -100,6 +166,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Verify B2 publisher secrets before expensive training
+        if: inputs.publish_model == true
         env:
           B2_KEY_ID: ${{ secrets.B2_KEY_ID }}
           B2_APPLICATION_KEY: ${{ secrets.B2_APPLICATION_KEY }}
@@ -170,6 +237,34 @@ jobs:
           echo "=== pip cache ==="
           du -sh "$HOME/.cache/pip" 2>/dev/null || true
 
+      - name: Check reused checkpoint settings
+        if: inputs.training_mode == 'sft_only'
+        env:
+          EXPECTED_TOKENIZER: ${{ inputs.tokenizer }}
+          EXPECTED_SEQUENCE_LENGTH: ${{ inputs.sequence_length }}
+        run: |
+          python - <<'PY'
+          import os
+          from catai.checkpoint import load_checkpoint_metadata
+
+          metadata = load_checkpoint_metadata("catai.pt")
+          tokenizer = metadata.get("tokenizer", {})
+          model = metadata.get("model", {})
+          expected_tokenizer = os.environ["EXPECTED_TOKENIZER"]
+          expected_length = int(os.environ["EXPECTED_SEQUENCE_LENGTH"])
+
+          if tokenizer.get("type") != expected_tokenizer:
+              raise SystemExit(
+                  f"Selected base checkpoint uses tokenizer={tokenizer.get('type')!r}; "
+                  f"the workflow requested {expected_tokenizer!r}."
+              )
+          if model.get("max_seq_len") != expected_length:
+              raise SystemExit(
+                  f"Selected base checkpoint uses context length={model.get('max_seq_len')!r}; "
+                  f"the workflow requested {expected_length}."
+              )
+          print("Reused checkpoint tokenizer and context match the selected experiment.")
+          PY
       - name: Restore OASST1 source cache
         id: oasst-cache
         uses: actions/cache/restore@v4
@@ -177,35 +272,37 @@ jobs:
           path: data/oasst1_ready.trees.jsonl.gz
           key: catai-oasst1-ready-v1
       - name: Build OASST1 CatAI chat dataset
+        env:
+          CHAT_EXAMPLES: ${{ inputs.chat_examples || '5000' }}
         run: |
           python data/download_oasst1.py \
             --source data/oasst1_ready.trees.jsonl.gz \
             --output data/oasst1_chat.jsonl \
             --language en \
             --min-assistant-chars 20 \
-            --max-examples "${{ inputs.chat_examples || '5000' }}" \
+            --max-assistant-rank 1 \
+            --max-depth 4 \
+            --max-examples "$CHAT_EXAMPLES" \
             --keep-source
 
-      - name: Merge CatAI personality examples
-        run: cat data/instruction_chat.jsonl data/oasst1_chat.jsonl > data/chat_sft.jsonl
-
-      - name: Validate chat dataset before base training
+      - name: Validate OASST1 and CatAI personality datasets
         run: |
           python - <<'PY'
           from catai.chat_dataset import load_chat_dataset
           from catai.sft import ChatSupervisedDataset
           from catai.tokenizer import CharTokenizer
 
-          examples = load_chat_dataset("data/chat_sft.jsonl")
+          base_examples = load_chat_dataset("data/oasst1_chat.jsonl")
+          personality_examples = load_chat_dataset("data/instruction_chat.jsonl")
+          examples = base_examples + personality_examples
           dataset = ChatSupervisedDataset(
               examples,
               CharTokenizer.default(),
               sequence_length=1024,
           )
-          print(f"validated {len(examples):,} chat examples")
+          print(f"validated {len(base_examples):,} OASST1 examples")
+          print(f"validated {len(personality_examples):,} personality examples")
           print(f"preflight constructed {len(dataset):,} SFT examples")
-          print(f"first message roles: {[message['role'] for message in examples[0]]}")
-          print(f"last message roles: {[message['role'] for message in examples[-1]]}")
           PY
 
       - name: Save OASST1 source cache
@@ -232,8 +329,25 @@ jobs:
           key: catai-corpus-redpajama-v2-100m-${{ hashFiles('data/download_corpus.py') }}
 
       - name: Train base model
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '5000000' }}
         run: |
-          python -m catai             --corpus data/corpus.txt             --checkpoint catai.pt             --epochs 1             --batch-size 16             --sequence-length 256             --model-size base             --max-tokens 10000000             --validation-split 0.05             --device cpu
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size 16 \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size base \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 512 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --device cpu
 
       - name: Generate base text
         run: |
@@ -259,11 +373,21 @@ jobs:
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
-      - name: Validate SFT-only inputs and B2 publishing configuration
+      - name: Validate SFT-only inputs
+        if: inputs.training_mode == 'sft_only'
         shell: bash
         env:
-          TRAINING_MODE: ${{ inputs.training_mode }}
           BASE_CHECKPOINT_RUN_ID: ${{ inputs.base_checkpoint_run_id }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$BASE_CHECKPOINT_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "SFT-only mode needs base_checkpoint_run_id: the Actions run ID that has the catai-base-checkpoint artifact." >&2
+            exit 1
+          fi
+      - name: Verify B2 publishing configuration
+        if: inputs.publish_model == true
+        shell: bash
+        env:
           B2_KEY_ID: ${{ secrets.B2_KEY_ID }}
           B2_APPLICATION_KEY: ${{ secrets.B2_APPLICATION_KEY }}
           B2_BUCKET_NAME: ${{ secrets.B2_BUCKET_NAME }}
@@ -271,10 +395,6 @@ jobs:
           B2_REGION: ${{ secrets.B2_REGION }}
         run: |
           set -euo pipefail
-          if [[ "$TRAINING_MODE" == "sft_only" && ! "$BASE_CHECKPOINT_RUN_ID" =~ ^[0-9]+$ ]]; then
-            echo "SFT-only mode needs base_checkpoint_run_id: the Actions run ID that has the catai-base-checkpoint artifact." >&2
-            exit 1
-          fi
           missing=()
           for name in B2_KEY_ID B2_APPLICATION_KEY B2_BUCKET_NAME B2_ENDPOINT_URL B2_REGION; do
             if [[ -z "${!name:-}" ]]; then missing+=("$name"); fi
@@ -306,7 +426,6 @@ jobs:
                   "The configured value was not printed."
               )
           print("B2 endpoint format validated (value hidden).")
-          PY
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -336,45 +455,54 @@ jobs:
           path: data/oasst1_ready.trees.jsonl.gz
           key: catai-oasst1-ready-v1
       - name: Build OASST1 CatAI chat dataset
+        env:
+          CHAT_EXAMPLES: ${{ inputs.chat_examples || '5000' }}
         run: |
           python data/download_oasst1.py \
             --source data/oasst1_ready.trees.jsonl.gz \
             --output data/oasst1_chat.jsonl \
             --language en \
             --min-assistant-chars 20 \
-            --max-examples "${{ inputs.chat_examples || '5000' }}" \
+            --max-assistant-rank 1 \
+            --max-depth 4 \
+            --max-examples "$CHAT_EXAMPLES" \
             --keep-source
-      - name: Merge CatAI personality examples
-        run: cat data/instruction_chat.jsonl data/oasst1_chat.jsonl > data/chat_sft.jsonl
-      - name: Validate chat dataset before SFT
+      - name: Validate OASST1 and CatAI personality datasets before SFT
         run: |
           python - <<'PY'
           from catai.chat_dataset import load_chat_dataset
           from catai.sft import ChatSupervisedDataset
           from catai.tokenizer import CharTokenizer
 
-          examples = load_chat_dataset("data/chat_sft.jsonl")
+          base_examples = load_chat_dataset("data/oasst1_chat.jsonl")
+          personality_examples = load_chat_dataset("data/instruction_chat.jsonl")
           dataset = ChatSupervisedDataset(
-              examples,
+              base_examples + personality_examples,
               CharTokenizer.default(),
-              sequence_length=768,
+              sequence_length=1024,
           )
-          print(f"validated {len(examples):,} chat examples")
+          print(f"validated {len(base_examples):,} OASST1 examples")
+          print(f"validated {len(personality_examples):,} personality examples")
           print(f"preflight constructed {len(dataset):,} SFT examples")
           PY
       - name: Supervised fine-tuning (SFT)
+        env:
+          SFT_EPOCHS: ${{ inputs.sft_epochs || '1' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
         run: |
           python -m catai.sft_cli \
             --base-checkpoint catai.pt \
-            --dataset data/chat_sft.jsonl \
+            --dataset data/oasst1_chat.jsonl \
+            --personality-dataset data/instruction_chat.jsonl \
+            --personality-ratio 0.25 \
             --checkpoint catai-sft.pt \
-            --epochs "${{ inputs.sft_epochs || '1' }}" \
+            --epochs "$SFT_EPOCHS" \
             --batch-size 2 \
             --learning-rate 2e-5 \
             --grad-clip 1.0 \
             --validation-split 0.05 \
             --patience 2 \
-            --sequence-length 768 \
+            --sequence-length "$SEQUENCE_LENGTH" \
             --seed 42 \
             --device cpu
       - name: Generate chat response
@@ -411,6 +539,7 @@ jobs:
         run: python scripts/export_inference.py --checkpoint catai-sft.pt --output catai-sft.npz
 
       - name: Publish checkpoints to Backblaze B2
+        if: inputs.publish_model == true
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.B2_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.B2_APPLICATION_KEY }}

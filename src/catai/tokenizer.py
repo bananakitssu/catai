@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
+import heapq
 
 
 EOS_TOKEN = "<EOS>"
@@ -132,18 +133,60 @@ class BPETokenizer:
         return self.vocabulary.index(UNK_TOKEN) if UNK_TOKEN in self.vocabulary else None
 
     def _apply_merges(self, symbols: list[str]) -> list[str]:
-        for left, right in self.merges:
-            merged: list[str] = []
-            index = 0
-            while index < len(symbols):
-                if index + 1 < len(symbols) and symbols[index] == left and symbols[index + 1] == right:
-                    merged.append(left + right)
-                    index += 2
-                else:
-                    merged.append(symbols[index])
-                    index += 1
-            symbols = merged
-        return symbols
+        """Apply ordered BPE merges without rescanning all text per merge."""
+        if len(symbols) < 2 or not self.merges:
+            return symbols
+
+        ranks = {pair: rank for rank, pair in enumerate(self.merges)}
+        count = len(symbols)
+        previous = [index - 1 for index in range(count)]
+        following = [index + 1 for index in range(count)]
+        following[-1] = -1
+        alive = [True] * count
+        candidates: list[tuple[int, int, int, tuple[str, str]]] = []
+
+        def push_pair(left_index: int, right_index: int) -> None:
+            if left_index < 0 or right_index < 0:
+                return
+            if not alive[left_index] or not alive[right_index]:
+                return
+            if following[left_index] != right_index:
+                return
+            pair = (symbols[left_index], symbols[right_index])
+            rank = ranks.get(pair)
+            if rank is not None:
+                heapq.heappush(candidates, (rank, left_index, right_index, pair))
+
+        for index in range(count - 1):
+            push_pair(index, index + 1)
+
+        while candidates:
+            rank, left_index, right_index, pair = heapq.heappop(candidates)
+            if (
+                not alive[left_index]
+                or not alive[right_index]
+                or following[left_index] != right_index
+                or (symbols[left_index], symbols[right_index]) != pair
+                or ranks.get(pair) != rank
+            ):
+                continue
+
+            symbols[left_index] += symbols[right_index]
+            alive[right_index] = False
+            after = following[right_index]
+            following[left_index] = after
+            if after >= 0:
+                previous[after] = left_index
+            push_pair(previous[left_index], left_index)
+            push_pair(left_index, after)
+
+        merged: list[str] = []
+        index = 0
+        while index >= 0:
+            if alive[index]:
+                merged.append(symbols[index])
+            index = following[index]
+        return merged
 
     def encode(self, text: str) -> list[int]:
         lookup = {token: i for i, token in enumerate(self.vocabulary)}
@@ -173,8 +216,14 @@ class BPETokenizer:
         return "".join(decoded)
 
     @classmethod
-    def from_text(cls, text: str, vocab_size: int = 256) -> "BPETokenizer":
-        """Train a deterministic BPE vocabulary from a text sample."""
+    def from_text(
+        cls,
+        text: str,
+        vocab_size: int = 256,
+        *,
+        extra_characters: str = "",
+    ) -> "BPETokenizer":
+        """Train BPE merges on a sample while optionally retaining corpus characters."""
         if not text:
             raise ValueError("training text must not be empty")
         if vocab_size < 3:
@@ -185,6 +234,7 @@ class BPETokenizer:
         # budget so small vocabularies remain useful and deterministic.
         symbols = list(text)
         base_vocabulary = set(symbols)
+        base_vocabulary.update(extra_characters)
         special_count = 2
         if len(base_vocabulary) + special_count > vocab_size:
             raise ValueError(

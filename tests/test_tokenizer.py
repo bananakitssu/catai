@@ -58,3 +58,40 @@ def test_bpe_is_deterministic():
     first = BPETokenizer.from_text("banana cat banana", vocab_size=12)
     second = BPETokenizer.from_text("banana cat banana", vocab_size=12)
     assert first == second
+
+
+
+def test_bpe_heap_merges_match_sequential_merge_order():
+    texts = [
+        "banana banana cat",
+        "aaaaaaabaaaa",
+        "the cat sat on the cat",
+        "one two two one three",
+    ]
+    for text in texts:
+        tokenizer = BPETokenizer.from_text(text, vocab_size=18)
+        expected = list(text)
+        for left, right in tokenizer.merges:
+            merged = []
+            index = 0
+            while index < len(expected):
+                if (
+                    index + 1 < len(expected)
+                    and expected[index] == left
+                    and expected[index + 1] == right
+                ):
+                    merged.append(left + right)
+                    index += 2
+                else:
+                    merged.append(expected[index])
+                    index += 1
+            expected = merged
+        assert tokenizer._apply_merges(list(text)) == expected
+
+
+def test_bpe_extra_characters_remain_encodable():
+    tokenizer = BPETokenizer.from_text(
+        "banana cat", vocab_size=20, extra_characters="Ω"
+    )
+    text = "banana Ω cat"
+    assert tokenizer.decode(tokenizer.encode(text)) == text
