@@ -201,3 +201,50 @@ def test_generate_stream_does_not_emit_whitespace_only_deltas(
     assert deltas
     assert all(delta.strip() for delta in deltas)
     assert "".join(deltas) == "  hi"
+
+
+@pytest.mark.parametrize(
+    "role",
+    [
+        "tool_call:assistant",
+        "tool_call:result->assistant",
+        "mcp_tool_call:assistant",
+        "mcp_tool_call:result->assistant",
+    ],
+)
+def test_generate_stream_accepts_native_tool_and_mcp_roles(
+    monkeypatch: pytest.MonkeyPatch,
+    role: str,
+) -> None:
+    tokenizer = CharTokenizer.default()
+    vocabulary = list(tokenizer.vocabulary)
+    lookup = {token: index for index, token in enumerate(vocabulary)}
+    generated_tokens = iter([lookup["o"], lookup["k"]])
+    loaded = {
+        "weights": {},
+        "metadata": {
+            "model": {"max_seq_len": 768, "d_model": 16, "n_heads": 4, "n_layers": 1},
+            "tokenizer": {"type": "char", "vocabulary": vocabulary},
+        },
+        "sha256": "c" * 64,
+    }
+    monkeypatch.setattr(inference_runtime, "_evict_if_idle_locked", lambda now: None)
+    monkeypatch.setattr(inference_runtime, "_load_model_locked", lambda: loaded)
+    monkeypatch.setattr(inference_runtime, "_touch_model_locked", lambda: None)
+    monkeypatch.setattr(inference_runtime, "_forward", lambda weights, model, tokens: np.zeros(len(vocabulary), dtype=np.float32))
+    monkeypatch.setattr(inference_runtime, "_sample", lambda *args: next(generated_tokens))
+
+    events = list(inference_runtime.generate_stream(
+        [
+            {"role": "system", "content": "Use the tool trace as conversation context."},
+            {"role": "user", "content": "Search for a useful result."},
+            {"role": role, "content": "{\"name\":\"search\",\"arguments\":{\"query\":\"example\"}}"},
+            {"role": "tool_call:result->assistant", "content": "Found a result."},
+            {"role": "user", "content": "Summarize the result."},
+        ],
+        max_new_tokens=2,
+        chunk_tokens=1,
+    ))
+
+    assert "".join(event["text"] for event in events if event["event"] == "delta") == "ok"
+    assert events[-1]["event"] == "done"
