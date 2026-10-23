@@ -44,7 +44,7 @@ def test_tool_examples_use_the_runtime_envelope_and_role_trace():
             assert envelope == payload
             found += 1
 
-    assert found >= 2
+    assert found >= 20
     assert "tool_call:assistant" in ASSISTANT_OUTPUT_ROLES
     assert "mcp_tool_call:assistant" in ASSISTANT_OUTPUT_ROLES
 
@@ -71,7 +71,7 @@ def test_cited_answers_link_to_urls_returned_by_web_tools():
                 assert url in result_text, f"citation URL must come from tool output: {url}"
                 citation_examples += 1
 
-    assert citation_examples >= 4
+    assert citation_examples >= 10
 
 
 def test_curated_dataset_contains_both_direct_answers_and_tool_use():
