@@ -541,6 +541,7 @@ jobs:
       always() &&
       github.event_name == 'workflow_dispatch' &&
       needs.test.result == 'success' &&
+      needs.sft.result == 'success' &&
       (needs.base_training.result == 'success' || inputs.training_mode == 'sft_only')
     needs: [test, base_training, sft]
     runs-on: ubuntu-latest
