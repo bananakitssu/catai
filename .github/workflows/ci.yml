@@ -523,7 +523,9 @@ jobs:
             --patience 2 \
             --sequence-length "$SEQUENCE_LENGTH" \
             --seed 42 \
-            --device cpu
+            --device cpu \\
+            --recovery-checkpoint catai-sft-recovery.pt \\
+            --checkpoint-every-batches 50
       - name: Upload SFT recovery checkpoint
         uses: actions/upload-artifact@v4
         with:
@@ -618,6 +620,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: catai-base-checkpoint
+          path: .
+      - name: Download SFT recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-sft-recovery
           path: .
       - name: Download SFT recovery checkpoint
         uses: actions/download-artifact@v4
