@@ -1,6 +1,6 @@
 import torch
 
-from catai.checkpoint import load_checkpoint, load_checkpoint_metadata, save_checkpoint
+from catai.checkpoint import load_checkpoint, load_checkpoint_metadata, load_checkpoint_state, save_checkpoint
 from catai.model import CatAI
 
 
@@ -63,3 +63,27 @@ def test_checkpoint_rejects_negative_step(tmp_path):
         assert str(exc) == "step must be non-negative"
     else:
         raise AssertionError("negative step should be rejected")
+
+
+def test_checkpoint_preserves_resume_state(tmp_path):
+    model = CatAI(vocab_size=4, max_seq_len=8, d_model=8, n_heads=2, n_layers=1)
+    optimizer = torch.optim.AdamW(model.parameters())
+    path = tmp_path / "recovery.pt"
+    extra_state = {
+        "epoch_index": 2,
+        "batch_index": 150,
+        "epoch_indices": [3, 1, 0, 2],
+        "torch_rng_state": torch.get_rng_state(),
+        "next_batch_hash": "abc123",
+    }
+
+    save_checkpoint(
+        path, model, optimizer, step=150, epoch=2, extra_state=extra_state
+    )
+
+    restored = load_checkpoint_state(path)
+    assert restored["epoch_index"] == 2
+    assert restored["batch_index"] == 150
+    assert restored["epoch_indices"] == [3, 1, 0, 2]
+    assert restored["next_batch_hash"] == "abc123"
+    assert torch.equal(restored["torch_rng_state"], extra_state["torch_rng_state"])

@@ -367,6 +367,7 @@ jobs:
       always() &&
       github.event_name == 'workflow_dispatch' &&
       needs.test.result == 'success' &&
+      needs.sft.result == 'success' &&
       (needs.base_training.result == 'success' || inputs.training_mode == 'sft_only')
     needs: [test, base_training]
     runs-on: ubuntu-latest
@@ -504,9 +505,192 @@ jobs:
               f"{instruction_dataset.skipped_overlength_examples:,} skipped"
           )
           PY
-      - name: Supervised fine-tuning (SFT)
+      - name: Supervised fine-tuning (SFT, epochs 1–2)
         env:
-          SFT_EPOCHS: ${{ inputs.sft_epochs || '1' }}
+          SFT_TOTAL_EPOCHS: ${{ inputs.sft_epochs || '3' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
+        run: |
+          SFT_STAGE_EPOCHS="$SFT_TOTAL_EPOCHS"
+          if (( SFT_STAGE_EPOCHS > 2 )); then SFT_STAGE_EPOCHS=2; fi
+          python -m catai.sft_cli \
+            --base-checkpoint catai.pt \
+            --dataset data/oasst1_chat.jsonl \
+            --personality-dataset data/instruction_chat.jsonl \
+            --personality-ratio 0.25 \
+            --checkpoint catai-sft.pt \
+            --epochs "$SFT_STAGE_EPOCHS" \
+            --batch-size 2 \
+            --learning-rate 2e-5 \
+            --grad-clip 1.0 \
+            --validation-split 0.05 \
+            --patience 2 \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --seed 42 \
+            --device cpu \
+            --recovery-checkpoint catai-sft-recovery.pt \
+            --checkpoint-every-batches 50
+      - name: Upload SFT recovery checkpoint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-sft-recovery
+          path: catai-sft-recovery.pt
+          if-no-files-found: ignore
+          retention-days: 7
+
+  sft2:
+    # In SFT-only mode, base_training is intentionally skipped. Explicitly
+    # allow this job to proceed when tests passed and a prior run is selected.
+    if: >-
+      always() &&
+      github.event_name == 'workflow_dispatch' &&
+      needs.test.result == 'success' &&
+      needs.sft.result == 'success' &&
+      (needs.base_training.result == 'success' || inputs.training_mode == 'sft_only')
+    needs: [test, base_training, sft]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate SFT-only inputs
+        if: inputs.training_mode == 'sft_only'
+        shell: bash
+        env:
+          BASE_CHECKPOINT_RUN_ID: ${{ inputs.base_checkpoint_run_id }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$BASE_CHECKPOINT_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "SFT-only mode needs base_checkpoint_run_id: the Actions run ID that has the catai-base-checkpoint artifact." >&2
+            exit 1
+          fi
+      - name: Verify B2 publishing configuration
+        if: inputs.publish_model == true
+        shell: bash
+        env:
+          B2_KEY_ID: ${{ secrets.B2_KEY_ID }}
+          B2_APPLICATION_KEY: ${{ secrets.B2_APPLICATION_KEY }}
+          B2_BUCKET_NAME: ${{ secrets.B2_BUCKET_NAME }}
+          B2_ENDPOINT_URL: ${{ secrets.B2_ENDPOINT_URL }}
+          B2_REGION: ${{ secrets.B2_REGION }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in B2_KEY_ID B2_APPLICATION_KEY B2_BUCKET_NAME B2_ENDPOINT_URL B2_REGION; do
+            if [[ -z "${!name:-}" ]]; then missing+=("$name"); fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            printf 'Missing GitHub Actions secrets: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+          python3 - <<'PY'
+          import os
+          from urllib.parse import urlsplit
+
+          endpoint = os.environ["B2_ENDPOINT_URL"].strip().strip(chr(34) + chr(39))
+          if "://" not in endpoint:
+              endpoint = "https://" + endpoint
+          parsed = urlsplit(endpoint)
+          if (
+              parsed.scheme.lower() != "https"
+              or not parsed.hostname
+              or parsed.username
+              or parsed.password
+              or parsed.query
+              or parsed.fragment
+              or parsed.path not in ("", "/")
+          ):
+              raise SystemExit(
+                  "Invalid B2_ENDPOINT_URL secret. Use the HTTPS S3 API base URL, "
+                  "for example https://s3.us-east-005.backblazeb2.com. "
+                  "The configured value was not printed."
+              )
+          print("B2 endpoint format validated (value hidden).")
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI
+        run: python -m pip install -e .
+      - name: Download base checkpoint from selected prior run
+        if: inputs.training_mode == 'sft_only'
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-checkpoint
+          path: .
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.base_checkpoint_run_id }}
+      - name: Download base checkpoint from this run
+        if: inputs.training_mode == 'full'
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-checkpoint
+          path: .
+      - name: Download SFT recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-sft-recovery
+          path: .
+      - name: Restore OASST1 source cache
+        id: oasst-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/oasst1_ready.trees.jsonl.gz
+          key: catai-oasst1-ready-v1
+      - name: Build OASST1 CatAI chat dataset
+        env:
+          CHAT_EXAMPLES: ${{ inputs.chat_examples || '4500' }}
+        run: |
+          python data/download_oasst1.py \
+            --source data/oasst1_ready.trees.jsonl.gz \
+            --output data/oasst1_chat.jsonl \
+            --language en \
+            --min-assistant-chars 20 \
+            --max-assistant-rank 1 \
+            --max-depth 4 \
+            --max-examples "$CHAT_EXAMPLES" \
+            --keep-source
+      - name: Validate OASST1 and CatAI instruction datasets before SFT
+        env:
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
+        run: |
+          python - <<'PY'
+          import os
+
+          from catai.checkpoint import load_checkpoint_metadata
+          from catai.chat_dataset import load_chat_dataset
+          from catai.sft import ChatSupervisedDataset
+          from catai.sft_cli import _load_tokenizer
+
+          metadata = load_checkpoint_metadata("catai.pt")
+          tokenizer = _load_tokenizer(metadata["tokenizer"])
+          sequence_length = int(os.environ["SEQUENCE_LENGTH"])
+
+          base_examples = load_chat_dataset("data/oasst1_chat.jsonl")
+          instruction_examples = load_chat_dataset("data/instruction_chat.jsonl")
+          base_dataset = ChatSupervisedDataset(
+              base_examples, tokenizer, sequence_length=sequence_length
+          )
+          instruction_dataset = ChatSupervisedDataset(
+              instruction_examples, tokenizer, sequence_length=sequence_length
+          )
+          print(
+              f"OASST1: {len(base_examples):,} loaded, "
+              f"{len(base_dataset):,} trainable, "
+              f"{base_dataset.compacted_examples:,} compacted, "
+              f"{base_dataset.skipped_overlength_examples:,} skipped"
+          )
+          print(
+              f"CatAI instructions: {len(instruction_examples):,} loaded, "
+              f"{len(instruction_dataset):,} trainable, "
+              f"{instruction_dataset.compacted_examples:,} compacted, "
+              f"{instruction_dataset.skipped_overlength_examples:,} skipped"
+          )
+          PY
+      - name: Supervised fine-tuning (SFT 2, remaining epochs + evaluation)
+        env:
+          SFT_EPOCHS: ${{ inputs.sft_epochs || '3' }}
           SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
         run: |
           python -m catai.sft_cli \
@@ -515,6 +699,9 @@ jobs:
             --personality-dataset data/instruction_chat.jsonl \
             --personality-ratio 0.25 \
             --checkpoint catai-sft.pt \
+            --resume-from catai-sft-recovery.pt \
+            --recovery-checkpoint catai-sft-recovery.pt \
+            --checkpoint-every-batches 50 \
             --epochs "$SFT_EPOCHS" \
             --batch-size 2 \
             --learning-rate 2e-5 \
