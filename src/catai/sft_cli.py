@@ -242,6 +242,8 @@ def main(argv: list[str] | None = None) -> int:
     best_optimizer_state = None
     stale_epochs = 0
     total_steps = 0
+    resume_epoch_loss = 0.0
+    resume_epoch_batches = 0
     start_epoch = 0
     resume_batch = 0
     saved_epoch_indices = None
@@ -262,6 +264,8 @@ def main(argv: list[str] | None = None) -> int:
         best_optimizer_state = resume_state.get("best_optimizer_state")
         stale_epochs = int(resume_state.get("stale_epochs", 0))
         total_steps = int(resume_state.get("total_steps", 0))
+        resume_epoch_loss = float(resume_state.get("current_epoch_loss", 0.0))
+        resume_epoch_batches = int(resume_state.get("current_epoch_batches", 0))
         rng_state = resume_state.get("torch_rng_state")
         if rng_state is not None:
             torch.set_rng_state(rng_state)
@@ -304,6 +308,8 @@ def main(argv: list[str] | None = None) -> int:
             "stale_epochs": stale_epochs,
             "total_steps": total_steps,
             "base_step": base_step,
+            "current_epoch_loss": resume_epoch_loss,
+            "current_epoch_batches": resume_epoch_batches,
         }
         save_checkpoint(
             args.recovery_checkpoint, model, optimizer, step=base_step + total_steps,
@@ -336,8 +342,8 @@ def main(argv: list[str] | None = None) -> int:
         ]
         if not batches_for_epoch:
             raise ValueError("training dataset produced no batches")
-        total_loss = 0.0
-        batches = 0
+        total_loss = resume_epoch_loss if epoch == start_epoch else 0.0
+        batches = resume_epoch_batches if epoch == start_epoch else 0
         first_batch = resume_batch if epoch == start_epoch else 0
         print(f"epoch {epoch + 1}/{args.epochs}", flush=True)
         if first_batch and saved_next_batch_hash:
@@ -369,6 +375,8 @@ def main(argv: list[str] | None = None) -> int:
             )
             batches += 1
             total_steps += 1
+            resume_epoch_loss = total_loss
+            resume_epoch_batches = batches
             completed_batch = batch_offset + 1
             if completed_batch % args.checkpoint_every_batches == 0:
                 save_recovery(epoch, completed_batch, epoch_indices)
@@ -412,6 +420,8 @@ def main(argv: list[str] | None = None) -> int:
                     break
         resume_batch = 0
         saved_epoch_indices = None
+        resume_epoch_loss = 0.0
+        resume_epoch_batches = 0
         save_recovery(epoch + 1, 0, [])
 
 
