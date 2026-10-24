@@ -346,7 +346,7 @@ def main(argv: list[str] | None = None) -> int:
             actual_hash = batch_hash(batches_for_epoch[first_batch])
             print(
                 f"resume sanity: last batch index {first_batch}; optimizer step {total_steps}; "
-                f"next-batch token hash {actual_hash}",
+                f"lr={optimizer.param_groups[0]['lr']:.8g}; next-batch token hash {actual_hash}",
                 flush=True,
             )
             if actual_hash != saved_next_batch_hash:
