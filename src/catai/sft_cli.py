@@ -316,7 +316,6 @@ def main(argv: list[str] | None = None) -> int:
             "best_validation_loss": best_validation_loss,
             "best_epoch": best_epoch,
             "best_model_state": best_model_state,
-            "best_optimizer_state": best_optimizer_state,
             "stale_epochs": stale_epochs,
             "total_steps": total_steps,
             "base_step": base_step,
