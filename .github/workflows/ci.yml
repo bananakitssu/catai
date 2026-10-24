@@ -9,7 +9,7 @@ on:
       chat_examples:
         description: "Maximum OASST1 chat examples for SFT"
         required: false
-        default: "5000"
+        default: "4500"
       sft_epochs:
         description: "SFT epochs"
         required: false
@@ -95,7 +95,7 @@ jobs:
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           SFT_EPOCHS: ${{ inputs.sft_epochs || '1' }}
-          CHAT_EXAMPLES: ${{ inputs.chat_examples || '5000' }}
+          CHAT_EXAMPLES: ${{ inputs.chat_examples || '4500' }}
           MAX_TOKENS: ${{ inputs.max_tokens || '5000000' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
           SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
@@ -273,7 +273,7 @@ jobs:
           key: catai-oasst1-ready-v1
       - name: Build OASST1 CatAI chat dataset
         env:
-          CHAT_EXAMPLES: ${{ inputs.chat_examples || '5000' }}
+          CHAT_EXAMPLES: ${{ inputs.chat_examples || '4500' }}
         run: |
           python data/download_oasst1.py \
             --source data/oasst1_ready.trees.jsonl.gz \
@@ -456,7 +456,7 @@ jobs:
           key: catai-oasst1-ready-v1
       - name: Build OASST1 CatAI chat dataset
         env:
-          CHAT_EXAMPLES: ${{ inputs.chat_examples || '5000' }}
+          CHAT_EXAMPLES: ${{ inputs.chat_examples || '4500' }}
         run: |
           python data/download_oasst1.py \
             --source data/oasst1_ready.trees.jsonl.gz \
