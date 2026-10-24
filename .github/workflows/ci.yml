@@ -688,7 +688,7 @@ jobs:
               f"{instruction_dataset.skipped_overlength_examples:,} skipped"
           )
           PY
-      - name: Supervised fine-tuning (SFT 2, epoch 3 + evaluation)
+      - name: Supervised fine-tuning (SFT 2, remaining epochs + evaluation)
         env:
           SFT_EPOCHS: ${{ inputs.sft_epochs || '3' }}
           SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
