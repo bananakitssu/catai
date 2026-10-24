@@ -507,7 +507,7 @@ jobs:
           PY
       - name: Supervised fine-tuning (SFT, epochs 1–2)
         env:
-          SFT_EPOCHS: "2"
+          SFT_TOTAL_EPOCHS: ${{ inputs.sft_epochs || '3' }}
           SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
         run: |
           python -m catai.sft_cli \
@@ -688,7 +688,7 @@ jobs:
           PY
       - name: Supervised fine-tuning (SFT 2, epoch 3 + evaluation)
         env:
-          SFT_EPOCHS: "3"
+          SFT_EPOCHS: ${{ inputs.sft_epochs || '3' }}
           SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
         run: |
           python -m catai.sft_cli \
