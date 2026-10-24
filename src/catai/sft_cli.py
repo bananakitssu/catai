@@ -250,8 +250,20 @@ def main(argv: list[str] | None = None) -> int:
     saved_next_batch_hash = None
     if args.resume_from:
         resume_state = load_checkpoint_state(args.resume_from)
-        load_checkpoint(args.resume_from, model, optimizer, map_location=device)
+        restored_step = load_checkpoint(args.resume_from, model, optimizer, map_location=device)
         base_step = int(resume_state.get("base_step", 0))
+        expected_step = base_step + int(resume_state.get("total_steps", 0))
+        if restored_step != expected_step:
+            raise ValueError(
+                f"resume sanity check failed: checkpoint step {restored_step} "
+                f"does not match saved training step {expected_step}"
+            )
+        if int(resume_state.get("batch_size", args.batch_size)) != args.batch_size:
+            raise ValueError("resume sanity check failed: batch size changed")
+        if int(resume_state.get("seed", args.seed)) != args.seed:
+            raise ValueError("resume sanity check failed: training seed changed")
+        if int(resume_state.get("sequence_length", sequence_length)) != sequence_length:
+            raise ValueError("resume sanity check failed: sequence length changed")
         start_epoch = int(resume_state.get("epoch_index", 0))
         resume_batch = int(resume_state.get("batch_index", 0))
         saved_epoch_indices = resume_state.get("epoch_indices")
@@ -310,6 +322,9 @@ def main(argv: list[str] | None = None) -> int:
             "base_step": base_step,
             "current_epoch_loss": resume_epoch_loss,
             "current_epoch_batches": resume_epoch_batches,
+            "batch_size": args.batch_size,
+            "seed": args.seed,
+            "sequence_length": sequence_length,
         }
         save_checkpoint(
             args.recovery_checkpoint, model, optimizer, step=base_step + total_steps,
