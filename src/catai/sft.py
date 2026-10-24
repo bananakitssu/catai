@@ -88,37 +88,86 @@ class ChatSupervisedDataset(Dataset[dict[str, torch.Tensor]]):
 
         self.inputs: list[torch.Tensor] = []
         self.labels: list[torch.Tensor] = []
+        self.compacted_examples = 0
+        self.skipped_overlength_examples = 0
 
         for messages in examples:
-            token_ids, train_mask = chat_token_stream(messages, tokenizer)
-            target_length = sequence_length + 1
-
-            # State-conditioned chats place the canonical system prompt first.
-            # Preserve that prefix when trimming long examples so the model
-            # never silently loses its emotional state/personality context.
-            system_prefix_length = 0
+            parts: list[dict[str, object]] = []
             for message in messages:
-                if message.get("role") != "system":
-                    break
-                system_prefix_length += len(encode(ROLE_HEADER.format(role="system")))
-                system_prefix_length += len(encode(message["content"]))
-                system_prefix_length += len(encode("\n"))
+                role = message.get("role")
+                content = message.get("content")
+                if role not in ALLOWED_ROLES:
+                    raise ValueError(f"unsupported message role: {role!r}")
+                if not isinstance(content, str) or not content.strip():
+                    raise ValueError("message content must be a non-empty string")
 
-            if system_prefix_length > target_length:
-                raise ValueError(
-                    "sequence_length is too short for the system state prompt"
+                header_ids = list(encode(ROLE_HEADER.format(role=role)))
+                content_ids = list(encode(content))
+                newline_ids = list(encode("\n"))
+                trainable = is_assistant_output_role(role)
+                parts.append({
+                    "role": role,
+                    "input_ids": header_ids + content_ids + newline_ids,
+                    "train_mask": (
+                        [False] * len(header_ids)
+                        + [trainable] * (len(content_ids) + len(newline_ids))
+                    ),
+                })
+
+            if eos_token_id is not None:
+                parts[-1]["input_ids"].append(int(eos_token_id))
+                parts[-1]["train_mask"].append(
+                    is_assistant_output_role(messages[-1]["role"])
                 )
 
-            if len(token_ids) > target_length:
-                tail_length = target_length - system_prefix_length
-                token_ids = (
-                    token_ids[:system_prefix_length]
-                    + token_ids[-tail_length:]
+            target_length = sequence_length + 1
+            original_length = sum(len(part["input_ids"]) for part in parts)
+
+            if original_length > target_length:
+                # Keep the state/system prompt, then start at the latest user
+                # turn. Dropping whole earlier turns prevents unrelated old
+                # questions or answer fragments from contaminating this target.
+                system_count = 0
+                while system_count < len(parts) and parts[system_count]["role"] == "system":
+                    system_count += 1
+
+                system_length = sum(
+                    len(part["input_ids"]) for part in parts[:system_count]
                 )
-                train_mask = (
-                    train_mask[:system_prefix_length]
-                    + train_mask[-tail_length:]
-                )
+                if system_length > target_length:
+                    raise ValueError(
+                        "sequence_length is too short for the system state prompt"
+                    )
+
+                user_indices = [
+                    index
+                    for index in range(system_count, len(parts) - 1)
+                    if parts[index]["role"] == "user"
+                ]
+                if not user_indices:
+                    self.skipped_overlength_examples += 1
+                    continue
+
+                latest_user_index = user_indices[-1]
+                parts = parts[:system_count] + parts[latest_user_index:]
+                retained_length = sum(len(part["input_ids"]) for part in parts)
+                if retained_length > target_length:
+                    # A too-long latest turn is discarded in full; never train
+                    # on only the end of its answer without the matching prompt.
+                    self.skipped_overlength_examples += 1
+                    continue
+                self.compacted_examples += 1
+
+            token_ids = [
+                token
+                for part in parts
+                for token in part["input_ids"]
+            ]
+            train_mask = [
+                enabled
+                for part in parts
+                for enabled in part["train_mask"]
+            ]
 
             if len(token_ids) < target_length:
                 padding = target_length - len(token_ids)
@@ -136,6 +185,12 @@ class ChatSupervisedDataset(Dataset[dict[str, torch.Tensor]]):
 
             self.inputs.append(inputs)
             self.labels.append(labels)
+
+        if not self.inputs:
+            raise ValueError(
+                "no chat examples fit within sequence_length while preserving "
+                "a complete latest user turn and assistant response"
+            )
 
     def __len__(self) -> int:
         return len(self.inputs)
