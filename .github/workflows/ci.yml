@@ -510,13 +510,15 @@ jobs:
           SFT_TOTAL_EPOCHS: ${{ inputs.sft_epochs || '3' }}
           SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
         run: |
+          SFT_STAGE_EPOCHS="$SFT_TOTAL_EPOCHS"
+          if (( SFT_STAGE_EPOCHS > 2 )); then SFT_STAGE_EPOCHS=2; fi
           python -m catai.sft_cli \
             --base-checkpoint catai.pt \
             --dataset data/oasst1_chat.jsonl \
             --personality-dataset data/instruction_chat.jsonl \
             --personality-ratio 0.25 \
             --checkpoint catai-sft.pt \
-            --epochs "$SFT_EPOCHS" \
+            --epochs "$SFT_STAGE_EPOCHS" \
             --batch-size 2 \
             --learning-rate 2e-5 \
             --grad-clip 1.0 \
