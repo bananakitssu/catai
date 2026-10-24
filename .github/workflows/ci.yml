@@ -528,10 +528,12 @@ jobs:
             --recovery-checkpoint catai-sft-recovery.pt \
             --checkpoint-every-batches 50
       - name: Upload SFT recovery checkpoint
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: catai-sft-recovery
           path: catai-sft-recovery.pt
+          if-no-files-found: ignore
           retention-days: 7
 
   sft2:
