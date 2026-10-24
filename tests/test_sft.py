@@ -56,12 +56,12 @@ def test_chat_dataset_returns_fixed_length_masked_labels():
             ]
         ],
         tokenizer,
-        sequence_length=32,
+        sequence_length=40,
     )
 
     sample = dataset[0]
-    assert sample["input_ids"].shape == (32,)
-    assert sample["labels"].shape == (32,)
+    assert sample["input_ids"].shape == (40,)
+    assert sample["labels"].shape == (40,)
     assert torch.any(sample["labels"] != IGNORE_INDEX)
     assert torch.any(sample["labels"] == IGNORE_INDEX)
 
@@ -89,13 +89,13 @@ def test_sft_train_step_updates_parameters():
             ]
         ],
         tokenizer,
-        sequence_length=12,
+        sequence_length=40,
     )
     sample = dataset[0]
 
     model = CatAI(
         vocab_size=tokenizer.vocab_size,
-        max_seq_len=12,
+        max_seq_len=40,
         d_model=16,
         n_heads=4,
         n_layers=1,
@@ -116,21 +116,41 @@ def test_sft_train_step_updates_parameters():
     )
 
 
-def test_chat_dataset_preserves_assistant_targets_when_truncated():
+def test_chat_dataset_drops_old_turns_without_splitting_latest_question_and_answer():
     tokenizer = CharTokenizer.default()
     dataset = ChatSupervisedDataset(
         [
             [
-                {"role": "user", "content": "hello"},
-                {"role": "assistant", "content": "hi"},
+                {"role": "system", "content": "RULES"},
+                {"role": "user", "content": "What was the old question?"},
+                {"role": "assistant", "content": "This was the old answer."},
+                {"role": "user", "content": "Explain recursion in one sentence."},
+                {"role": "assistant", "content": "Recursion is when a function calls itself."},
             ]
         ],
         tokenizer,
-        sequence_length=12,
+        sequence_length=128,
     )
 
     sample = dataset[0]
+    decoded = tokenizer.decode(sample["input_ids"].tolist())
+    assert dataset.compacted_examples == 1
+    assert dataset.skipped_overlength_examples == 0
+    assert "RULES" in decoded
+    assert "What was the old question?" not in decoded
+    assert "Explain recursion in one sentence." in decoded
+    assert "Recursion is when a function calls itself." in decoded
     assert torch.any(sample["labels"] != IGNORE_INDEX)
+
+
+def test_chat_dataset_skips_a_latest_turn_that_cannot_fit_whole():
+    tokenizer = CharTokenizer.default()
+    messages = [
+        {"role": "user", "content": "Question " + "extra details " * 80},
+        {"role": "assistant", "content": "The answer starts here and cannot be fitted whole."},
+    ]
+    with pytest.raises(ValueError, match="no chat examples fit"):
+        ChatSupervisedDataset([messages], tokenizer, sequence_length=64)
 
 
 def test_chat_dataset_loads_and_validates_structured_state(tmp_path):
