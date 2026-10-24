@@ -248,7 +248,8 @@ def main(argv: list[str] | None = None) -> int:
     saved_next_batch_hash = None
     if args.resume_from:
         resume_state = load_checkpoint_state(args.resume_from)
-        base_step = load_checkpoint(args.resume_from, model, optimizer, map_location=device)
+        load_checkpoint(args.resume_from, model, optimizer, map_location=device)
+        base_step = int(resume_state.get("base_step", 0))
         start_epoch = int(resume_state.get("epoch_index", 0))
         resume_batch = int(resume_state.get("batch_index", 0))
         saved_epoch_indices = resume_state.get("epoch_indices")
@@ -285,8 +286,8 @@ def main(argv: list[str] | None = None) -> int:
         if not args.recovery_checkpoint:
             return
         next_indices = (
-            epoch_indices[batch_index:batch_index + args.batch_size]
-            if epoch_index < args.epochs and batch_index < len(epoch_indices)
+            epoch_indices[batch_index * args.batch_size:(batch_index + 1) * args.batch_size]
+            if epoch_index < args.epochs and batch_index * args.batch_size < len(epoch_indices)
             else []
         )
         next_hash = batch_hash(next_indices)
@@ -304,6 +305,7 @@ def main(argv: list[str] | None = None) -> int:
             "best_optimizer_state": best_optimizer_state,
             "stale_epochs": stale_epochs,
             "total_steps": total_steps,
+            "base_step": base_step,
         }
         save_checkpoint(
             args.recovery_checkpoint, model, optimizer, step=base_step + total_steps,
