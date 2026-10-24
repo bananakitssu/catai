@@ -77,3 +77,26 @@ def test_load_chat_dataset_rejects_invalid_json(tmp_path):
 
     with pytest.raises(ValueError, match="invalid JSON on line 1"):
         load_chat_dataset(dataset)
+
+def test_chat_dataset_merges_leading_system_instructions_into_state_prompt(tmp_path):
+    path = tmp_path / "system-instructions.jsonl"
+    path.write_text(
+        json.dumps({
+            "state": DEFAULT_STATE,
+            "messages": [
+                {"role": "system", "content": "Available tools: web_search args: query."},
+                {"role": "user", "content": "Search for the official docs."},
+                {"role": "assistant", "content": "I found the official docs."},
+            ],
+        }) + "\n",
+        encoding="utf-8",
+    )
+
+    messages = load_chat_dataset(path)[0]
+    assert messages[0]["role"] == "system"
+    assert messages[0]["content"].startswith(
+        "You are CatAI, a friendly cat-themed conversational AI."
+    )
+    assert "Available tools: web_search args: query." in messages[0]["content"]
+    assert [message["role"] for message in messages].count("system") == 1
+    assert messages[1]["role"] == "user"
