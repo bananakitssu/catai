@@ -200,8 +200,18 @@ def load_chat_dataset(path: str | Path, *, encoding: str = "utf-8") -> list[list
             raise ValueError(f"line {line_number} is missing required state")
         state = validate_state(record["state"])
         messages = validate_messages(record.get("messages"))
-        messages = [state_system_message(state), *messages]
-        examples.append(messages)
+        system_message = state_system_message(state)
+
+        # Tool availability and instructions belong in the system prompt. Merge
+        # any leading system messages into the state prompt so training uses one
+        # system block, matching the chat format used for inference.
+        system_instructions: list[str] = []
+        while messages and messages[0]["role"] == "system":
+            system_instructions.append(messages.pop(0)["content"])
+        if system_instructions:
+            system_message["content"] += "\n" + "\n".join(system_instructions)
+
+        examples.append([system_message, *messages])
 
     if not examples:
         raise ValueError("chat dataset must contain at least one example")
