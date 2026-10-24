@@ -46,6 +46,16 @@ record must contain a `state` object plus a `messages` array. The loader
 validates the complete state schema, then renders the state together with
 CatAI's canonical personality system prompt before SFT.
 
+Instruction examples may also include a top-level `tools` array containing
+tool names, descriptions, and JSON argument schemas. Those definitions stay
+outside `messages`; the SFT loader builds the corresponding system context
+from the metadata for each example. That makes tool availability part of the
+model's training input without baking tool instructions into a fake `file`
+message or duplicating the prompt text across every conversation. At inference
+time, the caller supplies the system prompt and only the tools enabled for that
+conversation. Tool-call examples should use the same names and argument shapes
+the runtime exposes.
+
 The OASST1 converter downloads the ready-for-export conversation trees, keeps
 English paths by default, maps OASST1's `prompter` role to CatAI's `user`
 role, and emits the same required `state` + `messages` record shape. OASST1

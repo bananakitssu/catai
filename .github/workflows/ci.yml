@@ -467,23 +467,42 @@ jobs:
             --max-depth 4 \
             --max-examples "$CHAT_EXAMPLES" \
             --keep-source
-      - name: Validate OASST1 and CatAI personality datasets before SFT
+      - name: Validate OASST1 and CatAI instruction datasets before SFT
+        env:
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
         run: |
           python - <<'PY'
+          import os
+
+          from catai.checkpoint import load_checkpoint_metadata
           from catai.chat_dataset import load_chat_dataset
           from catai.sft import ChatSupervisedDataset
-          from catai.tokenizer import CharTokenizer
+          from catai.sft_cli import _load_tokenizer
+
+          metadata = load_checkpoint_metadata("catai.pt")
+          tokenizer = _load_tokenizer(metadata["tokenizer"])
+          sequence_length = int(os.environ["SEQUENCE_LENGTH"])
 
           base_examples = load_chat_dataset("data/oasst1_chat.jsonl")
-          personality_examples = load_chat_dataset("data/instruction_chat.jsonl")
-          dataset = ChatSupervisedDataset(
-              base_examples + personality_examples,
-              CharTokenizer.default(),
-              sequence_length=1024,
+          instruction_examples = load_chat_dataset("data/instruction_chat.jsonl")
+          base_dataset = ChatSupervisedDataset(
+              base_examples, tokenizer, sequence_length=sequence_length
           )
-          print(f"validated {len(base_examples):,} OASST1 examples")
-          print(f"validated {len(personality_examples):,} personality examples")
-          print(f"preflight constructed {len(dataset):,} SFT examples")
+          instruction_dataset = ChatSupervisedDataset(
+              instruction_examples, tokenizer, sequence_length=sequence_length
+          )
+          print(
+              f"OASST1: {len(base_examples):,} loaded, "
+              f"{len(base_dataset):,} trainable, "
+              f"{base_dataset.compacted_examples:,} compacted, "
+              f"{base_dataset.skipped_overlength_examples:,} skipped"
+          )
+          print(
+              f"CatAI instructions: {len(instruction_examples):,} loaded, "
+              f"{len(instruction_dataset):,} trainable, "
+              f"{instruction_dataset.compacted_examples:,} compacted, "
+              f"{instruction_dataset.skipped_overlength_examples:,} skipped"
+          )
           PY
       - name: Supervised fine-tuning (SFT)
         env:
