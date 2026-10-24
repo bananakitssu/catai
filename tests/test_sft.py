@@ -272,3 +272,41 @@ def test_chat_dataset_preserves_state_system_prompt_when_truncated():
     )
     assert sample["input_ids"][: len(expected_prefix)].tolist() == expected_prefix
     assert torch.any(sample["labels"] != IGNORE_INDEX)
+
+
+def test_recursion_instruction_keeps_next_token_labels_aligned():
+    from catai.chat_dataset import load_chat_dataset
+
+    tokenizer = CharTokenizer.default()
+    examples = load_chat_dataset("data/instruction_chat.jsonl")
+    example = next(
+        item for item in examples
+        if any(
+            message["role"] == "user"
+            and message["content"] == "Explain recursion in one sentence."
+            for message in item
+        )
+    )
+    tokens, train_mask = chat_token_stream(example, tokenizer)
+    sequence_length = 1024
+    assert len(tokens) <= sequence_length + 1
+
+    dataset = ChatSupervisedDataset(
+        [example], tokenizer, sequence_length=sequence_length
+    )
+    sample = dataset[0]
+    decoded = tokenizer.decode(sample["input_ids"].tolist())
+    assert "Explain recursion in one sentence." in decoded
+    assert (
+        "Recursion is when a function solves a problem by calling itself "
+        "on a smaller version of that problem."
+    ) in decoded
+
+    for position in range(sequence_length):
+        target_index = position + 1
+        expected = (
+            tokens[target_index]
+            if target_index < len(tokens) and train_mask[target_index]
+            else IGNORE_INDEX
+        )
+        assert sample["labels"][position].item() == expected
