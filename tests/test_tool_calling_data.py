@@ -83,3 +83,25 @@ def test_curated_dataset_contains_both_direct_answers_and_tool_use():
     )
     assert any(any(message["role"] == "tool_call:assistant" for message in example) for example in examples)
     assert any(any(message["role"] == "mcp_tool_call:assistant" for message in example) for example in examples)
+
+def test_tool_availability_instructions_use_system_messages_not_file_messages():
+    examples = _raw_examples()
+    instruction_count = 0
+
+    for example in examples:
+        for message in example["messages"]:
+            content = message["content"]
+            if content.startswith((
+                "Available tools:",
+                "Connected read-only MCP tools:",
+                "No tools are enabled",
+            )):
+                assert message["role"] == "system"
+                instruction_count += 1
+
+    assert instruction_count >= 30
+    assert not any(
+        message["role"] == "file"
+        for example in examples
+        for message in example["messages"]
+    )
