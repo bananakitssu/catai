@@ -148,6 +148,7 @@ def test_generate_stream_yields_incremental_text_and_accepts_file_role(
         },
         "sha256": "a" * 64,
     }
+    monkeypatch.setattr(inference_runtime, "_MODEL", None)
     monkeypatch.setattr(inference_runtime, "_evict_if_idle_locked", lambda now: None)
     monkeypatch.setattr(inference_runtime, "_load_model_locked", lambda: loaded)
     monkeypatch.setattr(inference_runtime, "_touch_model_locked", lambda: None)
@@ -164,6 +165,7 @@ def test_generate_stream_yields_incremental_text_and_accepts_file_role(
         chunk_tokens=1,
     ))
 
+    assert [event["status"] for event in events if event["event"] == "status"] == ["loading_model", "connecting"]
     assert [event["text"] for event in events if event["event"] == "delta"] == ["h", "i"]
     assert events[-1]["event"] == "done"
     assert events[-1]["text"] == "hi"

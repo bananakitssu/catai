@@ -406,6 +406,12 @@ def generate_stream(
 
     with _LOCK:
         _evict_if_idle_locked(time.monotonic())
+        needs_download = _MODEL is None
+    if needs_download:
+        yield {"event": "status", "status": "loading_model"}
+
+    with _LOCK:
+        _evict_if_idle_locked(time.monotonic())
         loaded = _load_model_locked()
         _touch_model_locked()
         metadata = loaded["metadata"]
@@ -420,6 +426,7 @@ def generate_stream(
         if not input_tokens:
             raise ValueError("The prompt produced no model tokens")
 
+        yield {"event": "status", "status": "connecting"}
         rng = np.random.default_rng()
         generated: list[int] = []
         sent_chars = 0
