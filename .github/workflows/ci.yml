@@ -524,7 +524,7 @@ jobs:
             --sequence-length "$SEQUENCE_LENGTH" \
             --seed 42 \
             --device cpu \
-            --recovery-checkpoint catai-sft-recovery.pt \\
+            --recovery-checkpoint catai-sft-recovery.pt \
             --checkpoint-every-batches 50
       - name: Upload SFT recovery checkpoint
         uses: actions/upload-artifact@v4
