@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import time
 
 import torch
@@ -15,7 +16,7 @@ from torch.utils.data import (
 )
 
 from .chat_dataset import load_chat_dataset
-from .checkpoint import load_checkpoint, load_checkpoint_metadata, save_checkpoint
+from .checkpoint import (load_checkpoint, load_checkpoint_metadata, load_checkpoint_state, save_checkpoint)
 from .device import resolve_device
 from .model import CatAI
 from .sft import ChatSupervisedDataset, evaluate_sft, sft_train_step
@@ -39,6 +40,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Target share of training samples drawn from --personality-dataset (0 < ratio < 1).",
     )
     parser.add_argument("--checkpoint", default="catai-sft.pt", help="Fine-tuned checkpoint output path.")
+    parser.add_argument("--resume-from", default=None, help="Resume model, optimizer, and data position from a recovery checkpoint.")
+    parser.add_argument("--recovery-checkpoint", default=None, help="Separate checkpoint updated during training.")
+    parser.add_argument("--checkpoint-every-batches", type=int, default=50, help="Save recovery state every N batches.")
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--learning-rate", type=float, default=1e-5)
@@ -80,6 +84,8 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--epochs must be positive")
     if args.batch_size < 1:
         raise ValueError("--batch-size must be positive")
+    if args.checkpoint_every_batches < 1:
+        raise ValueError("--checkpoint-every-batches must be positive")
     if args.learning_rate <= 0:
         raise ValueError("--learning-rate must be positive")
     if args.grad_clip <= 0:
@@ -229,8 +235,6 @@ def main(argv: list[str] | None = None) -> int:
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
     losses: list[float] = []
-    total_batches = len(loader)
-    progress_interval = max(1, total_batches // 10)
     validation_losses: list[float] = []
     best_validation_loss = float("inf")
     best_epoch = 0
@@ -238,47 +242,160 @@ def main(argv: list[str] | None = None) -> int:
     best_optimizer_state = None
     stale_epochs = 0
     total_steps = 0
+    start_epoch = 0
+    resume_batch = 0
+    saved_epoch_indices = None
+    saved_next_batch_hash = None
+    if args.resume_from:
+        resume_state = load_checkpoint_state(args.resume_from)
+        base_step = load_checkpoint(args.resume_from, model, optimizer, map_location=device)
+        start_epoch = int(resume_state.get("epoch_index", 0))
+        resume_batch = int(resume_state.get("batch_index", 0))
+        saved_epoch_indices = resume_state.get("epoch_indices")
+        saved_next_batch_hash = resume_state.get("next_batch_hash")
+        losses = list(resume_state.get("losses", []))
+        validation_losses = list(resume_state.get("validation_losses", []))
+        best_validation_loss = float(resume_state.get("best_validation_loss", float("inf")))
+        best_epoch = int(resume_state.get("best_epoch", 0))
+        best_model_state = resume_state.get("best_model_state")
+        best_optimizer_state = resume_state.get("best_optimizer_state")
+        stale_epochs = int(resume_state.get("stale_epochs", 0))
+        total_steps = int(resume_state.get("total_steps", 0))
+        rng_state = resume_state.get("torch_rng_state")
+        if rng_state is not None:
+            torch.set_rng_state(rng_state)
+        print(
+            f"Resuming at epoch {start_epoch + 1}, last completed batch {resume_batch}; "
+            f"optimizer step {total_steps}.",
+            flush=True,
+        )
+    else:
+        base_step = load_checkpoint(args.base_checkpoint, model, optimizer, map_location=device)
+    total_batches = (len(train_dataset) + args.batch_size - 1) // args.batch_size
+    progress_interval = max(1, total_batches // 10)
     started_at = time.perf_counter()
 
-    for epoch in range(args.epochs):
+    def batch_hash(indices):
+        if not indices:
+            return None
+        sample = train_dataset[indices[0]]["input_ids"][:10].detach().cpu().contiguous()
+        return hashlib.sha256(sample.numpy().tobytes()).hexdigest()
+
+    def save_recovery(epoch_index, batch_index, epoch_indices):
+        if not args.recovery_checkpoint:
+            return
+        next_indices = (
+            epoch_indices[batch_index:batch_index + args.batch_size]
+            if epoch_index < args.epochs and batch_index < len(epoch_indices)
+            else []
+        )
+        next_hash = batch_hash(next_indices)
+        extra = {
+            "epoch_index": epoch_index,
+            "batch_index": batch_index,
+            "epoch_indices": epoch_indices,
+            "next_batch_hash": next_hash,
+            "torch_rng_state": torch.get_rng_state(),
+            "losses": losses,
+            "validation_losses": validation_losses,
+            "best_validation_loss": best_validation_loss,
+            "best_epoch": best_epoch,
+            "best_model_state": best_model_state,
+            "best_optimizer_state": best_optimizer_state,
+            "stale_epochs": stale_epochs,
+            "total_steps": total_steps,
+        }
+        save_checkpoint(
+            args.recovery_checkpoint, model, optimizer, step=base_step + total_steps,
+            epoch=epoch_index, loss=losses[-1] if losses else None,
+            metadata={"stage": "sft-recovery", "model": sft_model_metadata_for_resume(),
+                      "tokenizer": dict(tokenizer_metadata)},
+            extra_state=extra,
+        )
+
+    def sft_model_metadata_for_resume():
+        result = dict(model_metadata)
+        result["max_seq_len"] = sequence_length
+        return result
+
+    for epoch in range(start_epoch, args.epochs):
+        if saved_epoch_indices is not None and epoch == start_epoch:
+            epoch_indices = list(saved_epoch_indices)
+        elif personality_dataset is not None:
+            generator = torch.Generator().manual_seed(args.seed + epoch)
+            epoch_indices = torch.multinomial(
+                torch.tensor(weights, dtype=torch.double),
+                num_samples=len(train_dataset), replacement=True, generator=generator
+            ).tolist()
+        else:
+            generator = torch.Generator().manual_seed(args.seed + epoch)
+            epoch_indices = torch.randperm(len(train_dataset), generator=generator).tolist()
+        batches_for_epoch = [
+            epoch_indices[i:i + args.batch_size]
+            for i in range(0, len(epoch_indices), args.batch_size)
+        ]
+        if not batches_for_epoch:
+            raise ValueError("training dataset produced no batches")
         total_loss = 0.0
         batches = 0
+        first_batch = resume_batch if epoch == start_epoch else 0
         print(f"epoch {epoch + 1}/{args.epochs}", flush=True)
-        for batch_index, batch in enumerate(loader, start=1):
+        if first_batch and saved_next_batch_hash:
+            actual_hash = batch_hash(batches_for_epoch[first_batch])
+            print(
+                f"resume sanity: last batch index {first_batch}; optimizer step {total_steps}; "
+                f"next-batch token hash {actual_hash}",
+                flush=True,
+            )
+            if actual_hash != saved_next_batch_hash:
+                raise ValueError("resume sanity check failed: next-batch token hash differs")
+        elif epoch == start_epoch and args.resume_from:
+            print(
+                f"resume sanity: last batch index {first_batch}; optimizer step {total_steps}; "
+                f"next-batch token hash {batch_hash(batches_for_epoch[first_batch]) if first_batch < len(batches_for_epoch) else 'epoch-boundary'}",
+                flush=True,
+            )
+        for batch_offset in range(first_batch, len(batches_for_epoch)):
+            indices = batches_for_epoch[batch_offset]
+            batch = {
+                "input_ids": torch.stack([train_dataset[i]["input_ids"] for i in indices]),
+                "labels": torch.stack([train_dataset[i]["labels"] for i in indices]),
+            }
             batch_input_ids = batch["input_ids"].to(device)
             batch_labels = batch["labels"].to(device)
             total_loss += sft_train_step(
-                model,
-                optimizer,
-                batch_input_ids,
-                batch_labels,
-                grad_clip=args.grad_clip,
+                model, optimizer, batch_input_ids, batch_labels, grad_clip=args.grad_clip
             )
             batches += 1
             total_steps += 1
-            if batch_index % progress_interval == 0 or batch_index == total_batches:
+            completed_batch = batch_offset + 1
+            if completed_batch % args.checkpoint_every_batches == 0:
+                save_recovery(epoch, completed_batch, epoch_indices)
+            if completed_batch % progress_interval == 0 or completed_batch == len(batches_for_epoch):
                 elapsed = max(time.perf_counter() - started_at, 1e-9)
-                completed_batches = (epoch * total_batches) + batch_index
-                total_training_batches = args.epochs * total_batches
-                remaining_batches = max(0, total_training_batches - completed_batches)
-                seconds_per_batch = elapsed / completed_batches
-                eta_seconds = remaining_batches * seconds_per_batch
+                completed_total = epoch * total_batches + completed_batch
+                remaining = max(0, args.epochs * total_batches - completed_total)
+                eta = remaining * elapsed / max(completed_total - start_epoch * total_batches, 1)
                 print(
-                    f"  batch {batch_index}/{total_batches} "
-                    f"loss={total_loss / batches:.4f} "
-                    f"ETA={eta_seconds:.0f}s",
+                    f"  batch {completed_batch}/{len(batches_for_epoch)} "
+                    f"loss={total_loss / max(batches, 1):.4f} ETA={eta:.0f}s",
                     flush=True,
                 )
-
-        if batches == 0:
+        if batches == 0 and first_batch == 0:
             raise ValueError("training dataset produced no batches")
-        epoch_loss = total_loss / batches
-        losses.append(epoch_loss)
-        print(f"epoch {epoch + 1}/{args.epochs}: train_loss={epoch_loss:.4f}", flush=True)
-
+        if batches:
+            epoch_loss = total_loss / batches
+            if len(losses) < epoch + 1:
+                losses.append(epoch_loss)
+            else:
+                losses[epoch] = epoch_loss
+            print(f"epoch {epoch + 1}/{args.epochs}: train_loss={epoch_loss:.4f}", flush=True)
         if validation_loader is not None:
             validation_loss = evaluate_sft(model, validation_loader, device=device)
-            validation_losses.append(validation_loss)
+            if len(validation_losses) < epoch + 1:
+                validation_losses.append(validation_loss)
+            else:
+                validation_losses[epoch] = validation_loss
             print(f"epoch {epoch + 1}/{args.epochs}: val_loss={validation_loss:.4f}", flush=True)
             if validation_loss < best_validation_loss:
                 best_validation_loss = validation_loss
@@ -290,7 +407,12 @@ def main(argv: list[str] | None = None) -> int:
                 stale_epochs += 1
                 if args.patience is not None and stale_epochs >= args.patience:
                     print(f"early stopping at epoch {epoch + 1}", flush=True)
+                    save_recovery(epoch + 1, 0, [])
                     break
+        resume_batch = 0
+        saved_epoch_indices = None
+        save_recovery(epoch + 1, 0, [])
+
 
     if best_model_state is not None:
         model.load_state_dict(best_model_state)
