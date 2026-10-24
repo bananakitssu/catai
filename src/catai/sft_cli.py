@@ -270,8 +270,6 @@ def main(argv: list[str] | None = None) -> int:
             f"optimizer step {total_steps}.",
             flush=True,
         )
-    else:
-        base_step = load_checkpoint(args.base_checkpoint, model, optimizer, map_location=device)
     total_batches = (len(train_dataset) + args.batch_size - 1) // args.batch_size
     progress_interval = max(1, total_batches // 10)
     started_at = time.perf_counter()
