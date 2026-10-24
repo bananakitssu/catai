@@ -123,6 +123,12 @@ def main(argv: list[str] | None = None) -> int:
     base_dataset = ChatSupervisedDataset(
         base_examples, tokenizer, sequence_length
     )
+    print(
+        f"base chat data: {len(base_examples)} loaded, "
+        f"{base_dataset.compacted_examples} compacted to the latest turn, "
+        f"{base_dataset.skipped_overlength_examples} overlength examples skipped",
+        flush=True,
+    )
     personality_dataset = None
     personality_examples_count = 0
 
@@ -131,6 +137,12 @@ def main(argv: list[str] | None = None) -> int:
         personality_examples_count = len(personality_examples)
         personality_dataset = ChatSupervisedDataset(
             personality_examples, tokenizer, sequence_length
+        )
+        print(
+            f"CatAI instruction data: {personality_examples_count} loaded, "
+            f"{personality_dataset.compacted_examples} compacted to the latest turn, "
+            f"{personality_dataset.skipped_overlength_examples} overlength examples skipped",
+            flush=True,
         )
         dataset = ConcatDataset([base_dataset, personality_dataset])
     else:
@@ -319,7 +331,21 @@ def main(argv: list[str] | None = None) -> int:
                 "total_steps": total_steps,
                 "examples": len(dataset),
                 "base_examples": len(base_examples),
+                "base_training_examples": len(base_dataset),
+                "base_compacted_examples": base_dataset.compacted_examples,
+                "base_skipped_overlength_examples": base_dataset.skipped_overlength_examples,
                 "personality_examples": personality_examples_count,
+                "personality_training_examples": (
+                    len(personality_dataset) if personality_dataset is not None else 0
+                ),
+                "personality_compacted_examples": (
+                    personality_dataset.compacted_examples
+                    if personality_dataset is not None else 0
+                ),
+                "personality_skipped_overlength_examples": (
+                    personality_dataset.skipped_overlength_examples
+                    if personality_dataset is not None else 0
+                ),
                 "personality_ratio": (
                     args.personality_ratio
                     if personality_dataset is not None
