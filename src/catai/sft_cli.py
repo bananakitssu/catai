@@ -294,7 +294,7 @@ def main(argv: list[str] | None = None) -> int:
         extra = {
             "epoch_index": epoch_index,
             "batch_index": batch_index,
-            "epoch_indices": epoch_indices,
+            "epoch_indices": epoch_indices if epoch_indices else None,
             "next_batch_hash": next_hash,
             "torch_rng_state": torch.get_rng_state(),
             "losses": losses,
@@ -354,6 +354,7 @@ def main(argv: list[str] | None = None) -> int:
         elif epoch == start_epoch and args.resume_from:
             print(
                 f"resume sanity: last batch index {first_batch}; optimizer step {total_steps}; "
+                f"lr={optimizer.param_groups[0]['lr']:.8g}; "
                 f"next-batch token hash {batch_hash(batches_for_epoch[first_batch]) if first_batch < len(batches_for_epoch) else 'epoch-boundary'}",
                 flush=True,
             )
