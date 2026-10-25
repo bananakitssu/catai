@@ -24,11 +24,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--corpus", required=True, help="Path to a UTF-8 text corpus.")
     parser.add_argument("--checkpoint", default="catai.pt", help="Checkpoint output path.")
     parser.add_argument("--epochs", type=int, default=1)
-    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--learning-rate", type=float, default=3e-4)
     parser.add_argument("--grad-clip", type=float, default=1.0)
-    # Raised from 32 → 256. Character-level models need more room to form words.
-    parser.add_argument("--sequence-length", type=int, default=256)
+    parser.add_argument(
+        "--sequence-length",
+        type=int,
+        default=1024,
+        help="Training context length in tokens (default: 1024).",
+    )
     parser.add_argument(
         "--window-stride",
         type=int,
