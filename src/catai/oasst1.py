@@ -69,13 +69,13 @@ def _is_retryable_http_error(error: urllib.error.HTTPError) -> bool:
 
 
 def download_dataset(url: str, output: Path) -> None:
-    """Download OASST1's ready-for-export conversation trees with retries."""
+    """Download OpenAssistant ready-for-export conversation trees with retries."""
     output.parent.mkdir(parents=True, exist_ok=True)
     partial = output.with_name(output.name + ".part")
 
     request = urllib.request.Request(
         url,
-        headers={"User-Agent": "CatAI-oasst1-converter/1.1"},
+        headers={"User-Agent": "CatAI-openassistant-converter/1.2"},
     )
 
     try:
@@ -312,7 +312,7 @@ def convert_dataset(
     max_depth: int = 4,
     min_assistant_chars: int = 0,
 ) -> tuple[int, int]:
-    """Convert an OASST1 tree archive to CatAI JSONL.
+    """Convert an OpenAssistant tree archive to CatAI JSONL.
 
     Returns (trees_seen, examples_written).
     """
@@ -368,14 +368,14 @@ def convert_dataset(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Download and convert OASST1 into CatAI chat JSONL."
+        description="Download and convert OpenAssistant trees into CatAI chat JSONL."
     )
     parser.add_argument("--output", type=Path, default=Path("data/oasst1_chat.jsonl"))
     parser.add_argument(
         "--source",
         type=Path,
         default=Path("data/oasst1_ready.trees.jsonl.gz"),
-        help="Local OASST1 archive; downloaded automatically when missing.",
+        help="Local OpenAssistant tree archive; downloaded automatically when missing.",
     )
     parser.add_argument("--url", default=DEFAULT_URL)
     parser.add_argument(
@@ -450,7 +450,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print(
         f"Wrote {examples_written:,} CatAI chat examples from "
-        f"{trees_seen:,} OASST1 trees to {args.output}"
+        f"{trees_seen:,} OpenAssistant trees to {args.output}"
     )
     return 0
 
