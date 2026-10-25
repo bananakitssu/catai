@@ -33,7 +33,7 @@ on:
           - "512"
           - "1024"
         required: true
-        default: "512"
+        default: "1024"
       max_tokens:
         description: "Base pretraining token budget; default is 10M tokens"
         required: false
@@ -98,7 +98,7 @@ jobs:
           CHAT_EXAMPLES: ${{ inputs.chat_examples || '4500' }}
           MAX_TOKENS: ${{ inputs.max_tokens || '10000000' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
-          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
         run: |
           python - <<'PY'
           import os
@@ -361,14 +361,21 @@ jobs:
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
-          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
           MAX_TOKENS: ${{ inputs.max_tokens || '10000000' }}
         run: |
+          # At 1024 context, reduce batch size to keep the attention activation
+          # footprint near the previous 16 x 512 configuration.
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
           python -m catai \
             --corpus data/corpus.txt \
             --checkpoint catai.pt \
             --epochs "$BASE_EPOCHS" \
-            --batch-size 16 \
+            --batch-size "$BASE_BATCH_SIZE" \
             --sequence-length "$SEQUENCE_LENGTH" \
             --model-size base \
             --tokenizer "$TOKENIZER" \
@@ -533,7 +540,7 @@ jobs:
             --seed 42
       - name: Validate OASST1 and CatAI instruction datasets before SFT
         env:
-          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
         run: |
           python - <<'PY'
           import os
@@ -571,7 +578,7 @@ jobs:
       - name: Supervised fine-tuning (SFT, epochs 1–2)
         env:
           SFT_TOTAL_EPOCHS: ${{ inputs.sft_epochs || '3' }}
-          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
         run: |
           SFT_STAGE_EPOCHS="$SFT_TOTAL_EPOCHS"
           if (( SFT_STAGE_EPOCHS > 2 )); then SFT_STAGE_EPOCHS=2; fi
@@ -751,7 +758,7 @@ jobs:
             --seed 42
       - name: Validate OASST1 and CatAI instruction datasets before SFT
         env:
-          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
         run: |
           python - <<'PY'
           import os
@@ -789,7 +796,7 @@ jobs:
       - name: Supervised fine-tuning (SFT 2, remaining epochs + evaluation)
         env:
           SFT_EPOCHS: ${{ inputs.sft_epochs || '3' }}
-          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
         run: |
           python -m catai.sft_cli \
             --base-checkpoint catai.pt \
