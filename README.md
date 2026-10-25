@@ -9,7 +9,7 @@ A small character-level language model experiment ("maybe like a cat...").
 - **Normalization**: RMSNorm
 - **Feed-forward**: SwiGLU
 - **Attention**: causal multi-head self-attention
-- **Default context**: 256 tokens
+- **Default context**: 1024 tokens (configurable per checkpoint)
 - **Generation defaults**: temperature 0.8, top-k 40
 
 ### Model presets
@@ -31,7 +31,7 @@ python data/generate_corpus.py --sentences 100000 --output data/train.txt
 python -m catai --corpus data/train.txt --checkpoint catai.pt --epochs 1
 
 # Or a larger preset
-python -m catai --corpus data/train.txt --model-size small --sequence-length 512 --epochs 2
+python -m catai --corpus data/train.txt --model-size small --sequence-length 1024 --epochs 2
 
 # Generate
 python -m catai.generate_cli --checkpoint catai.pt --prompt "The cat"
@@ -67,6 +67,8 @@ python data/download_oasst1.py --output data/oasst1_chat.jsonl --keep-source
 python data/download_oasst2.py --output data/oasst2_chat.jsonl --keep-source
 python data/merge_chat_datasets.py --max-examples 4500 --seed 42
 ```
+
+The default training context is 1024 tokens; the Actions workflow also offers 512 for faster/lower-memory experiments. Checkpoints record their own context length, and the inference runtime uses that saved value, so a 1024-token checkpoint can use the expanded window at inference time.
 
 The merged SFT file defaults to `data/oasst_chat.jsonl`. The example cap is combined across both sources and is split approximately 50/50, with unused quota filled from whichever source has more examples. Selection and output ordering are deterministic for a fixed seed. Exact duplicate conversations are removed, and each record keeps a `dataset_source` field for auditability. The source archives and generated JSONL files are ignored by Git.
 
