@@ -27,7 +27,7 @@ on:
         required: true
         default: bpe
       sequence_length:
-        description: "Base and SFT sequence length"
+        description: "Base and SFT sequence length (default 1024; use 512 for faster/lower-memory experiments)"
         type: choice
         options:
           - "512"
