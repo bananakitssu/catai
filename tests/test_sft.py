@@ -14,6 +14,22 @@ from catai.sft import (
 from catai.tokenizer import CharTokenizer
 
 
+def test_sft_trains_eos_after_assistant_response():
+    tokenizer = CharTokenizer.default()
+    messages = [
+        {"role": "user", "content": "Hello"},
+        {"role": "assistant", "content": "Hi!"},
+    ]
+
+    tokens, train_mask = chat_token_stream(messages, tokenizer)
+    assert tokens[-1] == tokenizer.eos_token_id
+    assert train_mask[-1] is True
+
+    dataset = ChatSupervisedDataset([messages], tokenizer, sequence_length=64)
+    sample = dataset[0]
+    assert tokenizer.eos_token_id in sample["labels"].tolist()
+
+
 def test_chat_token_stream_masks_non_assistant_tokens():
     tokenizer = CharTokenizer.default()
     tokens, mask = chat_token_stream(
