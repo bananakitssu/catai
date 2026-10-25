@@ -30,6 +30,28 @@ def test_sft_trains_eos_after_assistant_response():
     assert tokenizer.eos_token_id in sample["labels"].tolist()
 
 
+def test_sft_adds_eos_after_each_assistant_message():
+    tokenizer = CharTokenizer.default()
+    messages = [
+        {"role": "user", "content": "First question"},
+        {"role": "assistant", "content": "First answer"},
+        {"role": "user", "content": "Follow-up question"},
+        {"role": "assistant", "content": "Second answer"},
+    ]
+
+    tokens, train_mask = chat_token_stream(messages, tokenizer)
+    eos_positions = [
+        index for index, token in enumerate(tokens)
+        if token == tokenizer.eos_token_id
+    ]
+    assert len(eos_positions) == 2
+    assert all(train_mask[index] for index in eos_positions)
+
+    dataset = ChatSupervisedDataset([messages], tokenizer, sequence_length=128)
+    sample = dataset[0]
+    assert int((sample["labels"] == tokenizer.eos_token_id).sum().item()) == 2
+
+
 def test_chat_token_stream_masks_non_assistant_tokens():
     tokenizer = CharTokenizer.default()
     tokens, mask = chat_token_stream(
