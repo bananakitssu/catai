@@ -30,7 +30,6 @@ def chat_token_stream(
 
     token_ids: list[int] = []
     train_mask: list[bool] = []
-    last_role = None
 
     for message in messages:
         role = message.get("role")
@@ -52,11 +51,12 @@ def chat_token_stream(
 
         token_ids.extend(newline_tokens)
         train_mask.extend([is_assistant_output_role(role)] * len(newline_tokens))
-        last_role = role
 
-    if eos_token_id is not None:
-        token_ids.append(int(eos_token_id))
-        train_mask.append(is_assistant_output_role(last_role))
+        # End each generated assistant message explicitly. User/tool-result
+        # messages are context, not responses, and must not receive EOS labels.
+        if eos_token_id is not None and is_assistant_output_role(role):
+            token_ids.append(int(eos_token_id))
+            train_mask.append(True)
 
     if not token_ids:
         raise ValueError("chat messages must encode to at least one token")
@@ -113,12 +113,9 @@ class ChatSupervisedDataset(Dataset[dict[str, torch.Tensor]]):
                         + [trainable] * (len(content_ids) + len(newline_ids))
                     ),
                 })
-
-            if eos_token_id is not None:
-                parts[-1]["input_ids"].append(int(eos_token_id))
-                parts[-1]["train_mask"].append(
-                    is_assistant_output_role(messages[-1]["role"])
-                )
+                if eos_token_id is not None and trainable:
+                    parts[-1]["input_ids"].append(int(eos_token_id))
+                    parts[-1]["train_mask"].append(True)
 
             target_length = sequence_length + 1
             original_length = sum(len(part["input_ids"]) for part in parts)
