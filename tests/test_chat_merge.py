@@ -88,3 +88,13 @@ def test_merge_rejects_malformed_dataset_record(tmp_path):
 
     with pytest.raises(ValueError, match="complete exchange"):
         merge_chat_datasets(oasst1, oasst2, tmp_path / "merged.jsonl")
+
+
+def test_merge_rejects_two_empty_sources(tmp_path):
+    oasst1 = tmp_path / "oasst1.jsonl"
+    oasst2 = tmp_path / "oasst2.jsonl"
+    oasst1.write_text("", encoding="utf-8")
+    oasst2.write_text("", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="zero usable conversations"):
+        merge_chat_datasets(oasst1, oasst2, tmp_path / "merged.jsonl")
