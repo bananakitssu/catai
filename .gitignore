@@ -1,4 +1,7 @@
-# Generated OASST1 data (downloaded/expanded locally, not source-controlled)
+# Generated OpenAssistant data (downloaded/expanded locally, not source-controlled)
 data/oasst1_ready.trees.jsonl.gz
 data/oasst1_chat.jsonl
+data/oasst2_ready.trees.jsonl.gz
+data/oasst2_chat.jsonl
+data/oasst_chat.jsonl
 data/chat_sft.jsonl
