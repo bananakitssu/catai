@@ -29,6 +29,14 @@ def test_generate_stops_when_eos_is_predicted():
     assert result.tolist() == [[0, 1]]
 
 
+def test_model_accepts_1024_token_context():
+    torch.manual_seed(0)
+    model = CatAI(vocab_size=12, max_seq_len=1024, d_model=16, n_heads=4, n_layers=1)
+    tokens = torch.randint(0, 12, (1, 1024))
+    logits = model(tokens)
+    assert logits.shape == (1, 1024, 12)
+
+
 def test_generate_handles_context_longer_than_model_window():
     torch.manual_seed(0)
     model = CatAI(vocab_size=12, max_seq_len=4, d_model=16, n_heads=4, n_layers=1)
