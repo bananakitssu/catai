@@ -117,6 +117,8 @@ def merge_chat_datasets(
     seen: set[str] = set()
     first, first_duplicates = _read_records(Path(oasst1_path), "oasst1", seen)
     second, second_duplicates = _read_records(Path(oasst2_path), "oasst2", seen)
+    if not first and not second:
+        raise ValueError("both OpenAssistant datasets contained zero usable conversations")
     rng = random.Random(seed)
     selected, first_count, second_count = _balanced_selection(
         first, second, max_examples, rng
