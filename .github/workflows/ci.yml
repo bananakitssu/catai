@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       chat_examples:
-        description: "Maximum OASST1 chat examples for SFT"
+        description: "Maximum combined OASST1 + OASST2 chat examples for SFT"
         required: false
         default: "4500"
       sft_epochs:
@@ -27,17 +27,17 @@ on:
         required: true
         default: bpe
       sequence_length:
-        description: "Base and SFT sequence length"
+        description: "Base and SFT sequence length (default 1024; use 512 for faster/lower-memory experiments)"
         type: choice
         options:
           - "512"
           - "1024"
         required: true
-        default: "512"
+        default: "1024"
       max_tokens:
-        description: "Base pretraining token budget; start at 5M for a measured BPE experiment"
+        description: "Base pretraining token budget; default is 10M tokens"
         required: false
-        default: "5000000"
+        default: "10000000"
       publish_model:
         description: "Publish this experiment to the live B2 model manifest"
         type: boolean
@@ -98,7 +98,7 @@ jobs:
           CHAT_EXAMPLES: ${{ inputs.chat_examples || '4500' }}
           MAX_TOKENS: ${{ inputs.max_tokens || '10000000' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
-          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
         run: |
           python - <<'PY'
           import os
@@ -272,8 +272,6 @@ jobs:
           path: data/oasst1_ready.trees.jsonl.gz
           key: catai-oasst1-ready-v1
       - name: Build OASST1 CatAI chat dataset
-        env:
-          CHAT_EXAMPLES: ${{ inputs.chat_examples || '4500' }}
         run: |
           python data/download_oasst1.py \
             --source data/oasst1_ready.trees.jsonl.gz \
@@ -282,8 +280,39 @@ jobs:
             --min-assistant-chars 20 \
             --max-assistant-rank 1 \
             --max-depth 4 \
-            --max-examples "$CHAT_EXAMPLES" \
             --keep-source
+      - name: Restore OASST2 source cache
+        id: oasst2-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/oasst2_ready.trees.jsonl.gz
+          key: catai-oasst2-ready-v1
+      - name: Build OASST2 CatAI chat dataset
+        run: |
+          python data/download_oasst2.py \
+            --source data/oasst2_ready.trees.jsonl.gz \
+            --output data/oasst2_chat.jsonl \
+            --language en \
+            --min-assistant-chars 20 \
+            --max-assistant-rank 1 \
+            --max-depth 4 \
+            --keep-source
+      - name: Save OASST2 source cache
+        if: steps.oasst2-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/oasst2_ready.trees.jsonl.gz
+          key: catai-oasst2-ready-v1
+      - name: Merge and balance OASST1 + OASST2
+        env:
+          CHAT_EXAMPLES: ${{ inputs.chat_examples || '4500' }}
+        run: |
+          python data/merge_chat_datasets.py \
+            --oasst1 data/oasst1_chat.jsonl \
+            --oasst2 data/oasst2_chat.jsonl \
+            --output data/oasst_chat.jsonl \
+            --max-examples "$CHAT_EXAMPLES" \
+            --seed 42
 
       - name: Validate OASST1 and CatAI personality datasets
         run: |
@@ -292,7 +321,7 @@ jobs:
           from catai.sft import ChatSupervisedDataset
           from catai.tokenizer import CharTokenizer
 
-          base_examples = load_chat_dataset("data/oasst1_chat.jsonl")
+          base_examples = load_chat_dataset("data/oasst_chat.jsonl")
           personality_examples = load_chat_dataset("data/instruction_chat.jsonl")
           examples = base_examples + personality_examples
           dataset = ChatSupervisedDataset(
@@ -300,7 +329,7 @@ jobs:
               CharTokenizer.default(),
               sequence_length=1024,
           )
-          print(f"validated {len(base_examples):,} OASST1 examples")
+          print(f"validated {len(base_examples):,} merged OpenAssistant examples")
           print(f"validated {len(personality_examples):,} personality examples")
           print(f"preflight constructed {len(dataset):,} SFT examples")
           PY
@@ -332,14 +361,21 @@ jobs:
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
-          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
           MAX_TOKENS: ${{ inputs.max_tokens || '10000000' }}
         run: |
+          # At 1024 context, reduce batch size to keep the attention activation
+          # footprint near the previous 16 x 512 configuration.
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
           python -m catai \
             --corpus data/corpus.txt \
             --checkpoint catai.pt \
             --epochs "$BASE_EPOCHS" \
-            --batch-size 16 \
+            --batch-size "$BASE_BATCH_SIZE" \
             --sequence-length "$SEQUENCE_LENGTH" \
             --model-size base \
             --tokenizer "$TOKENIZER" \
@@ -455,8 +491,6 @@ jobs:
           path: data/oasst1_ready.trees.jsonl.gz
           key: catai-oasst1-ready-v1
       - name: Build OASST1 CatAI chat dataset
-        env:
-          CHAT_EXAMPLES: ${{ inputs.chat_examples || '4500' }}
         run: |
           python data/download_oasst1.py \
             --source data/oasst1_ready.trees.jsonl.gz \
@@ -465,11 +499,48 @@ jobs:
             --min-assistant-chars 20 \
             --max-assistant-rank 1 \
             --max-depth 4 \
-            --max-examples "$CHAT_EXAMPLES" \
             --keep-source
+      - name: Save OASST1 source cache
+        if: steps.oasst-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/oasst1_ready.trees.jsonl.gz
+          key: catai-oasst1-ready-v1
+      - name: Restore OASST2 source cache
+        id: oasst2-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/oasst2_ready.trees.jsonl.gz
+          key: catai-oasst2-ready-v1
+      - name: Build OASST2 CatAI chat dataset
+        run: |
+          python data/download_oasst2.py \
+            --source data/oasst2_ready.trees.jsonl.gz \
+            --output data/oasst2_chat.jsonl \
+            --language en \
+            --min-assistant-chars 20 \
+            --max-assistant-rank 1 \
+            --max-depth 4 \
+            --keep-source
+      - name: Save OASST2 source cache
+        if: steps.oasst2-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/oasst2_ready.trees.jsonl.gz
+          key: catai-oasst2-ready-v1
+      - name: Merge and balance OASST1 + OASST2
+        env:
+          CHAT_EXAMPLES: ${{ inputs.chat_examples || '4500' }}
+        run: |
+          python data/merge_chat_datasets.py \
+            --oasst1 data/oasst1_chat.jsonl \
+            --oasst2 data/oasst2_chat.jsonl \
+            --output data/oasst_chat.jsonl \
+            --max-examples "$CHAT_EXAMPLES" \
+            --seed 42
       - name: Validate OASST1 and CatAI instruction datasets before SFT
         env:
-          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
         run: |
           python - <<'PY'
           import os
@@ -483,7 +554,7 @@ jobs:
           tokenizer = _load_tokenizer(metadata["tokenizer"])
           sequence_length = int(os.environ["SEQUENCE_LENGTH"])
 
-          base_examples = load_chat_dataset("data/oasst1_chat.jsonl")
+          base_examples = load_chat_dataset("data/oasst_chat.jsonl")
           instruction_examples = load_chat_dataset("data/instruction_chat.jsonl")
           base_dataset = ChatSupervisedDataset(
               base_examples, tokenizer, sequence_length=sequence_length
@@ -492,7 +563,7 @@ jobs:
               instruction_examples, tokenizer, sequence_length=sequence_length
           )
           print(
-              f"OASST1: {len(base_examples):,} loaded, "
+              f"Merged OpenAssistant: {len(base_examples):,} loaded, "
               f"{len(base_dataset):,} trainable, "
               f"{base_dataset.compacted_examples:,} compacted, "
               f"{base_dataset.skipped_overlength_examples:,} skipped"
@@ -507,13 +578,13 @@ jobs:
       - name: Supervised fine-tuning (SFT, epochs 1–2)
         env:
           SFT_TOTAL_EPOCHS: ${{ inputs.sft_epochs || '3' }}
-          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
         run: |
           SFT_STAGE_EPOCHS="$SFT_TOTAL_EPOCHS"
           if (( SFT_STAGE_EPOCHS > 2 )); then SFT_STAGE_EPOCHS=2; fi
           python -m catai.sft_cli \
             --base-checkpoint catai.pt \
-            --dataset data/oasst1_chat.jsonl \
+            --dataset data/oasst_chat.jsonl \
             --personality-dataset data/instruction_chat.jsonl \
             --personality-ratio 0.25 \
             --checkpoint catai-sft.pt \
@@ -638,8 +709,6 @@ jobs:
           path: data/oasst1_ready.trees.jsonl.gz
           key: catai-oasst1-ready-v1
       - name: Build OASST1 CatAI chat dataset
-        env:
-          CHAT_EXAMPLES: ${{ inputs.chat_examples || '4500' }}
         run: |
           python data/download_oasst1.py \
             --source data/oasst1_ready.trees.jsonl.gz \
@@ -648,11 +717,48 @@ jobs:
             --min-assistant-chars 20 \
             --max-assistant-rank 1 \
             --max-depth 4 \
-            --max-examples "$CHAT_EXAMPLES" \
             --keep-source
+      - name: Save OASST1 source cache
+        if: steps.oasst-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/oasst1_ready.trees.jsonl.gz
+          key: catai-oasst1-ready-v1
+      - name: Restore OASST2 source cache
+        id: oasst2-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/oasst2_ready.trees.jsonl.gz
+          key: catai-oasst2-ready-v1
+      - name: Build OASST2 CatAI chat dataset
+        run: |
+          python data/download_oasst2.py \
+            --source data/oasst2_ready.trees.jsonl.gz \
+            --output data/oasst2_chat.jsonl \
+            --language en \
+            --min-assistant-chars 20 \
+            --max-assistant-rank 1 \
+            --max-depth 4 \
+            --keep-source
+      - name: Save OASST2 source cache
+        if: steps.oasst2-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/oasst2_ready.trees.jsonl.gz
+          key: catai-oasst2-ready-v1
+      - name: Merge and balance OASST1 + OASST2
+        env:
+          CHAT_EXAMPLES: ${{ inputs.chat_examples || '4500' }}
+        run: |
+          python data/merge_chat_datasets.py \
+            --oasst1 data/oasst1_chat.jsonl \
+            --oasst2 data/oasst2_chat.jsonl \
+            --output data/oasst_chat.jsonl \
+            --max-examples "$CHAT_EXAMPLES" \
+            --seed 42
       - name: Validate OASST1 and CatAI instruction datasets before SFT
         env:
-          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
         run: |
           python - <<'PY'
           import os
@@ -666,7 +772,7 @@ jobs:
           tokenizer = _load_tokenizer(metadata["tokenizer"])
           sequence_length = int(os.environ["SEQUENCE_LENGTH"])
 
-          base_examples = load_chat_dataset("data/oasst1_chat.jsonl")
+          base_examples = load_chat_dataset("data/oasst_chat.jsonl")
           instruction_examples = load_chat_dataset("data/instruction_chat.jsonl")
           base_dataset = ChatSupervisedDataset(
               base_examples, tokenizer, sequence_length=sequence_length
@@ -675,7 +781,7 @@ jobs:
               instruction_examples, tokenizer, sequence_length=sequence_length
           )
           print(
-              f"OASST1: {len(base_examples):,} loaded, "
+              f"Merged OpenAssistant: {len(base_examples):,} loaded, "
               f"{len(base_dataset):,} trainable, "
               f"{base_dataset.compacted_examples:,} compacted, "
               f"{base_dataset.skipped_overlength_examples:,} skipped"
@@ -690,11 +796,11 @@ jobs:
       - name: Supervised fine-tuning (SFT 2, remaining epochs + evaluation)
         env:
           SFT_EPOCHS: ${{ inputs.sft_epochs || '3' }}
-          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '512' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
         run: |
           python -m catai.sft_cli \
             --base-checkpoint catai.pt \
-            --dataset data/oasst1_chat.jsonl \
+            --dataset data/oasst_chat.jsonl \
             --personality-dataset data/instruction_chat.jsonl \
             --personality-ratio 0.25 \
             --checkpoint catai-sft.pt \

@@ -59,10 +59,10 @@ def test_parser_defaults_are_stable():
     args = build_parser().parse_args(["--corpus", "corpus.txt"])
     assert args.checkpoint == "catai.pt"
     assert args.epochs == 1
-    assert args.batch_size == 32
+    assert args.batch_size == 8
     assert args.learning_rate == 3e-4
     assert args.grad_clip == 1.0
-    assert args.sequence_length == 256
+    assert args.sequence_length == 1024
     assert args.d_model == 128
     assert args.heads == 4
     assert args.layers == 4

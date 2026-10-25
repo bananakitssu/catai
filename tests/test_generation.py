@@ -13,6 +13,30 @@ def test_generate_appends_requested_number_of_tokens():
     assert torch.equal(result[:, :3], prompt)
 
 
+def test_generate_stops_when_eos_is_predicted():
+    # Highest-logit token 1 is EOS, so generation should terminate immediately.
+    model = FixedLogitModel([0.0, 5.0, 1.0])
+    prompt = torch.tensor([[0]])
+
+    result = generate(
+        model,
+        prompt,
+        max_new_tokens=5,
+        eos_token_id=1,
+        top_k=1,
+    )
+
+    assert result.tolist() == [[0, 1]]
+
+
+def test_model_accepts_1024_token_context():
+    torch.manual_seed(0)
+    model = CatAI(vocab_size=12, max_seq_len=1024, d_model=16, n_heads=4, n_layers=1)
+    tokens = torch.randint(0, 12, (1, 1024))
+    logits = model(tokens)
+    assert logits.shape == (1, 1024, 12)
+
+
 def test_generate_handles_context_longer_than_model_window():
     torch.manual_seed(0)
     model = CatAI(vocab_size=12, max_seq_len=4, d_model=16, n_heads=4, n_layers=1)
