@@ -46,6 +46,8 @@ record must contain a `state` object plus a `messages` array. The loader
 validates the complete state schema, then renders the state together with
 CatAI's canonical personality system prompt before SFT.
 
+CatAI's tokenizer already includes a dedicated `\u003cEOS\u003e` token. SFT trains that token as the target immediately after each complete assistant response, and generation stops when it is produced; regression tests cover both the target label and generation stop behavior.
+
 Instruction examples may also include a top-level `tools` array containing
 tool names, descriptions, and JSON argument schemas. Those definitions stay
 outside `messages`; the SFT loader builds the corresponding system context
