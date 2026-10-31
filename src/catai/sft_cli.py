@@ -270,8 +270,10 @@ def main(argv: list[str] | None = None) -> int:
             validation_dataset, batch_size=args.batch_size, shuffle=False
         )
 
-    samples_per_epoch = args.samples_per_epoch or len(train_dataset)
     use_weighted_sampling = len(source_specs) > 1
+    samples_per_epoch = args.samples_per_epoch or len(train_dataset)
+    if not use_weighted_sampling:
+        samples_per_epoch = min(samples_per_epoch, len(train_dataset))
     if use_weighted_sampling:
         sampler = WeightedRandomSampler(
             weights,
@@ -409,7 +411,9 @@ def main(argv: list[str] | None = None) -> int:
             ).tolist()
         else:
             generator = torch.Generator().manual_seed(args.seed + epoch)
-            epoch_indices = torch.randperm(len(train_dataset), generator=generator).tolist()
+            epoch_indices = torch.randperm(
+                len(train_dataset), generator=generator
+            )[:samples_per_epoch].tolist()
         batches_for_epoch = [
             epoch_indices[i:i + args.batch_size]
             for i in range(0, len(epoch_indices), args.batch_size)

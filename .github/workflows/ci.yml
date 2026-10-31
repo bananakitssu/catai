@@ -44,11 +44,12 @@ on:
         required: true
         default: false
       training_mode:
-        description: "Full retraining or reuse a prior base checkpoint for SFT-only iteration"
+        description: "Full retraining, SFT-only iteration, or emotion-data preparation without training"
         type: choice
         options:
           - full
           - sft_only
+          - emotions_only
         required: true
         default: full
       base_checkpoint_run_id:

@@ -123,3 +123,9 @@ the required permissions. See the
 [GoEmotions dataset card](https://huggingface.co/datasets/google-research-datasets/go_emotions),
 [DailyDialog dataset card](https://huggingface.co/datasets/li2017dailydialog/daily_dialog),
 and [EmpatheticDialogues dataset card](https://huggingface.co/datasets/facebook/empathetic_dialogues).
+
+
+To validate and generate just the emotion corpus without launching any model
+training, manually run **Actions → CI → Run workflow** and select
+\`training_mode: emotions_only\`. The three source jobs run in parallel, followed
+by the merge and validation job; base training and both SFT stages are skipped.
