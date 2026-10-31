@@ -357,7 +357,7 @@ jobs:
           path: data/corpus.txt
           key: catai-corpus-redpajama-v2-100m-${{ hashFiles('data/download_corpus.py') }}
 
-      - name: Train base model
+      - name: Train base model (first half)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -383,11 +383,92 @@ jobs:
             --tokenizer-sample-chars 250000 \
             --max-tokens "$MAX_TOKENS" \
             --validation-split 0.05 \
+            --device cpu \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --max-batches-per-run-fraction 0.5
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery
+          path: catai-base-recovery.pt
+          retention-days: 7
+
+  base_training2:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI
+        run: python -m pip install -e .
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-redpajama-v2-100m-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 100000000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-redpajama-v2-100m-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery
+          path: .
+      - name: Resume base training (second half)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '10000000' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size base \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 512 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
             --device cpu
 
       - name: Generate base text
         run: |
-          python -m catai.generate_cli             --checkpoint catai.pt             --prompt "The cat"             --max-new-tokens 200             --temperature 0.7             --top-k 40             --repetition-penalty 1.0             --no-repeat-ngram-size 0             --device cpu
+          python -m catai.generate_cli \
+            --checkpoint catai.pt \
+            --prompt "The cat" \
+            --max-new-tokens 200 \
+            --temperature 0.7 \
+            --top-k 40 \
+            --repetition-penalty 1.0 \
+            --no-repeat-ngram-size 0 \
+            --device cpu
 
       - name: Upload base checkpoint
         uses: actions/upload-artifact@v4
@@ -397,14 +478,14 @@ jobs:
           retention-days: 7
 
   sft:
-    # In SFT-only mode, base_training is intentionally skipped. Explicitly
+    # In SFT-only mode, both base-training stages are intentionally skipped. Explicitly
     # allow this job to proceed when tests passed and a prior run is selected.
     if: >-
       always() &&
       github.event_name == 'workflow_dispatch' &&
       needs.test.result == 'success' &&
-      (needs.base_training.result == 'success' || inputs.training_mode == 'sft_only')
-    needs: [test, base_training]
+      (needs.base_training2.result == 'success' || inputs.training_mode == 'sft_only')
+    needs: [test, base_training2]
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -609,15 +690,15 @@ jobs:
           retention-days: 7
 
   sft2:
-    # In SFT-only mode, base_training is intentionally skipped. Explicitly
+    # In SFT-only mode, both base-training stages are intentionally skipped. Explicitly
     # allow this job to proceed when tests passed and a prior run is selected.
     if: >-
       always() &&
       github.event_name == 'workflow_dispatch' &&
       needs.test.result == 'success' &&
       needs.sft.result == 'success' &&
-      (needs.base_training.result == 'success' || inputs.training_mode == 'sft_only')
-    needs: [test, base_training, sft]
+      (needs.base_training2.result == 'success' || inputs.training_mode == 'sft_only')
+    needs: [test, base_training2, sft]
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
