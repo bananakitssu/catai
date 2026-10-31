@@ -128,7 +128,7 @@ jobs:
           print("Experiment inputs validated.")
           PY
       - name: Compile CatAI Python sources
-        run: python -m compileall -q inference scripts tests
+        run: python -m compileall -q inference scripts data src tests
 
       - name: Run tests with disk monitor
         shell: bash
@@ -477,6 +477,118 @@ jobs:
           path: catai.pt
           retention-days: 7
 
+  emotion_go_emotions:
+    if: github.event_name == 'workflow_dispatch'
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install GoEmotions reader
+        run: python -m pip install --upgrade pip pyarrow
+      - name: Prepare GoEmotions
+        run: |
+          python data/prepare_emotion_datasets.py \
+            --source go_emotions \
+            --output data/go_emotions_emotion.jsonl
+      - name: Upload GoEmotions examples
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-emotion-go-emotions
+          path: data/go_emotions_emotion.jsonl
+          retention-days: 7
+
+  emotion_daily_dialog:
+    if: github.event_name == 'workflow_dispatch'
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Prepare DailyDialog
+        run: |
+          python data/prepare_emotion_datasets.py \
+            --source daily_dialog \
+            --output data/daily_dialog_emotion.jsonl
+      - name: Upload DailyDialog examples
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-emotion-daily-dialog
+          path: data/daily_dialog_emotion.jsonl
+          retention-days: 7
+
+  emotion_empathetic_dialogues:
+    if: github.event_name == 'workflow_dispatch'
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Prepare EmpatheticDialogues
+        run: |
+          python data/prepare_emotion_datasets.py \
+            --source empathetic_dialogues \
+            --output data/empathetic_dialogues_emotion.jsonl
+      - name: Upload EmpatheticDialogues examples
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-emotion-empathetic-dialogues
+          path: data/empathetic_dialogues_emotion.jsonl
+          retention-days: 7
+
+  emotion_merge:
+    if: github.event_name == 'workflow_dispatch'
+    needs: [emotion_go_emotions, emotion_daily_dialog, emotion_empathetic_dialogues]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: catai-emotion-go-emotions
+          path: data
+      - uses: actions/download-artifact@v4
+        with:
+          name: catai-emotion-daily-dialog
+          path: data
+      - uses: actions/download-artifact@v4
+        with:
+          name: catai-emotion-empathetic-dialogues
+          path: data
+      - name: Merge the emotional datasets
+        run: |
+          python data/merge_emotion_datasets.py \
+            --go-emotions data/go_emotions_emotion.jsonl \
+            --daily-dialog data/daily_dialog_emotion.jsonl \
+            --empathetic-dialogues data/empathetic_dialogues_emotion.jsonl \
+            --output data/catai_emotion.jsonl \
+            --seed 42
+      - name: Validate the merged emotional dataset
+        run: |
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, "src")
+          from catai.chat_dataset import load_chat_dataset
+
+          examples = load_chat_dataset("data/catai_emotion.jsonl")
+          print(f"Validated {len(examples):,} emotion-aware examples")
+          PY
+      - name: Upload CatAI emotional dataset
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-emotion-dataset
+          path: data/catai_emotion.jsonl
+          retention-days: 7
+
+
   sft:
     # In SFT-only mode, both base-training stages are intentionally skipped. Explicitly
     # allow this job to proceed when tests passed and a prior run is selected.
@@ -484,8 +596,9 @@ jobs:
       always() &&
       github.event_name == 'workflow_dispatch' &&
       needs.test.result == 'success' &&
-      (needs.base_training2.result == 'success' || inputs.training_mode == 'sft_only')
-    needs: [test, base_training2]
+      (needs.base_training2.result == 'success' || inputs.training_mode == 'sft_only') &&
+      needs.emotion_merge.result == 'success'
+    needs: [test, base_training2, emotion_merge]
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -565,6 +678,11 @@ jobs:
         with:
           name: catai-base-checkpoint
           path: .
+      - name: Download merged emotion dataset
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-emotion-dataset
+          path: data
       - name: Restore OASST1 source cache
         id: oasst-cache
         uses: actions/cache/restore@v4
@@ -643,6 +761,11 @@ jobs:
           instruction_dataset = ChatSupervisedDataset(
               instruction_examples, tokenizer, sequence_length=sequence_length
           )
+          emotion_examples = load_chat_dataset("data/catai_emotion.jsonl")
+          emotion_sample = emotion_examples[: min(128, len(emotion_examples))]
+          emotion_dataset = ChatSupervisedDataset(
+              emotion_sample, tokenizer, sequence_length=sequence_length
+          )
           print(
               f"Merged OpenAssistant: {len(base_examples):,} loaded, "
               f"{len(base_dataset):,} trainable, "
@@ -654,6 +777,10 @@ jobs:
               f"{len(instruction_dataset):,} trainable, "
               f"{instruction_dataset.compacted_examples:,} compacted, "
               f"{instruction_dataset.skipped_overlength_examples:,} skipped"
+          )
+          print(
+              f"Emotion dataset: {len(emotion_examples):,} loaded; "
+              f"preflight checked {len(emotion_dataset):,} examples"
           )
           PY
       - name: Supervised fine-tuning (SFT, epochs 1–2)
@@ -667,7 +794,11 @@ jobs:
             --base-checkpoint catai.pt \
             --dataset data/oasst_chat.jsonl \
             --personality-dataset data/instruction_chat.jsonl \
-            --personality-ratio 0.25 \
+            --personality-ratio 0.20 \
+            --emotion-dataset data/catai_emotion.jsonl \
+            --emotion-ratio 0.35 \
+            --samples-per-epoch 2000 \
+            --max-validation-examples 500 \
             --checkpoint catai-sft.pt \
             --epochs "$SFT_STAGE_EPOCHS" \
             --batch-size 2 \
@@ -697,8 +828,9 @@ jobs:
       github.event_name == 'workflow_dispatch' &&
       needs.test.result == 'success' &&
       needs.sft.result == 'success' &&
-      (needs.base_training2.result == 'success' || inputs.training_mode == 'sft_only')
-    needs: [test, base_training2, sft]
+      (needs.base_training2.result == 'success' || inputs.training_mode == 'sft_only') &&
+      needs.emotion_merge.result == 'success'
+    needs: [test, base_training2, emotion_merge, sft]
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -778,6 +910,11 @@ jobs:
         with:
           name: catai-base-checkpoint
           path: .
+      - name: Download merged emotion dataset
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-emotion-dataset
+          path: data
       - name: Download SFT recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -861,6 +998,11 @@ jobs:
           instruction_dataset = ChatSupervisedDataset(
               instruction_examples, tokenizer, sequence_length=sequence_length
           )
+          emotion_examples = load_chat_dataset("data/catai_emotion.jsonl")
+          emotion_sample = emotion_examples[: min(128, len(emotion_examples))]
+          emotion_dataset = ChatSupervisedDataset(
+              emotion_sample, tokenizer, sequence_length=sequence_length
+          )
           print(
               f"Merged OpenAssistant: {len(base_examples):,} loaded, "
               f"{len(base_dataset):,} trainable, "
@@ -873,6 +1015,10 @@ jobs:
               f"{instruction_dataset.compacted_examples:,} compacted, "
               f"{instruction_dataset.skipped_overlength_examples:,} skipped"
           )
+          print(
+              f"Emotion dataset: {len(emotion_examples):,} loaded; "
+              f"preflight checked {len(emotion_dataset):,} examples"
+          )
           PY
       - name: Supervised fine-tuning (SFT 2, remaining epochs + evaluation)
         env:
@@ -883,7 +1029,11 @@ jobs:
             --base-checkpoint catai.pt \
             --dataset data/oasst_chat.jsonl \
             --personality-dataset data/instruction_chat.jsonl \
-            --personality-ratio 0.25 \
+            --personality-ratio 0.20 \
+            --emotion-dataset data/catai_emotion.jsonl \
+            --emotion-ratio 0.35 \
+            --samples-per-epoch 2000 \
+            --max-validation-examples 500 \
             --checkpoint catai-sft.pt \
             --resume-from catai-sft-recovery.pt \
             --recovery-checkpoint catai-sft-recovery.pt \

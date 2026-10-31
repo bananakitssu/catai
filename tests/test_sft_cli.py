@@ -205,3 +205,89 @@ def test_sft_cli_restores_the_best_validation_epoch(tmp_path, monkeypatch):
     assert metadata["training"]["best_epoch"] == 2
     assert metadata["training"]["selected_epoch"] == 2
     assert metadata["training"]["best_validation_loss"] == 0.5
+
+
+def test_sft_cli_balances_emotion_personality_and_openassistant_data(tmp_path):
+    tokenizer = CharTokenizer.default()
+    model = CatAI(
+        vocab_size=tokenizer.vocab_size,
+        max_seq_len=1024,
+        d_model=16,
+        n_heads=4,
+        n_layers=1,
+    )
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+    base_checkpoint = tmp_path / "base.pt"
+    save_checkpoint(
+        base_checkpoint,
+        model,
+        optimizer,
+        step=0,
+        metadata={
+            "model": {
+                "max_seq_len": 1024,
+                "d_model": 16,
+                "n_heads": 4,
+                "n_layers": 1,
+            },
+            "tokenizer": {
+                "type": "char",
+                "vocabulary": list(tokenizer.vocabulary),
+            },
+        },
+    )
+
+    def write_dataset(path, prefix):
+        records = [
+            {
+                "state": DEFAULT_STATE,
+                "messages": [
+                    {"role": "user", "content": f"{prefix} question {index}"},
+                    {"role": "assistant", "content": f"{prefix} response {index}"},
+                ],
+            }
+            for index in range(2)
+        ]
+        path.write_text(
+            "\n".join(json.dumps(record) for record in records) + "\n",
+            encoding="utf-8",
+        )
+
+    base_data = tmp_path / "base.jsonl"
+    personality_data = tmp_path / "personality.jsonl"
+    emotion_data = tmp_path / "emotion.jsonl"
+    write_dataset(base_data, "OpenAssistant")
+    write_dataset(personality_data, "CatAI")
+    write_dataset(emotion_data, "Emotion")
+
+    output = tmp_path / "balanced-sft.pt"
+    result = main([
+        "--base-checkpoint", str(base_checkpoint),
+        "--dataset", str(base_data),
+        "--personality-dataset", str(personality_data),
+        "--personality-ratio", "0.2",
+        "--emotion-dataset", str(emotion_data),
+        "--emotion-ratio", "0.3",
+        "--samples-per-epoch", "4",
+        "--checkpoint", str(output),
+        "--epochs", "1",
+        "--batch-size", "1",
+        "--learning-rate", "0.001",
+        "--sequence-length", "1024",
+        "--device", "cpu",
+    ])
+
+    assert result == 0
+    metadata = load_checkpoint_metadata(output)
+    training = metadata["training"]
+    assert training["base_examples"] == 2
+    assert training["personality_examples"] == 2
+    assert training["emotion_examples"] == 2
+    assert training["sampling_ratios"] == {
+        "base": 0.5,
+        "emotion": 0.3,
+        "personality": 0.2,
+    }
+    assert training["emotion_ratio"] == 0.3
+    assert training["samples_per_epoch"] == 4
+    assert training["total_steps"] == 4

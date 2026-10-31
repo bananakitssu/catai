@@ -79,3 +79,47 @@ python data/download_oasst1.py --max-trees 100 --max-examples 1000
 ```
 
 The generated datasets and downloaded source archives are ignored by Git. The OASST1 ready export contains 10,364 trees and 88,838 messages. The OASST2 ready export contains 13,854 trees and 135,174 messages, including 64,513 English messages. Both official releases are licensed under Apache-2.0. See the [OASST1 dataset card](https://huggingface.co/datasets/OpenAssistant/oasst1) and [OASST2 dataset card](https://huggingface.co/datasets/OpenAssistant/oasst2).
+
+
+## Emotion-aware SFT dataset (GoEmotions + DailyDialog + EmpatheticDialogues)
+
+The CI pipeline prepares a unified, source-attributed emotional dataset from the
+training splits of three public datasets:
+
+- **GoEmotions** supplies fine-grained, multi-label emotion-recognition examples.
+  These are trained as explicit classification tasks; CatAI is not given invented
+  assistant replies to isolated Reddit comments.
+- **DailyDialog** supplies actual adjacent dialogue turns. The emotion annotation
+  on a user turn is used as context for the real next-speaker response.
+- **EmpatheticDialogues** supplies speaker/listener conversations. The listener's
+  real response is paired with the speaker's preceding turn and the dialogue's
+  annotated emotional context.
+
+The normalized output is \`data/catai_emotion.jsonl\`. Every record retains
+\`dataset_source\`, \`dataset_license\`, and emotion labels for provenance. The
+merge is deterministic and removes duplicate conversations. Generated JSONL
+files and downloaded archives are ignored by Git.
+
+Run the preparation locally:
+
+\`\`\`bash
+python -m pip install pyarrow
+python data/prepare_emotion_datasets.py --source go_emotions --output data/go_emotions_emotion.jsonl
+python data/prepare_emotion_datasets.py --source daily_dialog --output data/daily_dialog_emotion.jsonl
+python data/prepare_emotion_datasets.py --source empathetic_dialogues --output data/empathetic_dialogues_emotion.jsonl
+python data/merge_emotion_datasets.py
+\`\`\`
+
+SFT samples from the merged emotion corpus alongside OpenAssistant and CatAI's
+personality examples. The workflow caps the number of draws per epoch so that a
+large source archive does not turn one SFT epoch into an unbounded multi-hour job;
+increase \`--samples-per-epoch\` when a larger training budget is available.
+
+**Licensing warning:** GoEmotions is Apache-2.0, but DailyDialog is CC BY-NC-SA
+4.0 and EmpatheticDialogues is CC BY-NC 4.0. The combined emotional corpus
+therefore contains non-commercial source material. Do not use the merged corpus
+or assume resulting checkpoints are cleared for commercial use without obtaining
+the required permissions. See the
+[GoEmotions dataset card](https://huggingface.co/datasets/google-research-datasets/go_emotions),
+[DailyDialog dataset card](https://huggingface.co/datasets/li2017dailydialog/daily_dialog),
+and [EmpatheticDialogues dataset card](https://huggingface.co/datasets/facebook/empathetic_dialogues).

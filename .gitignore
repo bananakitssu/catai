@@ -5,3 +5,10 @@ data/oasst2_ready.trees.jsonl.gz
 data/oasst2_chat.jsonl
 data/oasst_chat.jsonl
 data/chat_sft.jsonl
+
+# Generated emotion datasets and downloaded source archives
+data/emotion_sources/
+data/go_emotions_emotion.jsonl
+data/daily_dialog_emotion.jsonl
+data/empathetic_dialogues_emotion.jsonl
+data/catai_emotion.jsonl
