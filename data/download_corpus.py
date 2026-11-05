@@ -104,6 +104,7 @@ def _duplicate_ids(payload: bytes) -> set[str]:
 def filter_redpajama_shard(
     document_payload: bytes,
     signals_payload: bytes,
+    shard_path: str,
     duplicate_ids: set[str],
     seen_digests: set[str],
     stats: dict[str, int] | None = None,
@@ -117,8 +118,14 @@ def filter_redpajama_shard(
     if len(documents) != len(signals):
         raise ValueError(f"RPv2 documents/signals row mismatch: {len(documents)} vs {len(signals)}")
     selected = []
-    for document_line, signal_line in zip(documents, signals):
+    for row_index, (document_line, signal_line) in enumerate(zip(documents, signals)):
         counters["seen"] += 1
+        # RPv2 duplicate Parquet doc_id is the document shard path followed
+        # by the document's zero-based row index (see Together's FAQ example).
+        document_id = f"{shard_path}/{row_index}"
+        if document_id in duplicate_ids:
+            counters["duplicate_ids"] += 1
+            continue
         try:
             document, signal_record = json.loads(document_line), json.loads(signal_line)
         except json.JSONDecodeError:
@@ -126,13 +133,6 @@ def filter_redpajama_shard(
             continue
         if not isinstance(document, dict) or not isinstance(signal_record, dict):
             counters["quality_rejected"] += 1
-            continue
-        ids = {
-            str(value) for value in (signal_record.get("id"), signal_record.get("id_int"))
-            if value is not None
-        }
-        if ids & duplicate_ids:
-            counters["duplicate_ids"] += 1
             continue
         signal_map, text = signal_record.get("quality_signals"), document.get("raw_content")
         if (
@@ -199,13 +199,16 @@ def download_redpajama(
             if chars >= target_chars or (max_documents is not None and docs >= max_documents):
                 break
             processed += 1
-            stem = shard_id.removesuffix(".json.gz")
+            document_shard_path = (
+                shard_id if shard_id.endswith(".json.gz") else f"{shard_id}.json.gz"
+            )
+            stem = document_shard_path.removesuffix(".json.gz")
             try:
-                document_payload = _download(f"{REDPAJAMA_BASE_URL}/documents/{stem}.json.gz")
+                document_payload = _download(f"{REDPAJAMA_BASE_URL}/documents/{document_shard_path}")
                 signal_payload = _download(f"{REDPAJAMA_BASE_URL}/quality_signals/{stem}.signals.json.gz")
                 duplicate_payload = _download(f"{REDPAJAMA_BASE_URL}/duplicates/{stem}.duplicates.parquet")
                 selected = filter_redpajama_shard(
-                    document_payload, signal_payload,
+                    document_payload, signal_payload, document_shard_path,
                     _duplicate_ids(duplicate_payload), seen_digests, stats,
                 )
             except Exception as exc:
