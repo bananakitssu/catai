@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import copy
 import hashlib
 import time
@@ -239,7 +240,7 @@ def main(argv: list[str] | None = None) -> int:
             flush=True,
         )
 
-    optional_ratio = sum((
+    optional_ratio = math.fsum((
         args.personality_ratio if personality_dataset is not None else 0.0,
         args.emotion_ratio if emotion_dataset is not None else 0.0,
         args.smol_smoltalk_ratio if smol_smoltalk_dataset is not None else 0.0,
