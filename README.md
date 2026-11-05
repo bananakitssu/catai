@@ -1,6 +1,6 @@
 # catai
 
-A small decoder-only language model experiment ("maybe like a cat...") with BPE as the default tokenizer.
+A small decoder-only language model experiment ("maybe like a cat..."). The recommended CI training workflow uses BPE by default; the standalone CLI still offers the character tokenizer for lightweight experiments.
 
 ## Architecture (current)
 
