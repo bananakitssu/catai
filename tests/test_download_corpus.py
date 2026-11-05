@@ -44,8 +44,10 @@ def test_redpajama_filter_drops_marked_and_exact_duplicates():
     doc_payload = gzip.compress("\n".join(json.dumps(x) for x in docs).encode())
     signal_payload = gzip.compress("\n".join(json.dumps(x) for x in signals).encode())
     stats = {}
+    shard_path = "2023-06/0000/en_head_middle.json.gz"
     selected = filter_redpajama_shard(
-        doc_payload, signal_payload, {"remote-duplicate"}, set(), stats
+        doc_payload, signal_payload, shard_path,
+        {f"{shard_path}/2"}, set(), stats
     )
     assert selected == [text]
     assert stats["duplicate_ids"] == 1
