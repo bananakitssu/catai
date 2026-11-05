@@ -1,10 +1,10 @@
 # catai
 
-A small character-level language model experiment ("maybe like a cat...").
+A small decoder-only language model experiment ("maybe like a cat...") with BPE as the default tokenizer.
 
 ## Architecture (current)
 
-- **Tokenizer**: fixed printable-ASCII character vocabulary (can spell any name/code from known characters)
+- **Tokenizer**: deterministic BPE subword tokenizer by default; the printable-ASCII character tokenizer remains available for experiments
 - **Position encoding**: Rotary Position Embeddings (RoPE)
 - **Normalization**: RMSNorm
 - **Feed-forward**: SwiGLU
@@ -27,11 +27,12 @@ A small character-level language model experiment ("maybe like a cat...").
 # Generate a synthetic corpus (or use any UTF-8 text file)
 python data/generate_corpus.py --sentences 100000 --output data/train.txt
 
-# Train (tiny model, character tokenizer)
-python -m catai --corpus data/train.txt --checkpoint catai.pt --epochs 1
+# Build a curated real-text corpus
+python -m pip install -e ".[data]"
+python data/download_corpus.py --output data/corpus.txt --target-chars 100000000 --fineweb-edu-chars 15000000
 
-# Or a larger preset
-python -m catai --corpus data/train.txt --model-size small --sequence-length 1024 --epochs 2
+# Train a tiny BPE model with a 20M-token budget
+python -m catai --corpus data/corpus.txt --checkpoint catai.pt --model-size tiny --tokenizer bpe --vocab-size 512 --max-tokens 20000000 --validation-split 0.05
 
 # Generate
 python -m catai.generate_cli --checkpoint catai.pt --prompt "The cat"
@@ -129,3 +130,63 @@ To validate and generate just the emotion corpus without launching any model
 training, manually run **Actions → CI → Run workflow** and select
 \`training_mode: emotions_only\`. The three source jobs run in parallel, followed
 by the merge and validation job; base training and both SFT stages are skipped.
+
+
+## Updated base-training data and budget
+
+The Actions workflow defaults to the **tiny** preset (about 0.92M parameters)
+and 20M pretraining tokens, approximately 21.8 tokens per parameter. It rejects
+budgets below 10 tokens per parameter. A rough 20-token target:
+
+| Preset | Parameters | 20-token target |
+|---|---:|---:|
+| tiny | 918,656 | 20M tokens |
+| small | 6,557,952 | 131M tokens |
+| base | 38,810,112 | 776M tokens |
+| medium | 113,664,768 | 2.27B tokens |
+
+These are scaling-law reference points, not a quality guarantee or universal
+rule for small models. CatAI logs the model's actual parameter count, training
+token count, and achieved ratio.
+
+The corpus combines:
+- English RedPajama-V2 `head_middle` documents filtered using published
+  Gopher-style quality signals.
+- RedPajama's duplicate-ID Parquet artifacts plus a local SHA-256 pass for
+  additional exact deduplication.
+- A bounded 15M-character FineWeb-Edu sample, filtered to score >= 3 and
+  language_score >= 0.8. It is placed first so it appears in the capped
+  training-token prefix.
+
+Install corpus dependencies using `python -m pip install -e ".[data]"`.
+FineWeb-Edu is ODC-BY-1.0 and remains subject to Common Crawl's terms. See the
+[FineWeb-Edu dataset card](https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu)
+and [RedPajama-V2 paper](https://papers.nips.cc/paper/2024/file/d34497330b1fd6530f7afd86d0df9f76-Paper-Datasets_and_Benchmarks_Track.pdf).
+
+## Additional SFT sources
+
+The default SFT sampling targets are:
+
+| Source | Target share |
+|---|---:|
+| OpenAssistant 1 + 2 | 30% |
+| CatAI personality examples | 20% |
+| Emotion-aware examples | 30% |
+| Smol-SmolTalk | 10% |
+| Blended Skill Talk | 10% |
+
+Smol-SmolTalk is adapted for models below 1B parameters. CatAI takes up to
+1,000 shorter examples and retains the upstream source label; its dataset card
+lists Apache-2.0. Blended Skill Talk adds up to 1,000 training conversations:
+the free participant becomes the user and the guided participant becomes the
+assistant. It is licensed CC BY 4.0. Both converters preserve dataset/license
+provenance in each record.
+
+The existing emotion mixture still includes DailyDialog (CC BY-NC-SA 4.0) and
+EmpatheticDialogues (CC BY-NC 4.0). The combined emotional corpus therefore
+contains non-commercial source material; do not assume the resulting checkpoint
+is commercially cleared without separate permission and review.
+
+The added dialogue sources start with small samples. Compare validation loss
+and the same CatAI evaluation prompts against the previous 45%/20%/35% SFT
+baseline before raising their shares or sample caps.
