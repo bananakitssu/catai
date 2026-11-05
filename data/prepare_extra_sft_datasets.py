@@ -55,26 +55,20 @@ def normalize_messages(raw_messages: object) -> list[dict[str, str]] | None:
 
 
 def convert_smol_smoltalk_row(row: dict[str, Any]) -> dict[str, Any] | None:
+    # The published dataset schema guarantees only messages and source.
+    # Long examples are handled by CatAI's tokenizer-aware compact/skip logic
+    # in ChatSupervisedDataset, rather than relying on undocumented columns.
     messages = normalize_messages(row.get("messages"))
     if messages is None:
         return None
-    try:
-        token_count = int(row.get("conversation_tokens", 0))
-    except (TypeError, ValueError):
-        token_count = 0
-    if token_count and token_count > 900:
-        return None
-    quality = str(row.get("quality", "")).lower()
-    if quality not in {"good", "average", ""}:
-        return None
+    source = row.get("source")
     return {
         "state": default_state(),
         "messages": messages,
         "dataset_source": "smol-smoltalk",
         "dataset_license": "Apache-2.0",
         "dataset_repository": SMOL_SMOLTALK_DATASET,
-        "upstream_source": str(row.get("source", "unknown")),
-        "quality": quality or None,
+        "upstream_source": source.strip() if isinstance(source, str) and source.strip() else "unknown",
     }
 
 
