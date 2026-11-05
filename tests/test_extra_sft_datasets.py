@@ -4,22 +4,19 @@ from data.prepare_extra_sft_datasets import (
 )
 
 
-def test_smol_smoltalk_provenance_and_filters():
-    base = {
+def test_smol_smoltalk_uses_documented_messages_and_source_fields():
+    item = convert_smol_smoltalk_row({
         "messages": [
             {"role": "user", "content": "Hello"},
             {"role": "assistant", "content": "Hello!"},
         ],
-        "conversation_tokens": 120,
-        "quality": "good",
         "source": "smol-magpie-ultra-short",
-    }
-    item = convert_smol_smoltalk_row(base)
+    })
     assert item is not None
     assert item["dataset_license"] == "Apache-2.0"
     assert item["upstream_source"] == "smol-magpie-ultra-short"
-    assert convert_smol_smoltalk_row({**base, "conversation_tokens": 1500}) is None
-    assert convert_smol_smoltalk_row({**base, "quality": "bad"}) is None
+    assert item["messages"][-1] == {"role": "assistant", "content": "Hello!"}
+    assert convert_smol_smoltalk_row({"source": "smol-magpie-ultra"}) is None
 
 
 def test_blended_skill_talk_turns_and_context():
