@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import copy
 import hashlib
 import time
@@ -51,6 +52,10 @@ def build_parser() -> argparse.ArgumentParser:
         default=0.0,
         help="Target share of samples drawn from --emotion-dataset (0 < ratio < 1).",
     )
+    parser.add_argument("--smol-smoltalk-dataset", default=None, help="Optional Apache-2.0 Smol-SmolTalk chat JSONL.")
+    parser.add_argument("--smol-smoltalk-ratio", type=float, default=0.0, help="Target SFT share from --smol-smoltalk-dataset.")
+    parser.add_argument("--blended-skill-talk-dataset", default=None, help="Optional CC-BY-4.0 Blended Skill Talk chat JSONL.")
+    parser.add_argument("--blended-skill-talk-ratio", type=float, default=0.0, help="Target SFT share from --blended-skill-talk-dataset.")
     parser.add_argument(
         "--samples-per-epoch",
         type=int,
@@ -130,6 +135,16 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--emotion-ratio must be positive when --emotion-dataset is provided")
     if not args.emotion_dataset and args.emotion_ratio != 0.0:
         raise ValueError("--emotion-ratio requires --emotion-dataset")
+    for dataset_path, ratio, label in (
+        (args.smol_smoltalk_dataset, args.smol_smoltalk_ratio, "smol-smoltalk"),
+        (args.blended_skill_talk_dataset, args.blended_skill_talk_ratio, "blended-skill-talk"),
+    ):
+        if not 0.0 <= ratio < 1.0:
+            raise ValueError(f"--{label}-ratio must be in [0, 1)")
+        if dataset_path and ratio <= 0.0:
+            raise ValueError(f"--{label}-ratio must be positive when its dataset is provided")
+        if not dataset_path and ratio != 0.0:
+            raise ValueError(f"--{label}-ratio requires its dataset")
     if args.samples_per_epoch is not None and args.samples_per_epoch < 1:
         raise ValueError("--samples-per-epoch must be positive")
     if args.max_validation_examples is not None and args.max_validation_examples < 1:
@@ -199,22 +214,55 @@ def main(argv: list[str] | None = None) -> int:
             flush=True,
         )
 
-    optional_ratio = (
-        (args.personality_ratio if personality_dataset is not None else 0.0)
-        + (args.emotion_ratio if emotion_dataset is not None else 0.0)
-    )
-    if optional_ratio >= 1.0:
-        raise ValueError(
-            "personality and emotion sampling ratios must add up to less than 1.0"
+    smol_smoltalk_dataset = None
+    smol_smoltalk_examples_count = 0
+    if args.smol_smoltalk_dataset:
+        smol_examples = load_chat_dataset(args.smol_smoltalk_dataset)
+        smol_smoltalk_examples_count = len(smol_examples)
+        smol_smoltalk_dataset = ChatSupervisedDataset(smol_examples, tokenizer, sequence_length)
+        print(
+            f"Smol-SmolTalk data: {smol_smoltalk_examples_count} loaded, "
+            f"{smol_smoltalk_dataset.compacted_examples} compacted, "
+            f"{smol_smoltalk_dataset.skipped_overlength_examples} skipped",
+            flush=True,
         )
 
+    blended_skill_talk_dataset = None
+    blended_skill_talk_examples_count = 0
+    if args.blended_skill_talk_dataset:
+        blended_examples = load_chat_dataset(args.blended_skill_talk_dataset)
+        blended_skill_talk_examples_count = len(blended_examples)
+        blended_skill_talk_dataset = ChatSupervisedDataset(blended_examples, tokenizer, sequence_length)
+        print(
+            f"Blended Skill Talk data: {blended_skill_talk_examples_count} loaded, "
+            f"{blended_skill_talk_dataset.compacted_examples} compacted, "
+            f"{blended_skill_talk_dataset.skipped_overlength_examples} skipped",
+            flush=True,
+        )
+
+    optional_ratio = math.fsum((
+        args.personality_ratio if personality_dataset is not None else 0.0,
+        args.emotion_ratio if emotion_dataset is not None else 0.0,
+        args.smol_smoltalk_ratio if smol_smoltalk_dataset is not None else 0.0,
+        args.blended_skill_talk_ratio if blended_skill_talk_dataset is not None else 0.0,
+    ))
+    if optional_ratio >= 1.0:
+        raise ValueError("all optional SFT sampling ratios must add up to less than 1.0")
+
+    # Normalize the residual decimal share (e.g. 1 - 0.6) so checkpoint
+    # metadata and exact sampler configuration comparisons are deterministic.
+    base_ratio = round(1.0 - optional_ratio, 12)
     source_specs: list[tuple[str, ChatSupervisedDataset, float]] = [
-        ("base", base_dataset, 1.0 - optional_ratio)
+        ("base", base_dataset, base_ratio)
     ]
     if emotion_dataset is not None:
         source_specs.append(("emotion", emotion_dataset, args.emotion_ratio))
     if personality_dataset is not None:
         source_specs.append(("personality", personality_dataset, args.personality_ratio))
+    if smol_smoltalk_dataset is not None:
+        source_specs.append(("smol_smoltalk", smol_smoltalk_dataset, args.smol_smoltalk_ratio))
+    if blended_skill_talk_dataset is not None:
+        source_specs.append(("blended_skill_talk", blended_skill_talk_dataset, args.blended_skill_talk_ratio))
 
     dataset_sizes = {name: len(source_dataset) for name, source_dataset, _ in source_specs}
     sampling_ratios = {name: ratio for name, _, ratio in source_specs}
@@ -576,6 +624,20 @@ def main(argv: list[str] | None = None) -> int:
                     args.personality_ratio
                     if personality_dataset is not None
                     else None
+                ),
+                "smol_smoltalk_examples": smol_smoltalk_examples_count,
+                "smol_smoltalk_training_examples": (
+                    len(smol_smoltalk_dataset) if smol_smoltalk_dataset is not None else 0
+                ),
+                "smol_smoltalk_ratio": (
+                    args.smol_smoltalk_ratio if smol_smoltalk_dataset is not None else None
+                ),
+                "blended_skill_talk_examples": blended_skill_talk_examples_count,
+                "blended_skill_talk_training_examples": (
+                    len(blended_skill_talk_dataset) if blended_skill_talk_dataset is not None else 0
+                ),
+                "blended_skill_talk_ratio": (
+                    args.blended_skill_talk_ratio if blended_skill_talk_dataset is not None else None
                 ),
                 "tokens_per_example": sequence_length,
                 "seconds": elapsed,

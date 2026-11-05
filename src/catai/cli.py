@@ -172,6 +172,12 @@ def main(argv: list[str] | None = None) -> int:
         n_layers=n_layers,
     ).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
+    parameter_count = model.parameter_count()
+    print(
+        f"parameters={parameter_count:,} training_tokens={len(tokens):,} "
+        f"tokens_per_parameter={len(tokens) / max(parameter_count, 1):.2f}",
+        flush=True,
+    )
 
     model_metadata = {
         "max_seq_len": args.sequence_length,
@@ -179,7 +185,7 @@ def main(argv: list[str] | None = None) -> int:
         "n_heads": n_heads,
         "n_layers": n_layers,
         "model_size": args.model_size,
-        "parameter_count": model.parameter_count(),
+        "parameter_count": parameter_count,
     }
     tokenizer_metadata = {
         "type": args.tokenizer,

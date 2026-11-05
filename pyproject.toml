@@ -14,6 +14,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest>=8"]
+data = ["datasets>=3.3", "pyarrow>=14"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

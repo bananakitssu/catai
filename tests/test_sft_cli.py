@@ -256,9 +256,13 @@ def test_sft_cli_balances_emotion_personality_and_openassistant_data(tmp_path):
     base_data = tmp_path / "base.jsonl"
     personality_data = tmp_path / "personality.jsonl"
     emotion_data = tmp_path / "emotion.jsonl"
+    smol_data = tmp_path / "smol.jsonl"
+    blended_data = tmp_path / "blended.jsonl"
     write_dataset(base_data, "OpenAssistant")
     write_dataset(personality_data, "CatAI")
     write_dataset(emotion_data, "Emotion")
+    write_dataset(smol_data, "Smol-SmolTalk")
+    write_dataset(blended_data, "Blended Skill Talk")
 
     output = tmp_path / "balanced-sft.pt"
     result = main([
@@ -267,7 +271,11 @@ def test_sft_cli_balances_emotion_personality_and_openassistant_data(tmp_path):
         "--personality-dataset", str(personality_data),
         "--personality-ratio", "0.2",
         "--emotion-dataset", str(emotion_data),
-        "--emotion-ratio", "0.3",
+        "--emotion-ratio", "0.2",
+        "--smol-smoltalk-dataset", str(smol_data),
+        "--smol-smoltalk-ratio", "0.1",
+        "--blended-skill-talk-dataset", str(blended_data),
+        "--blended-skill-talk-ratio", "0.1",
         "--samples-per-epoch", "4",
         "--checkpoint", str(output),
         "--epochs", "1",
@@ -284,10 +292,16 @@ def test_sft_cli_balances_emotion_personality_and_openassistant_data(tmp_path):
     assert training["personality_examples"] == 2
     assert training["emotion_examples"] == 2
     assert training["sampling_ratios"] == {
-        "base": 0.5,
-        "emotion": 0.3,
+        "base": 0.4,
+        "emotion": 0.2,
         "personality": 0.2,
+        "smol_smoltalk": 0.1,
+        "blended_skill_talk": 0.1,
     }
-    assert training["emotion_ratio"] == 0.3
+    assert training["emotion_ratio"] == 0.2
+    assert training["smol_smoltalk_examples"] == 2
+    assert training["smol_smoltalk_ratio"] == 0.1
+    assert training["blended_skill_talk_examples"] == 2
+    assert training["blended_skill_talk_ratio"] == 0.1
     assert training["samples_per_epoch"] == 4
     assert training["total_steps"] == 4
