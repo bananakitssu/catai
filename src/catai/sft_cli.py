@@ -249,8 +249,11 @@ def main(argv: list[str] | None = None) -> int:
     if optional_ratio >= 1.0:
         raise ValueError("all optional SFT sampling ratios must add up to less than 1.0")
 
+    # Normalize the residual decimal share (e.g. 1 - 0.6) so checkpoint
+    # metadata and exact sampler configuration comparisons are deterministic.
+    base_ratio = round(1.0 - optional_ratio, 12)
     source_specs: list[tuple[str, ChatSupervisedDataset, float]] = [
-        ("base", base_dataset, 1.0 - optional_ratio)
+        ("base", base_dataset, base_ratio)
     ]
     if emotion_dataset is not None:
         source_specs.append(("emotion", emotion_dataset, args.emotion_ratio))
