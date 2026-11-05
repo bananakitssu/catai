@@ -109,6 +109,7 @@ jobs:
           CHAT_EXAMPLES: ${{ inputs.chat_examples || '4500' }}
           MAX_TOKENS: ${{ inputs.max_tokens || '20000000' }}
           MODEL_SIZE: ${{ inputs.model_size || 'tiny' }}
+          TRAINING_MODE: ${{ inputs.training_mode || 'full' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
           SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
         run: |
@@ -127,19 +128,20 @@ jobs:
           positive_int("BASE_EPOCHS", 5)
           positive_int("SFT_EPOCHS", 10)
           positive_int("CHAT_EXAMPLES", 50000)
-          max_tokens = positive_int("MAX_TOKENS", 2500000000)
-          parameter_counts = {"tiny": 918656, "small": 6557952, "base": 38810112, "medium": 113664768}
-          model_size = os.environ["MODEL_SIZE"]
-          if model_size not in parameter_counts:
-              raise SystemExit("MODEL_SIZE must be tiny, small, base, or medium")
-          tokens_per_parameter = max_tokens / parameter_counts[model_size]
-          if tokens_per_parameter < 10:
-              raise SystemExit(
-                  f"{model_size} has {parameter_counts[model_size]:,} parameters; "
-                  f"{max_tokens:,} tokens is only {tokens_per_parameter:.1f} tokens/parameter. "
-                  "Set at least 10 tokens/parameter; around 20 is a useful starting target."
-              )
-          print(f"Training budget: {model_size}, {max_tokens:,} tokens, {tokens_per_parameter:.1f} tokens/parameter.")
+          if os.environ["TRAINING_MODE"] == "full":
+              max_tokens = positive_int("MAX_TOKENS", 2500000000)
+              parameter_counts = {"tiny": 918656, "small": 6557952, "base": 38810112, "medium": 113664768}
+              model_size = os.environ["MODEL_SIZE"]
+              if model_size not in parameter_counts:
+                  raise SystemExit("MODEL_SIZE must be tiny, small, base, or medium")
+              tokens_per_parameter = max_tokens / parameter_counts[model_size]
+              if tokens_per_parameter < 10:
+                  raise SystemExit(
+                      f"{model_size} has {parameter_counts[model_size]:,} parameters; "
+                      f"{max_tokens:,} tokens is only {tokens_per_parameter:.1f} tokens/parameter. "
+                      "Set at least 10 tokens/parameter; around 20 is a useful starting target."
+                  )
+              print(f"Training budget: {model_size}, {max_tokens:,} tokens, {tokens_per_parameter:.1f} tokens/parameter.")
           if os.environ["TOKENIZER"] not in {"bpe", "char"}:
               raise SystemExit("TOKENIZER must be 'bpe' or 'char'")
           if os.environ["SEQUENCE_LENGTH"] not in {"512", "1024"}:
