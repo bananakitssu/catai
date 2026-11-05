@@ -137,7 +137,8 @@ def filter_redpajama_shard(
         signal_map, text = signal_record.get("quality_signals"), document.get("raw_content")
         if (
             not isinstance(signal_map, dict) or not isinstance(text, str)
-            or not text.strip() or not gopher_rules_pass(signal_map)
+            or not text.strip() or len(text.split()) < 10
+            or not gopher_rules_pass(signal_map)
         ):
             counters["quality_rejected"] += 1
             continue
