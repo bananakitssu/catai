@@ -7,10 +7,13 @@ import hashlib
 import io
 import json
 import random
+import sys
 import tarfile
+import time
+import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
-import sys
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -152,23 +155,106 @@ def _write_jsonl(records: list[dict[str, Any]], output: Path) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def prepare_smol_smoltalk(output: Path, limit: int, seed: int) -> int:
-    try:
-        from datasets import load_dataset
-    except ImportError as exc:
-        raise RuntimeError("Smol-SmolTalk requires datasets>=3.3") from exc
-    dataset = load_dataset(SMOL_SMOLTALK_DATASET, split="train", streaming=True).shuffle(
-        seed=seed, buffer_size=10_000
+def _fetch_smol_smoltalk_page(offset: int, length: int = 100) -> dict[str, Any]:
+    """Fetch one bounded page from the public Hugging Face Dataset Viewer API."""
+    if offset < 0 or not 1 <= length <= 100:
+        raise ValueError("Dataset Viewer offsets must be non-negative and page lengths must be 1..100")
+
+    query = urllib.parse.urlencode({
+        "dataset": SMOL_SMOLTALK_DATASET,
+        "config": "default",
+        "split": "train",
+        "offset": offset,
+        "length": length,
+    })
+    request = urllib.request.Request(
+        f"https://datasets-server.huggingface.co/rows?{query}",
+        headers={"User-Agent": "CatAI-SFT-dataset-preparation/1.0"},
     )
-    records = []
-    for row in dataset:
-        item = convert_smol_smoltalk_row(row)
-        if item is not None:
-            records.append(item)
-            if len(records) >= limit:
-                break
+
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+            break
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as exc:
+            if attempt == 3:
+                raise RuntimeError(
+                    f"Could not fetch Smol-SmolTalk rows at offset {offset} after 4 attempts"
+                ) from exc
+            retry_after = (
+                exc.headers.get("Retry-After")
+                if isinstance(exc, urllib.error.HTTPError) and exc.headers is not None
+                else None
+            )
+            try:
+                delay = max(1.0, min(30.0, float(retry_after)))
+            except (TypeError, ValueError):
+                delay = float(2 ** attempt)
+            time.sleep(delay)
+
+    if not isinstance(payload, dict):
+        raise ValueError("Hugging Face Dataset Viewer returned an invalid rows response")
+    if payload.get("partial") is True:
+        raise RuntimeError(
+            "Hugging Face Dataset Viewer marked Smol-SmolTalk as partial; refusing to sample incomplete data"
+        )
+    return payload
+
+
+def prepare_smol_smoltalk(output: Path, limit: int, seed: int) -> int:
+    # Avoid datasets' remote Parquet streaming iterator. Breaking out of that
+    # iterator can leave concurrent fsspec/Arrow reads alive during interpreter
+    # shutdown, causing PyGILState_Release crashes in CI. The Dataset Viewer
+    # serves bounded JSON pages (100 rows maximum) without local Arrow readers.
+    first_page = _fetch_smol_smoltalk_page(0, 100)
+    total_rows = first_page.get("num_rows_total")
+    if not isinstance(total_rows, int) or total_rows < 0:
+        raise ValueError("Hugging Face Dataset Viewer omitted a valid num_rows_total")
+    if not isinstance(first_page.get("rows"), list):
+        raise ValueError("Hugging Face Dataset Viewer returned an invalid rows page")
+
+    page_offsets = list(range(0, total_rows, 100))
+    random.Random(seed).shuffle(page_offsets)
+    pages_needed = (limit + 99) // 100
+    max_pages = min(len(page_offsets), max(20, pages_needed * 5))
+    records: list[dict[str, Any]] = []
+
+    for offset in page_offsets[:max_pages]:
+        payload = first_page if offset == 0 else _fetch_smol_smoltalk_page(
+            offset, min(100, total_rows - offset)
+        )
+        if payload.get("partial") is True:
+            raise RuntimeError("Hugging Face Dataset Viewer returned a partial Smol-SmolTalk page")
+        if payload.get("num_rows_total") != total_rows:
+            raise RuntimeError("Smol-SmolTalk row count changed while pages were being sampled")
+        rows = payload.get("rows")
+        if not isinstance(rows, list):
+            raise ValueError(f"Hugging Face Dataset Viewer returned an invalid page at offset {offset}")
+
+        for entry in rows:
+            if not isinstance(entry, dict):
+                continue
+            row = entry.get("row")
+            if not isinstance(row, dict):
+                continue
+            item = convert_smol_smoltalk_row(row)
+            if item is not None:
+                records.append(item)
+                if len(records) >= limit:
+                    break
+        if len(records) >= limit:
+            break
+
     if not records:
         raise RuntimeError("Smol-SmolTalk produced no usable examples")
+    if len(records) < limit:
+        raise RuntimeError(
+            f"Smol-SmolTalk produced only {len(records):,} usable examples after "
+            f"checking at most {max_pages:,} pages; requested {limit:,}"
+        )
+
+    random.Random(seed).shuffle(records)
     _write_jsonl(records, output)
     print(f"Prepared {len(records):,} Smol-SmolTalk examples at {output}")
     return len(records)
