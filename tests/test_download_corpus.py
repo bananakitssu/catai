@@ -35,16 +35,16 @@ def test_redpajama_filter_drops_marked_and_exact_duplicates():
         {"raw_content": text}, {"raw_content": text},
         {"raw_content": text + " A distinct ending."}, {"raw_content": "tiny"},
     ]
+    shard_path = "2023-06/0000/en_head_middle.json.gz"
     signals = [
-        {"id": "keep", "quality_signals": good_signals()},
-        {"id": "same-text", "quality_signals": good_signals()},
-        {"id": "remote-duplicate", "quality_signals": good_signals()},
-        {"id": "short", "quality_signals": good_signals()},
+        {"id": f"{shard_path}/0", "quality_signals": good_signals()},
+        {"id": f"{shard_path}/1", "quality_signals": good_signals()},
+        {"id": f"{shard_path}/2", "quality_signals": good_signals()},
+        {"id": f"{shard_path}/3", "quality_signals": good_signals()},
     ]
     doc_payload = gzip.compress("\n".join(json.dumps(x) for x in docs).encode())
     signal_payload = gzip.compress("\n".join(json.dumps(x) for x in signals).encode())
     stats = {}
-    shard_path = "2023-06/0000/en_head_middle.json.gz"
     selected = filter_redpajama_shard(
         doc_payload, signal_payload, shard_path,
         {f"{shard_path}/2"}, set(), stats
@@ -53,3 +53,30 @@ def test_redpajama_filter_drops_marked_and_exact_duplicates():
     assert stats["duplicate_ids"] == 1
     assert stats["exact_duplicates"] == 1
     assert stats["quality_rejected"] == 1
+
+
+
+def test_redpajama_filter_joins_signals_by_id_with_missing_and_reordered_rows():
+    texts = [
+        "First valid document contains enough ordinary words to pass the quality filter.",
+        "Second valid document is present but has no quality signal row in this shard.",
+        "Third valid document contains enough ordinary words to pass the quality filter.",
+    ]
+    docs = [{"raw_content": text} for text in texts]
+    shard_path = "2023-06/0000/en_head.json.gz"
+    signals = [
+        {"id": f"{shard_path}/2", "quality_signals": good_signals()},
+        {"id": f"{shard_path}/0", "quality_signals": good_signals()},
+    ]
+    doc_payload = gzip.compress("\n".join(json.dumps(x) for x in docs).encode())
+    signal_payload = gzip.compress("\n".join(json.dumps(x) for x in signals).encode())
+    stats = {}
+
+    selected = filter_redpajama_shard(
+        doc_payload, signal_payload, shard_path, set(), set(), stats
+    )
+
+    assert selected == [texts[0], texts[2]]
+    assert stats["seen"] == 3
+    assert stats["missing_signals"] == 1
+    assert stats["kept"] == 2

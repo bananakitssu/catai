@@ -109,29 +109,66 @@ def filter_redpajama_shard(
     seen_digests: set[str],
     stats: dict[str, int] | None = None,
 ) -> list[str]:
-    """Filter aligned document and quality-signal JSONL shards."""
+    """Filter documents joined to quality-signal rows by their canonical IDs."""
     counters = stats if stats is not None else {}
-    for key in ("seen", "duplicate_ids", "quality_rejected", "exact_duplicates", "kept"):
+    for key in (
+        "seen", "duplicate_ids", "quality_rejected", "exact_duplicates", "kept",
+        "missing_signals", "invalid_signal_records", "invalid_signal_ids", "duplicate_signal_ids",
+    ):
         counters.setdefault(key, 0)
     documents = gzip.decompress(document_payload).decode("utf-8").splitlines()
-    signals = gzip.decompress(signals_payload).decode("utf-8").splitlines()
-    if len(documents) != len(signals):
-        raise ValueError(f"RPv2 documents/signals row mismatch: {len(documents)} vs {len(signals)}")
+    signal_lines = gzip.decompress(signals_payload).decode("utf-8").splitlines()
+
+    # Quality-signal rows carry the document's canonical shard path and
+    # zero-based row index in their "id" field. Join by that key instead of
+    # assuming the two downloaded JSONL files always have identical lengths.
+    # This also tolerates missing signal rows without shifting later documents.
+    signal_prefix = f"{shard_path}/"
+    signals_by_row: dict[int, dict] = {}
+    for signal_line in signal_lines:
+        try:
+            signal_record = json.loads(signal_line)
+        except json.JSONDecodeError:
+            counters["invalid_signal_records"] += 1
+            continue
+        if not isinstance(signal_record, dict):
+            counters["invalid_signal_records"] += 1
+            continue
+        signal_id = signal_record.get("id")
+        if not isinstance(signal_id, str) or not signal_id.startswith(signal_prefix):
+            counters["invalid_signal_ids"] += 1
+            continue
+        row_text = signal_id[len(signal_prefix):]
+        if not row_text.isdecimal():
+            counters["invalid_signal_ids"] += 1
+            continue
+        row_index = int(row_text)
+        if row_index >= len(documents):
+            counters["invalid_signal_ids"] = counters.get("invalid_signal_ids", 0) + 1
+            continue
+        if row_index in signals_by_row:
+            counters["duplicate_signal_ids"] += 1
+            continue
+        signals_by_row[row_index] = signal_record
+
     selected = []
-    for row_index, (document_line, signal_line) in enumerate(zip(documents, signals)):
+    for row_index, document_line in enumerate(documents):
         counters["seen"] += 1
-        # RPv2 duplicate Parquet doc_id is the document shard path followed
-        # by the document's zero-based row index (see Together's FAQ example).
+        # RPv2 duplicate Parquet doc_id uses this same document path/index key.
         document_id = f"{shard_path}/{row_index}"
         if document_id in duplicate_ids:
             counters["duplicate_ids"] += 1
             continue
+        signal_record = signals_by_row.get(row_index)
+        if signal_record is None:
+            counters["missing_signals"] += 1
+            continue
         try:
-            document, signal_record = json.loads(document_line), json.loads(signal_line)
+            document = json.loads(document_line)
         except json.JSONDecodeError:
             counters["quality_rejected"] += 1
             continue
-        if not isinstance(document, dict) or not isinstance(signal_record, dict):
+        if not isinstance(document, dict):
             counters["quality_rejected"] += 1
             continue
         signal_map, text = signal_record.get("quality_signals"), document.get("raw_content")
@@ -157,12 +194,13 @@ def _progress(chars: int, target: int, docs: int, shard: int, total: int, starte
     fraction = min(chars / target, 1.0)
     elapsed = max(time.monotonic() - started, 1e-9)
     rate = chars / elapsed
-    eta = max(target - chars, 0) / rate if rate else 0
+    eta = max(target - chars, 0) / rate if rate else None
+    eta_label = f"{eta:.0f}s" if eta is not None else "unknown"
     width = 28
     filled = int(fraction * width)
     print(
         f"[{'=' * filled}{'-' * (width-filled)}] {fraction*100:6.2f}% | "
-        f"{chars:,}/{target:,} chars | {docs:,} docs | {shard:,}/{total:,} shards | ETA {eta:.0f}s"
+        f"{chars:,}/{target:,} chars | {docs:,} docs | {shard:,}/{total:,} shards | ETA {eta_label}"
     )
 
 
@@ -233,7 +271,10 @@ def download_redpajama(
         f"Filtered RPv2: {chars:,} chars from {docs:,} docs; "
         f"{stats.get('duplicate_ids', 0):,} marked duplicates, "
         f"{stats.get('exact_duplicates', 0):,} exact duplicates, "
-        f"{stats.get('quality_rejected', 0):,} rejected, {failures:,} failed shards."
+        f"{stats.get('quality_rejected', 0):,} rejected, "
+        f"{stats.get('missing_signals', 0):,} docs without signals, "
+        f"{stats.get('invalid_signal_ids', 0):,} invalid signal IDs, "
+        f"{failures:,} failed shards."
     )
     return {"characters": chars, "documents": docs, "failed_shards": failures, **stats}
 
