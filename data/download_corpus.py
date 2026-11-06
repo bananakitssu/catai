@@ -114,24 +114,58 @@ def filter_redpajama_shard(
     for key in ("seen", "duplicate_ids", "quality_rejected", "exact_duplicates", "kept"):
         counters.setdefault(key, 0)
     documents = gzip.decompress(document_payload).decode("utf-8").splitlines()
-    signals = gzip.decompress(signals_payload).decode("utf-8").splitlines()
-    if len(documents) != len(signals):
-        raise ValueError(f"RPv2 documents/signals row mismatch: {len(documents)} vs {len(signals)}")
+    signal_lines = gzip.decompress(signals_payload).decode("utf-8").splitlines()
+
+    # Quality-signal rows carry the document's canonical shard path and
+    # zero-based row index in their "id" field. Join by that key instead of
+    # assuming the two downloaded JSONL files always have identical lengths.
+    # Some published shards have fewer signal rows than document rows.
+    signal_prefix = f"{shard_path}/"
+    signals_by_row: dict[int, dict] = {}
+    for signal_line in signal_lines:
+        try:
+            signal_record = json.loads(signal_line)
+        except json.JSONDecodeError:
+            counters["invalid_signal_records"] = counters.get("invalid_signal_records", 0) + 1
+            continue
+        if not isinstance(signal_record, dict):
+            counters["invalid_signal_records"] = counters.get("invalid_signal_records", 0) + 1
+            continue
+        signal_id = signal_record.get("id")
+        if not isinstance(signal_id, str) or not signal_id.startswith(signal_prefix):
+            counters["invalid_signal_ids"] = counters.get("invalid_signal_ids", 0) + 1
+            continue
+        row_text = signal_id[len(signal_prefix):]
+        if not row_text.isdecimal():
+            counters["invalid_signal_ids"] = counters.get("invalid_signal_ids", 0) + 1
+            continue
+        row_index = int(row_text)
+        if row_index >= len(documents):
+            counters["invalid_signal_ids"] = counters.get("invalid_signal_ids", 0) + 1
+            continue
+        if row_index in signals_by_row:
+            counters["duplicate_signal_ids"] = counters.get("duplicate_signal_ids", 0) + 1
+            continue
+        signals_by_row[row_index] = signal_record
+
     selected = []
-    for row_index, (document_line, signal_line) in enumerate(zip(documents, signals)):
+    for row_index, document_line in enumerate(documents):
         counters["seen"] += 1
-        # RPv2 duplicate Parquet doc_id is the document shard path followed
-        # by the document's zero-based row index (see Together's FAQ example).
+        # RPv2 duplicate Parquet doc_id uses this same document path/index key.
         document_id = f"{shard_path}/{row_index}"
         if document_id in duplicate_ids:
             counters["duplicate_ids"] += 1
             continue
+        signal_record = signals_by_row.get(row_index)
+        if signal_record is None:
+            counters["missing_signals"] = counters.get("missing_signals", 0) + 1
+            continue
         try:
-            document, signal_record = json.loads(document_line), json.loads(signal_line)
+            document = json.loads(document_line)
         except json.JSONDecodeError:
             counters["quality_rejected"] += 1
             continue
-        if not isinstance(document, dict) or not isinstance(signal_record, dict):
+        if not isinstance(document, dict):
             counters["quality_rejected"] += 1
             continue
         signal_map, text = signal_record.get("quality_signals"), document.get("raw_content")
