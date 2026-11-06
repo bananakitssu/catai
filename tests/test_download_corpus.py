@@ -68,8 +68,8 @@ def test_redpajama_filter_joins_signals_by_id_with_missing_and_reordered_rows():
         {"id": f"{shard_path}/2", "quality_signals": good_signals()},
         {"id": f"{shard_path}/0", "quality_signals": good_signals()},
     ]
-    doc_payload = gzip.compress("\\n".join(json.dumps(x) for x in docs).encode())
-    signal_payload = gzip.compress("\\n".join(json.dumps(x) for x in signals).encode())
+    doc_payload = gzip.compress("\n".join(json.dumps(x) for x in docs).encode())
+    signal_payload = gzip.compress("\n".join(json.dumps(x) for x in signals).encode())
     stats = {}
 
     selected = filter_redpajama_shard(
