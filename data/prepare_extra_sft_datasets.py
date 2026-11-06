@@ -20,7 +20,7 @@ from catai.chat_dataset import default_state, validate_messages
 
 SMOL_SMOLTALK_DATASET = "HuggingFaceTB/smol-smoltalk"
 BLENDED_SKILL_TALK_URL = "https://parl.ai/downloads/blended_skill_talk/blended_skill_talk.tar.gz"
-BLENDED_SKILL_TALK_SHA256 = "5fbed0068ee89e2d43b93c3ecb341e784617033efa5e8e911a2194deda6134a6"
+BLENDED_SKILL_TALK_SHA256 = "5fbed0068ee89e2d43b93c3ecb341e784617033efa5e8e911a219d4eda6134a6"
 
 
 def normalize_messages(raw_messages: object) -> list[dict[str, str]] | None:
