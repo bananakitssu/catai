@@ -1,4 +1,5 @@
 from data.prepare_extra_sft_datasets import (
+    BLENDED_SKILL_TALK_SHA256,
     convert_blended_skill_talk_row,
     convert_smol_smoltalk_row,
 )
@@ -35,3 +36,9 @@ def test_blended_skill_talk_turns_and_context():
     ]
     assert "guided persona" in item["messages"][0]["content"]
     assert "Astronomy" in item["messages"][0]["content"]
+
+
+def test_blended_skill_talk_checksum_matches_official_parlai_build():
+    assert BLENDED_SKILL_TALK_SHA256 == (
+        "5fbed0068ee89e2d43b93c3ecb341e784617033efa5e8e911a219d4eda6134a6"
+    )
