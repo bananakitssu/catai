@@ -122,7 +122,7 @@ def filter_redpajama_shard(
     # Quality-signal rows carry the document's canonical shard path and
     # zero-based row index in their "id" field. Join by that key instead of
     # assuming the two downloaded JSONL files always have identical lengths.
-    # Some published shards have fewer signal rows than document rows.
+    # This also tolerates missing signal rows without shifting later documents.
     signal_prefix = f"{shard_path}/"
     signals_by_row: dict[int, dict] = {}
     for signal_line in signal_lines:
@@ -132,7 +132,7 @@ def filter_redpajama_shard(
             counters["invalid_signal_records"] += 1
             continue
         if not isinstance(signal_record, dict):
-            counters["invalid_signal_records"] = counters.get("invalid_signal_records", 0) + 1
+            counters["invalid_signal_records"] += 1
             continue
         signal_id = signal_record.get("id")
         if not isinstance(signal_id, str) or not signal_id.startswith(signal_prefix):
@@ -140,7 +140,7 @@ def filter_redpajama_shard(
             continue
         row_text = signal_id[len(signal_prefix):]
         if not row_text.isdecimal():
-            counters["invalid_signal_ids"] = counters.get("invalid_signal_ids", 0) + 1
+            counters["invalid_signal_ids"] += 1
             continue
         row_index = int(row_text)
         if row_index >= len(documents):
