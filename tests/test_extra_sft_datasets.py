@@ -37,8 +37,6 @@ def test_blended_skill_talk_turns_and_context():
     assert "guided persona" in item["messages"][0]["content"]
     assert "Astronomy" in item["messages"][0]["content"]
 
-from data.prepare_extra_sft_datasets import BLENDED_SKILL_TALK_SHA256
-
 
 def test_blended_skill_talk_checksum_matches_official_parlai_build():
     assert BLENDED_SKILL_TALK_SHA256 == (
