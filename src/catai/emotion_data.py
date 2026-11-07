@@ -48,6 +48,7 @@ def _bounded_situation_prompt(prompt: str) -> str:
         shortened = prompt[:cutoff]
     return shortened + "..."
 
+
 def _clean(value: object) -> str:
     if not isinstance(value, str):
         return ""
