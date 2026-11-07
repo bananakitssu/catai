@@ -34,6 +34,20 @@ EMOTION_RECOGNITION_GUIDANCE = (
     "labels only, in a concise comma-separated list."
 )
 
+# Keep situation context useful without allowing it to dominate the model's
+# fixed system-prompt budget after CatAI state is prepended.
+MAX_EMPATHETIC_SITUATION_CHARS = 220
+
+
+def _bounded_situation_prompt(prompt: str) -> str:
+    if len(prompt) <= MAX_EMPATHETIC_SITUATION_CHARS:
+        return prompt
+    cutoff = MAX_EMPATHETIC_SITUATION_CHARS - 3
+    shortened = prompt[:cutoff].rsplit(" ", 1)[0].rstrip()
+    if not shortened:
+        shortened = prompt[:cutoff]
+    return shortened + "..."
+
 def _clean(value: object) -> str:
     if not isinstance(value, str):
         return ""
@@ -172,7 +186,10 @@ def empathetic_dialogues_records(rows: Iterable[dict[str, Any]]) -> list[dict[st
                 "Treat this as background context, not proof of the user's current mood."
             )
             if prompt:
-                instruction += "\nSituation shared in the original prompt: " + prompt
+                instruction += (
+                    "\nSituation shared in the original prompt: "
+                    + _bounded_situation_prompt(prompt)
+                )
             records.append(_record(
                 "empathetic_dialogues", instruction, messages,
                 [emotion] if emotion != "unspecified" else [],
