@@ -1,3 +1,6 @@
+import json
+
+from data import prepare_extra_sft_datasets as extra_sft_datasets
 from data.prepare_extra_sft_datasets import (
     BLENDED_SKILL_TALK_SHA256,
     convert_blended_skill_talk_row,
@@ -42,3 +45,81 @@ def test_blended_skill_talk_checksum_matches_official_parlai_build():
     assert BLENDED_SKILL_TALK_SHA256 == (
         "5fbed0068ee89e2d43b93c3ecb341e784617033efa5e8e911a219d4eda6134a6"
     )
+
+
+
+def test_smol_smoltalk_fetches_bounded_random_dataset_viewer_pages(monkeypatch, tmp_path):
+    calls = []
+
+    def fake_fetch_page(offset, length=100):
+        calls.append((offset, length))
+        total_rows = 350
+        rows = [
+            {
+                "row_idx": index,
+                "row": {
+                    "messages": [
+                        {"role": "user", "content": f"Question {index}"},
+                        {"role": "assistant", "content": f"Answer {index}"},
+                    ],
+                    "source": "smol-magpie-ultra-short",
+                },
+            }
+            for index in range(offset, min(offset + length, total_rows))
+        ]
+        return {"num_rows_total": total_rows, "partial": False, "rows": rows}
+
+    monkeypatch.setattr(extra_sft_datasets, "_fetch_smol_smoltalk_page", fake_fetch_page)
+    first_output = tmp_path / "first.jsonl"
+    second_output = tmp_path / "second.jsonl"
+
+    assert extra_sft_datasets.prepare_smol_smoltalk(first_output, limit=150, seed=42) == 150
+    first_records = [json.loads(line) for line in first_output.read_text(encoding="utf-8").splitlines()]
+
+    assert extra_sft_datasets.prepare_smol_smoltalk(second_output, limit=150, seed=42) == 150
+    second_records = [json.loads(line) for line in second_output.read_text(encoding="utf-8").splitlines()]
+
+    assert first_records == second_records
+    assert len(first_records) == 150
+    assert all(length <= 100 for _, length in calls)
+    assert all(offset >= 0 for offset, _ in calls)
+
+
+def test_smol_smoltalk_dataset_viewer_request_uses_default_train_split(monkeypatch):
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def read(self):
+            return json.dumps({
+                "num_rows_total": 460341,
+                "partial": False,
+                "rows": [],
+            }).encode("utf-8")
+
+    def fake_urlopen(request, timeout):
+        captured["url"] = request.full_url
+        captured["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr(extra_sft_datasets.urllib.request, "urlopen", fake_urlopen)
+    payload = extra_sft_datasets._fetch_smol_smoltalk_page(200, 100)
+
+    from urllib.parse import parse_qs, urlsplit
+
+    query = parse_qs(urlsplit(captured["url"]).query)
+    assert urlsplit(captured["url"]).path == "/rows"
+    assert query == {
+        "dataset": ["HuggingFaceTB/smol-smoltalk"],
+        "config": ["default"],
+        "split": ["train"],
+        "offset": ["200"],
+        "length": ["100"],
+    }
+    assert captured["timeout"] == 60
+    assert payload["num_rows_total"] == 460341
