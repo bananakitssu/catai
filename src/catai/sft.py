@@ -90,6 +90,7 @@ class ChatSupervisedDataset(Dataset[dict[str, torch.Tensor]]):
         self.labels: list[torch.Tensor] = []
         self.compacted_examples = 0
         self.skipped_overlength_examples = 0
+        self.skipped_system_prompt_examples = 0
 
         for messages in examples:
             parts: list[dict[str, object]] = []
@@ -132,9 +133,11 @@ class ChatSupervisedDataset(Dataset[dict[str, torch.Tensor]]):
                     len(part["input_ids"]) for part in parts[:system_count]
                 )
                 if system_length > target_length:
-                    raise ValueError(
-                        "sequence_length is too short for the system state/tool prompt"
-                    )
+                    # Keep the complete state/tool prompt or skip the whole
+                    # example. One oversized system prompt must not abort SFT.
+                    self.skipped_overlength_examples += 1
+                    self.skipped_system_prompt_examples += 1
+                    continue
 
                 user_indices = [
                     index
