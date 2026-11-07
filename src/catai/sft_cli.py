@@ -181,7 +181,8 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"base chat data: {len(base_examples)} loaded, "
         f"{base_dataset.compacted_examples} compacted to the latest turn, "
-        f"{base_dataset.skipped_overlength_examples} overlength examples skipped",
+        f"{base_dataset.skipped_overlength_examples} overlength examples skipped, "
+        f"{base_dataset.skipped_system_prompt_examples} with oversized system prompts",
         flush=True,
     )
     personality_dataset = None
@@ -195,7 +196,8 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"CatAI instruction data: {personality_examples_count} loaded, "
             f"{personality_dataset.compacted_examples} compacted to the latest turn, "
-            f"{personality_dataset.skipped_overlength_examples} overlength examples skipped",
+            f"{personality_dataset.skipped_overlength_examples} overlength examples skipped, "
+            f"{personality_dataset.skipped_system_prompt_examples} with oversized system prompts",
             flush=True,
         )
 
@@ -210,7 +212,8 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"Emotion-aware data: {emotion_examples_count} loaded, "
             f"{emotion_dataset.compacted_examples} compacted to the latest turn, "
-            f"{emotion_dataset.skipped_overlength_examples} overlength examples skipped",
+            f"{emotion_dataset.skipped_overlength_examples} overlength examples skipped, "
+            f"{emotion_dataset.skipped_system_prompt_examples} with oversized system prompts",
             flush=True,
         )
 
@@ -223,7 +226,8 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"Smol-SmolTalk data: {smol_smoltalk_examples_count} loaded, "
             f"{smol_smoltalk_dataset.compacted_examples} compacted, "
-            f"{smol_smoltalk_dataset.skipped_overlength_examples} skipped",
+            f"{smol_smoltalk_dataset.skipped_overlength_examples} skipped, "
+            f"{smol_smoltalk_dataset.skipped_system_prompt_examples} with oversized system prompts",
             flush=True,
         )
 
@@ -236,7 +240,8 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"Blended Skill Talk data: {blended_skill_talk_examples_count} loaded, "
             f"{blended_skill_talk_dataset.compacted_examples} compacted, "
-            f"{blended_skill_talk_dataset.skipped_overlength_examples} skipped",
+            f"{blended_skill_talk_dataset.skipped_overlength_examples} skipped, "
+            f"{blended_skill_talk_dataset.skipped_system_prompt_examples} with oversized system prompts",
             flush=True,
         )
 

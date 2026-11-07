@@ -154,6 +154,29 @@ def test_sft_train_step_updates_parameters():
     )
 
 
+def test_chat_dataset_skips_oversized_system_prompt_without_aborting_sft():
+    tokenizer = CharTokenizer.default()
+    dataset = ChatSupervisedDataset(
+        [
+            [
+                {"role": "system", "content": "RULES " * 40},
+                {"role": "user", "content": "Hello"},
+                {"role": "assistant", "content": "Hi!"},
+            ],
+            [
+                {"role": "user", "content": "Hello"},
+                {"role": "assistant", "content": "Hi!"},
+            ],
+        ],
+        tokenizer,
+        sequence_length=64,
+    )
+
+    assert len(dataset) == 1
+    assert dataset.skipped_overlength_examples == 1
+    assert dataset.skipped_system_prompt_examples == 1
+
+
 def test_chat_dataset_drops_old_turns_without_splitting_latest_question_and_answer():
     tokenizer = CharTokenizer.default()
     dataset = ChatSupervisedDataset(

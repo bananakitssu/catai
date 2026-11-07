@@ -119,3 +119,36 @@ def test_merge_emotion_datasets_retains_provenance_and_deduplicates(tmp_path):
         "go_emotions", "daily_dialog", "empathetic_dialogues"
     }
     assert all(record["dataset_license"] for record in merged)
+
+
+def test_empathetic_dialogues_bounds_situation_context_in_system_prompt():
+    long_prompt = (
+        "A person is preparing for a major change and is thinking carefully about "
+        "their family, work, and the friends they may leave behind. "
+    ) * 12
+    records = empathetic_dialogues_records([
+        {
+            "conv_id": "long-context",
+            "utterance_idx": "1",
+            "speaker_idx": "0",
+            "context": "afraid",
+            "prompt": long_prompt,
+            "utterance": "I have been thinking about moving away.",
+        },
+        {
+            "conv_id": "long-context",
+            "utterance_idx": "2",
+            "speaker_idx": "1",
+            "context": "afraid",
+            "prompt": long_prompt,
+            "utterance": "That sounds like a difficult decision.",
+        },
+    ])
+
+    assert len(records) == 1
+    system_prompt = records[0]["messages"][0]["content"]
+    marker = "Situation shared in the original prompt: "
+    assert marker in system_prompt
+    situation = system_prompt.split(marker, 1)[1]
+    assert len(situation) <= 220
+    assert situation.endswith("...")
