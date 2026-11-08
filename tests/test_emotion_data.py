@@ -158,7 +158,7 @@ def test_default_emotion_merge_can_use_go_emotions_without_restricted_sources(tm
     records = go_emotions_records([{"text": "I feel excited.", "labels": [17]}])
     source = tmp_path / "go_emotions.jsonl"
     source.write_text(
-        json.dumps(records[0], ensure_ascii=False) + "\\n",
+        json.dumps(records[0], ensure_ascii=False) + chr(10),
         encoding="utf-8",
     )
     output = tmp_path / "commercial_emotions.jsonl"
