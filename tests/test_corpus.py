@@ -43,3 +43,20 @@ def test_token_budget_does_not_encode_all_bpe_tokens(tmp_path):
         tokenizer_sample_chars=40,
     )
     assert len(tokens) == 6
+
+
+def test_bpe_corpus_vocab_stays_within_the_requested_budget(tmp_path):
+    rare_characters = "".join(chr(0x1000 + index) for index in range(600))
+    path = tmp_path / "unicode-corpus.txt"
+    path.write_text(("the cat sits. " * 1000) + rare_characters, encoding="utf-8")
+
+    tokenizer, tokens = tokenizer_and_tokens(
+        path,
+        tokenizer_type="bpe",
+        vocab_size=512,
+        tokenizer_sample_chars=5000,
+    )
+
+    assert tokenizer.vocab_size <= 512
+    assert tokenizer.unk_token_id is not None
+    assert tokenizer.unk_token_id in tokens.tolist()

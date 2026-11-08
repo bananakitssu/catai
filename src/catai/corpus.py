@@ -96,22 +96,13 @@ def tokenizer_and_tokens(
     if tokenizer_type == "char":
         tokenizer: Tokenizer = CharTokenizer.from_text(text)
     elif tokenizer_type == "bpe":
-        # Learning merges across the full corpus is expensive. A fixed prefix
-        # is enough for a first experiment; retain every corpus character.
+        # Learn merges from a bounded prefix but pass the full character set
+        # as low-priority candidates. BPETokenizer caps its base alphabet and
+        # maps rare code points to UNK instead of inflating the model vocabulary.
         sample = text[:tokenizer_sample_chars]
-        sample_characters = len(set(sample))
-        corpus_characters = len(set(text))
-        # Keep room for subword merges even if the sample contains many rare
-        # Unicode characters. Those extra base characters are preserved above
-        # the configured budget instead of consuming every merge slot.
-        common_character_budget = min(
-            sample_characters, len(set(PRINTABLE_ASCII))
-        )
-        merge_budget = max(0, vocab_size - common_character_budget - 2)
-        effective_vocab_size = corpus_characters + merge_budget + 2
         tokenizer = BPETokenizer.from_text(
             sample,
-            vocab_size=effective_vocab_size,
+            vocab_size=vocab_size,
             extra_characters=text,
         )
     else:

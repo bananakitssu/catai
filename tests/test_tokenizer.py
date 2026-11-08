@@ -95,3 +95,18 @@ def test_bpe_extra_characters_remain_encodable():
     )
     text = "banana Ω cat"
     assert tokenizer.decode(tokenizer.encode(text)) == text
+
+
+def test_bpe_never_exceeds_requested_vocabulary_with_many_unicode_characters():
+    rare_characters = "".join(chr(0x1000 + index) for index in range(600))
+    training_text = "hello world " * 500 + rare_characters
+    tokenizer = BPETokenizer.from_text(
+        training_text,
+        vocab_size=512,
+        extra_characters=training_text,
+    )
+
+    assert tokenizer.vocab_size <= 512
+    assert tokenizer.unk_token_id is not None
+    assert tokenizer.unk_token_id not in tokenizer.encode("hello world")
+    assert tokenizer.unk_token_id in tokenizer.encode(rare_characters[-1])

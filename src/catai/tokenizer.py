@@ -229,19 +229,24 @@ class BPETokenizer:
         if vocab_size < 3:
             raise ValueError("vocab_size must be at least 3")
 
-        # BPE starts with the characters that actually occur in the corpus.
-        # Unlike the character tokenizer, it must honor the requested vocabulary
-        # budget so small vocabularies remain useful and deterministic.
+        # Keep a bounded base alphabet. The previous implementation retained
+        # every unique code point from a web-scale corpus, silently turning a
+        # requested 512-token vocabulary into several thousand tokens. Frequent
+        # characters are retained; rare/unseen characters map to the UNK token.
         symbols = list(text)
-        base_vocabulary = set(symbols)
-        base_vocabulary.update(extra_characters)
-        special_count = 2
-        if len(base_vocabulary) + special_count > vocab_size:
-            raise ValueError(
-                "vocab_size is too small to represent all corpus characters "
-                "plus UNK/EOS tokens"
-            )
+        character_counts = Counter(text)
+        for character in set(extra_characters):
+            character_counts.setdefault(character, 0)
+        base_limit = min(256, vocab_size - 2)
+        ranked_characters = sorted(
+            character_counts.items(),
+            key=lambda item: (-item[1], item[0]),
+        )
+        base_vocabulary = {
+            character for character, _ in ranked_characters[:base_limit]
+        }
 
+        special_count = 2
         vocabulary = set(base_vocabulary)
         merges: list[tuple[str, str]] = []
         target = vocab_size - special_count
@@ -252,7 +257,10 @@ class BPETokenizer:
             # how neighboring words are segmented during encoding.
             counts = Counter()
             for left, right in zip(symbols, symbols[1:]):
-                if left.isspace() or right.isspace():
+                if (
+                    left not in vocabulary or right not in vocabulary
+                    or left.isspace() or right.isspace()
+                ):
                     continue
                 counts[(left, right)] += 1
 

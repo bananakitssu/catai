@@ -135,11 +135,11 @@ jobs:
               if model_size not in parameter_counts:
                   raise SystemExit("MODEL_SIZE must be tiny, small, base, or medium")
               tokens_per_parameter = max_tokens / parameter_counts[model_size]
-              if tokens_per_parameter < 10:
+              if tokens_per_parameter < 21.1:
                   raise SystemExit(
                       f"{model_size} has {parameter_counts[model_size]:,} parameters; "
                       f"{max_tokens:,} tokens is only {tokens_per_parameter:.1f} tokens/parameter. "
-                      "Set at least 10 tokens/parameter; around 20 is a useful starting target."
+                      "With a 5% validation split, use at least 21.1 input tokens/parameter to retain 20 training tokens/parameter."
                   )
               print(f"Training budget: {model_size}, {max_tokens:,} tokens, {tokens_per_parameter:.1f} tokens/parameter.")
           if os.environ["TOKENIZER"] not in {"bpe", "char"}:
@@ -383,7 +383,7 @@ jobs:
           path: data/corpus.txt
           key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
 
-      - name: Train base model (first half)
+      - name: Train base model (quarter 1 of 4)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -410,10 +410,11 @@ jobs:
             --tokenizer-sample-chars 250000 \
             --max-tokens "$MAX_TOKENS" \
             --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
             --device cpu \
             --recovery-checkpoint catai-base-recovery.pt \
             --checkpoint-every-batches 50 \
-            --max-batches-per-run-fraction 0.5
+            --max-batches-per-run-fraction 0.25
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -456,7 +457,7 @@ jobs:
         with:
           name: catai-base-recovery
           path: .
-      - name: Resume base training (second half)
+      - name: Resume base training (quarter 2 of 4)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -484,6 +485,153 @@ jobs:
             --tokenizer-sample-chars 250000 \
             --max-tokens "$MAX_TOKENS" \
             --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.25
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery2
+          path: catai-base-recovery.pt
+          retention-days: 7
+
+  base_training3:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training2]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 100000000 --fineweb-edu-chars 15000000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery2
+          path: .
+      - name: Resume base training (quarter 3 of 4)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '20000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'tiny' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 512 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.25
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery3
+          path: catai-base-recovery.pt
+          retention-days: 7
+
+  base_training4:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training3]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 100000000 --fineweb-edu-chars 15000000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery3
+          path: .
+      - name: Finish base training (final quarter)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '20000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'tiny' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 512 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
             --device cpu
 
       - name: Generate base text
@@ -528,51 +676,9 @@ jobs:
           path: data/go_emotions_emotion.jsonl
           retention-days: 7
 
-  emotion_daily_dialog:
-    if: github.event_name == 'workflow_dispatch'
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Prepare DailyDialog
-        run: |
-          python data/prepare_emotion_datasets.py \
-            --source daily_dialog \
-            --output data/daily_dialog_emotion.jsonl
-      - name: Upload DailyDialog examples
-        uses: actions/upload-artifact@v4
-        with:
-          name: catai-emotion-daily-dialog
-          path: data/daily_dialog_emotion.jsonl
-          retention-days: 7
-
-  emotion_empathetic_dialogues:
-    if: github.event_name == 'workflow_dispatch'
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Prepare EmpatheticDialogues
-        run: |
-          python data/prepare_emotion_datasets.py \
-            --source empathetic_dialogues \
-            --output data/empathetic_dialogues_emotion.jsonl
-      - name: Upload EmpatheticDialogues examples
-        uses: actions/upload-artifact@v4
-        with:
-          name: catai-emotion-empathetic-dialogues
-          path: data/empathetic_dialogues_emotion.jsonl
-          retention-days: 7
-
   emotion_merge:
     if: github.event_name == 'workflow_dispatch'
-    needs: [emotion_go_emotions, emotion_daily_dialog, emotion_empathetic_dialogues]
+    needs: [emotion_go_emotions]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -583,20 +689,10 @@ jobs:
         with:
           name: catai-emotion-go-emotions
           path: data
-      - uses: actions/download-artifact@v4
-        with:
-          name: catai-emotion-daily-dialog
-          path: data
-      - uses: actions/download-artifact@v4
-        with:
-          name: catai-emotion-empathetic-dialogues
-          path: data
       - name: Merge the emotional datasets
         run: |
           python data/merge_emotion_datasets.py \
             --go-emotions data/go_emotions_emotion.jsonl \
-            --daily-dialog data/daily_dialog_emotion.jsonl \
-            --empathetic-dialogues data/empathetic_dialogues_emotion.jsonl \
             --output data/catai_emotion.jsonl \
             --seed 42
       - name: Validate the merged emotional dataset
@@ -652,6 +748,32 @@ jobs:
           name: catai-extra-blended-skill-talk
           path: data/blended_skill_talk_chat.jsonl
           retention-days: 7
+      - name: Prepare bounded MIT-licensed UltraChat sample
+        run: |
+          python data/prepare_extra_sft_datasets.py \
+            --source ultrachat \
+            --output data/ultrachat_200k_chat.jsonl \
+            --max-examples 1500 \
+            --seed 42
+      - name: Upload UltraChat examples
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-extra-ultrachat
+          path: data/ultrachat_200k_chat.jsonl
+          retention-days: 7
+      - name: Prepare bounded MIT-licensed GSM8K sample
+        run: |
+          python data/prepare_extra_sft_datasets.py \
+            --source gsm8k \
+            --output data/gsm8k_chat.jsonl \
+            --max-examples 1000 \
+            --seed 42
+      - name: Upload GSM8K examples
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-extra-gsm8k
+          path: data/gsm8k_chat.jsonl
+          retention-days: 7
 
   sft:
     # In SFT-only mode, both base-training stages are intentionally skipped. Explicitly
@@ -660,10 +782,10 @@ jobs:
       always() &&
       github.event_name == 'workflow_dispatch' &&
       needs.test.result == 'success' &&
-      (needs.base_training2.result == 'success' || inputs.training_mode == 'sft_only') &&
+      (needs.base_training4.result == 'success' || inputs.training_mode == 'sft_only') &&
       needs.emotion_merge.result == 'success' &&
       needs.extra_sft_data.result == 'success'
-    needs: [test, base_training2, emotion_merge, extra_sft_data]
+    needs: [test, base_training4, emotion_merge, extra_sft_data]
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -757,6 +879,16 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: catai-extra-blended-skill-talk
+          path: data
+      - name: Download UltraChat examples
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-extra-ultrachat
+          path: data
+      - name: Download GSM8K examples
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-extra-gsm8k
           path: data
       - name: Restore OASST1 source cache
         id: oasst-cache
@@ -881,19 +1013,24 @@ jobs:
             --base-checkpoint catai.pt \
             --dataset data/oasst_chat.jsonl \
             --personality-dataset data/instruction_chat.jsonl \
-            --personality-ratio 0.20 \
+            --personality-ratio 0.05 \
             --emotion-dataset data/catai_emotion.jsonl \
-            --emotion-ratio 0.30 \
+            --emotion-ratio 0.10 \
             --smol-smoltalk-dataset data/smol_smoltalk_chat.jsonl \
             --smol-smoltalk-ratio 0.10 \
             --blended-skill-talk-dataset data/blended_skill_talk_chat.jsonl \
-            --blended-skill-talk-ratio 0.10 \
-            --samples-per-epoch 2000 \
+            --blended-skill-talk-ratio 0.05 \
+            --ultrachat-dataset data/ultrachat_200k_chat.jsonl \
+            --ultrachat-ratio 0.15 \
+            --gsm8k-dataset data/gsm8k_chat.jsonl \
+            --gsm8k-ratio 0.05 \
+            --samples-per-epoch 4000 \
             --max-validation-examples 500 \
             --checkpoint catai-sft.pt \
             --epochs "$SFT_STAGE_EPOCHS" \
             --batch-size 2 \
             --learning-rate 2e-5 \
+            --minimum-tokens-per-parameter 20 \
             --grad-clip 1.0 \
             --validation-split 0.05 \
             --patience 2 \
@@ -919,10 +1056,10 @@ jobs:
       github.event_name == 'workflow_dispatch' &&
       needs.test.result == 'success' &&
       needs.sft.result == 'success' &&
-      (needs.base_training2.result == 'success' || inputs.training_mode == 'sft_only') &&
+      (needs.base_training4.result == 'success' || inputs.training_mode == 'sft_only') &&
       needs.emotion_merge.result == 'success' &&
       needs.extra_sft_data.result == 'success'
-    needs: [test, base_training2, emotion_merge, extra_sft_data, sft]
+    needs: [test, base_training4, emotion_merge, extra_sft_data, sft]
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -1021,6 +1158,16 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: catai-extra-blended-skill-talk
+          path: data
+      - name: Download UltraChat examples
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-extra-ultrachat
+          path: data
+      - name: Download GSM8K examples
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-extra-gsm8k
           path: data
       - name: Restore OASST1 source cache
         id: oasst-cache
@@ -1143,14 +1290,18 @@ jobs:
             --base-checkpoint catai.pt \
             --dataset data/oasst_chat.jsonl \
             --personality-dataset data/instruction_chat.jsonl \
-            --personality-ratio 0.20 \
+            --personality-ratio 0.05 \
             --emotion-dataset data/catai_emotion.jsonl \
-            --emotion-ratio 0.30 \
+            --emotion-ratio 0.10 \
             --smol-smoltalk-dataset data/smol_smoltalk_chat.jsonl \
             --smol-smoltalk-ratio 0.10 \
             --blended-skill-talk-dataset data/blended_skill_talk_chat.jsonl \
-            --blended-skill-talk-ratio 0.10 \
-            --samples-per-epoch 2000 \
+            --blended-skill-talk-ratio 0.05 \
+            --ultrachat-dataset data/ultrachat_200k_chat.jsonl \
+            --ultrachat-ratio 0.15 \
+            --gsm8k-dataset data/gsm8k_chat.jsonl \
+            --gsm8k-ratio 0.05 \
+            --samples-per-epoch 4000 \
             --max-validation-examples 500 \
             --checkpoint catai-sft.pt \
             --resume-from catai-sft-recovery.pt \
@@ -1159,6 +1310,7 @@ jobs:
             --epochs "$SFT_EPOCHS" \
             --batch-size 2 \
             --learning-rate 2e-5 \
+            --minimum-tokens-per-parameter 20 \
             --grad-clip 1.0 \
             --validation-split 0.05 \
             --patience 2 \

@@ -58,12 +58,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Number of leading corpus characters used to learn BPE merges.",
     )
     parser.add_argument("--max-tokens", type=int, default=None, help="Cap the training token budget.")
+    parser.add_argument("--minimum-tokens-per-parameter", type=float, default=0.0, help="Reject a planned training run below this actual train-token/parameter ratio.")
     parser.add_argument("--validation-split", type=float, default=0.0)
     parser.add_argument("--patience", type=int, default=None, help="Early-stop after this many non-improving validation epochs.")
     parser.add_argument("--resume-from", default=None, help="Resume model, optimizer, and data position from a recovery checkpoint.")
     parser.add_argument("--recovery-checkpoint", default=None, help="Checkpoint updated during training so a later job can resume.")
     parser.add_argument("--checkpoint-every-batches", type=int, default=50, help="Save recovery state every N batches.")
-    parser.add_argument("--max-batches-per-run-fraction", type=float, default=None, help="Stop after this fraction of one epoch, saving a recovery checkpoint for the next job.")
+    parser.add_argument("--max-batches-per-run-fraction", type=float, default=None, help="Stop after this fraction of the full multi-epoch run, saving a recovery checkpoint for the next job.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducible training.")
     parser.add_argument("--device", default=None)
     return parser
@@ -91,6 +92,8 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--d-model must be divisible by --heads")
     if args.seed < 0:
         raise ValueError("--seed must be non-negative")
+    if args.minimum_tokens_per_parameter < 0:
+        raise ValueError("--minimum-tokens-per-parameter must be non-negative")
     if args.tokenizer == "bpe" and args.vocab_size < 3:
         raise ValueError("--vocab-size must be at least 3")
     if args.tokenizer_sample_chars < 1:
@@ -173,11 +176,24 @@ def main(argv: list[str] | None = None) -> int:
     ).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
     parameter_count = model.parameter_count()
+    planned_training_tokens = len(train_dataset) * args.sequence_length * config.epochs
+    tokens_per_parameter = planned_training_tokens / max(parameter_count, 1)
     print(
-        f"parameters={parameter_count:,} training_tokens={len(tokens):,} "
-        f"tokens_per_parameter={len(tokens) / max(parameter_count, 1):.2f}",
+        f"parameters={parameter_count:,} corpus_tokens={len(tokens):,} "
+        f"planned_training_tokens={planned_training_tokens:,} "
+        f"tokens_per_parameter={tokens_per_parameter:.2f}",
         flush=True,
     )
+    if (
+        args.minimum_tokens_per_parameter > 0
+        and tokens_per_parameter < args.minimum_tokens_per_parameter
+    ):
+        raise ValueError(
+            f"training budget is too small: {planned_training_tokens:,} train tokens "
+            f"for {parameter_count:,} parameters ({tokens_per_parameter:.2f} tokens/parameter); "
+            f"at least {args.minimum_tokens_per_parameter:.2f} are required. "
+            "Increase --max-tokens or choose a smaller model."
+        )
 
     model_metadata = {
         "max_seq_len": args.sequence_length,
@@ -280,14 +296,15 @@ def main(argv: list[str] | None = None) -> int:
     total_batches = (len(train_dataset) + args.batch_size - 1) // args.batch_size
     if total_batches < 1:
         raise ValueError("training dataset produced no batches")
+    total_training_batches = total_batches * config.epochs
     max_batches_this_run = None
     if args.max_batches_per_run_fraction is not None:
         max_batches_this_run = max(
-            1, math.ceil(total_batches * args.max_batches_per_run_fraction)
+            1, math.ceil(total_training_batches * args.max_batches_per_run_fraction)
         )
         print(
             f"This job will process at most {max_batches_this_run:,} batches "
-            f"({args.max_batches_per_run_fraction:.0%} of one epoch).",
+            f"({args.max_batches_per_run_fraction:.0%} of the full training run).",
             flush=True,
         )
 

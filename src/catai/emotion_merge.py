@@ -38,23 +38,23 @@ def _read_source(path: Path, source: str) -> list[dict[str, Any]]:
 
 def merge_emotion_datasets(
     go_emotions_path: str | Path,
-    daily_dialog_path: str | Path,
-    empathetic_dialogues_path: str | Path,
+    daily_dialog_path: str | Path | None,
+    empathetic_dialogues_path: str | Path | None,
     output_path: str | Path,
     *,
     seed: int = 42,
     max_examples: int | None = None,
 ) -> dict[str, int]:
-    """Validate, deduplicate, and deterministically merge all three emotion sources."""
+    """Validate, deduplicate, and deterministically merge the selected emotion sources."""
     if seed < 0:
         raise ValueError("seed must be non-negative")
     if max_examples is not None and max_examples < 1:
         raise ValueError("max_examples must be positive when provided")
-    sources = [
-        ("go_emotions", Path(go_emotions_path)),
-        ("daily_dialog", Path(daily_dialog_path)),
-        ("empathetic_dialogues", Path(empathetic_dialogues_path)),
-    ]
+    sources = [("go_emotions", Path(go_emotions_path))]
+    if daily_dialog_path is not None:
+        sources.append(("daily_dialog", Path(daily_dialog_path)))
+    if empathetic_dialogues_path is not None:
+        sources.append(("empathetic_dialogues", Path(empathetic_dialogues_path)))
     seen: set[str] = set()
     selected: list[dict[str, Any]] = []
     counts: dict[str, int] = {}
@@ -78,7 +78,7 @@ def merge_emotion_datasets(
         counts[source] = len(unique)
         selected.extend(unique)
     if not selected:
-        raise ValueError("all three emotion datasets contained zero unique examples")
+        raise ValueError("selected emotion datasets contained zero unique examples")
     rng = random.Random(seed)
     rng.shuffle(selected)
     if max_examples is not None:
@@ -97,10 +97,12 @@ def merge_emotion_datasets(
     return {**counts, "duplicates_removed": duplicates, "total": len(selected)}
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Merge GoEmotions, DailyDialog, and EmpatheticDialogues for CatAI.")
+    parser = argparse.ArgumentParser(description="Merge selected, license-reviewed emotion datasets for CatAI.")
     parser.add_argument("--go-emotions", type=Path, default=Path("data/go_emotions_emotion.jsonl"))
-    parser.add_argument("--daily-dialog", type=Path, default=Path("data/daily_dialog_emotion.jsonl"))
-    parser.add_argument("--empathetic-dialogues", type=Path, default=Path("data/empathetic_dialogues_emotion.jsonl"))
+    parser.add_argument("--daily-dialog", type=Path, default=None,
+                        help="Optional non-commercial source; excluded from the default training workflow.")
+    parser.add_argument("--empathetic-dialogues", type=Path, default=None,
+                        help="Optional non-commercial source; excluded from the default training workflow.")
     parser.add_argument("--output", type=Path, default=Path("data/catai_emotion.jsonl"))
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max-examples", type=int, default=None)
@@ -111,9 +113,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     print(
         f"Merged {stats['total']:,} emotional examples to {args.output}: "
-        f"GoEmotions {stats['go_emotions']:,}, DailyDialog {stats['daily_dialog']:,}, "
-        f"EmpatheticDialogues {stats['empathetic_dialogues']:,}; "
-        f"{stats['duplicates_removed']:,} duplicates removed."
+        ", ".join(f"{name}: {count:,}" for name, count in stats.items()
+                   if name not in {"duplicates_removed", "total"} and count),
+        f"; {stats['duplicates_removed']:,} duplicates removed."
     )
     return 0
 

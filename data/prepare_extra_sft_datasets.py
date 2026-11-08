@@ -22,6 +22,8 @@ sys.path.insert(0, str(ROOT / "src"))
 from catai.chat_dataset import default_state, validate_messages
 
 SMOL_SMOLTALK_DATASET = "HuggingFaceTB/smol-smoltalk"
+ULTRACHAT_DATASET = "HuggingFaceH4/ultrachat_200k"
+GSM8K_DATASET = "openai/gsm8k"
 BLENDED_SKILL_TALK_URL = "https://parl.ai/downloads/blended_skill_talk/blended_skill_talk.tar.gz"
 BLENDED_SKILL_TALK_SHA256 = "5fbed0068ee89e2d43b93c3ecb341e784617033efa5e8e911a219d4eda6134a6"
 
@@ -153,6 +155,171 @@ def _write_jsonl(records: list[dict[str, Any]], output: Path) -> None:
         temporary.replace(output)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def convert_ultrachat_row(row: dict[str, Any]) -> dict[str, Any] | None:
+    messages = normalize_messages(row.get("messages"))
+    if messages is None:
+        return None
+    return {
+        "state": default_state(),
+        "messages": messages,
+        "dataset_source": "ultrachat_200k",
+        "dataset_license": "MIT",
+        "dataset_repository": ULTRACHAT_DATASET,
+        "prompt_id": str(row.get("prompt_id") or ""),
+    }
+
+
+def convert_gsm8k_row(row: dict[str, Any]) -> dict[str, Any] | None:
+    question, answer = row.get("question"), row.get("answer")
+    if (
+        not isinstance(question, str) or not question.strip()
+        or not isinstance(answer, str) or not answer.strip()
+    ):
+        return None
+    messages = [
+        {
+            "role": "user",
+            "content": (
+                "Solve this grade-school math problem. Show a clear, concise "
+                "calculation and state the final answer.\n\n" + question.strip()
+            ),
+        },
+        {"role": "assistant", "content": answer.strip()},
+    ]
+    try:
+        messages = validate_messages(messages)
+    except ValueError:
+        return None
+    return {
+        "state": default_state(),
+        "messages": messages,
+        "dataset_source": "gsm8k",
+        "dataset_license": "MIT",
+        "dataset_repository": GSM8K_DATASET,
+        "dataset_config": "main",
+    }
+
+
+def _fetch_dataset_viewer_page(
+    dataset: str, config: str, split: str, offset: int, length: int = 100
+) -> dict[str, Any]:
+    """Fetch one bounded page from the official Hugging Face Dataset Viewer API."""
+    if offset < 0 or not 1 <= length <= 100:
+        raise ValueError("Dataset Viewer offsets must be non-negative and page lengths must be 1..100")
+    query = urllib.parse.urlencode({
+        "dataset": dataset,
+        "config": config,
+        "split": split,
+        "offset": offset,
+        "length": length,
+    })
+    request = urllib.request.Request(
+        f"https://datasets-server.huggingface.co/rows?{query}",
+        headers={"User-Agent": "CatAI-SFT-dataset-preparation/1.0"},
+    )
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+            break
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as exc:
+            if attempt == 3:
+                raise RuntimeError(
+                    f"Could not fetch {dataset} rows at offset {offset} after 4 attempts"
+                ) from exc
+            retry_after = (
+                exc.headers.get("Retry-After")
+                if isinstance(exc, urllib.error.HTTPError) and exc.headers is not None
+                else None
+            )
+            try:
+                delay = max(1.0, min(30.0, float(retry_after)))
+            except (TypeError, ValueError):
+                delay = float(2 ** attempt)
+            time.sleep(delay)
+    if not isinstance(payload, dict):
+        raise ValueError(f"Dataset Viewer returned an invalid {dataset} response")
+    if payload.get("partial") is True:
+        raise RuntimeError(f"Dataset Viewer marked {dataset} as partial; refusing incomplete data")
+    if not isinstance(payload.get("rows"), list):
+        raise ValueError(f"Dataset Viewer returned an invalid rows page for {dataset}")
+    return payload
+
+
+def _sample_viewer_rows(
+    fetch_page, limit: int, seed: int, dataset_label: str
+) -> list[dict[str, Any]]:
+    """Select deterministic examples from shuffled, bounded Dataset Viewer pages."""
+    if limit < 1 or seed < 0:
+        raise ValueError("limit must be positive and seed must be non-negative")
+    first_page = fetch_page(0, 100)
+    total_rows = first_page.get("num_rows_total")
+    if not isinstance(total_rows, int) or total_rows < 0:
+        raise ValueError(f"{dataset_label} Dataset Viewer omitted a valid num_rows_total")
+    page_offsets = list(range(0, total_rows, 100))
+    random.Random(seed).shuffle(page_offsets)
+    pages_needed = (limit + 99) // 100
+    max_pages = min(len(page_offsets), max(20, pages_needed * 5))
+    selected: list[dict[str, Any]] = []
+    for offset in page_offsets[:max_pages]:
+        payload = first_page if offset == 0 else fetch_page(offset, min(100, total_rows - offset))
+        if payload.get("partial") is True:
+            raise RuntimeError(f"{dataset_label} Dataset Viewer returned a partial page")
+        if payload.get("num_rows_total") != total_rows:
+            raise RuntimeError(f"{dataset_label} row count changed while sampling")
+        rows = payload.get("rows")
+        if not isinstance(rows, list):
+            raise ValueError(f"{dataset_label} Dataset Viewer returned an invalid page at offset {offset}")
+        for entry in rows:
+            if isinstance(entry, dict) and isinstance(entry.get("row"), dict):
+                selected.append(entry["row"])
+                if len(selected) >= limit:
+                    break
+        if len(selected) >= limit:
+            break
+    if len(selected) < limit:
+        raise RuntimeError(
+            f"{dataset_label} produced only {len(selected):,} rows after checking "
+            f"at most {max_pages:,} pages; requested {limit:,}"
+        )
+    random.Random(seed).shuffle(selected)
+    return selected
+
+
+def _fetch_ultrachat_page(offset: int, length: int = 100) -> dict[str, Any]:
+    return _fetch_dataset_viewer_page(ULTRACHAT_DATASET, "default", "train_sft", offset, length)
+
+
+def _fetch_gsm8k_page(offset: int, length: int = 100) -> dict[str, Any]:
+    return _fetch_dataset_viewer_page(GSM8K_DATASET, "main", "train", offset, length)
+
+
+def prepare_ultrachat(output: Path, limit: int, seed: int) -> int:
+    rows = _sample_viewer_rows(_fetch_ultrachat_page, limit, seed, "UltraChat 200k")
+    records = [
+        converted for row in rows
+        for converted in [convert_ultrachat_row(row)] if converted is not None
+    ]
+    if len(records) < limit:
+        raise RuntimeError(f"UltraChat produced only {len(records):,} usable rows; requested {limit:,}")
+    _write_jsonl(records[:limit], output)
+    print(f"Prepared {limit:,} MIT-licensed UltraChat examples at {output}")
+    return limit
+
+
+def prepare_gsm8k(output: Path, limit: int, seed: int) -> int:
+    rows = _sample_viewer_rows(_fetch_gsm8k_page, limit, seed, "GSM8K")
+    records = [
+        converted for row in rows
+        for converted in [convert_gsm8k_row(row)] if converted is not None
+    ]
+    if len(records) < limit:
+        raise RuntimeError(f"GSM8K produced only {len(records):,} usable rows; requested {limit:,}")
+    _write_jsonl(records[:limit], output)
+    print(f"Prepared {limit:,} MIT-licensed GSM8K examples at {output}")
+    return limit
 
 
 def _fetch_smol_smoltalk_page(offset: int, length: int = 100) -> dict[str, Any]:
@@ -297,7 +464,7 @@ def prepare_blended_skill_talk(output: Path, limit: int, seed: int) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Prepare bounded CatAI SFT sources.")
-    parser.add_argument("--source", choices=("smol-smoltalk", "blended-skill-talk"), required=True)
+    parser.add_argument("--source", choices=("smol-smoltalk", "blended-skill-talk", "ultrachat", "gsm8k"), required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--max-examples", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=42)
@@ -306,8 +473,12 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--max-examples must be positive and --seed non-negative")
     if args.source == "smol-smoltalk":
         prepare_smol_smoltalk(args.output, args.max_examples, args.seed)
-    else:
+    elif args.source == "blended-skill-talk":
         prepare_blended_skill_talk(args.output, args.max_examples, args.seed)
+    elif args.source == "ultrachat":
+        prepare_ultrachat(args.output, args.max_examples, args.seed)
+    else:
+        prepare_gsm8k(args.output, args.max_examples, args.seed)
     return 0
 
 

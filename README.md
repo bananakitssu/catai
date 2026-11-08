@@ -82,61 +82,38 @@ python data/download_oasst1.py --max-trees 100 --max-examples 1000
 The generated datasets and downloaded source archives are ignored by Git. The OASST1 ready export contains 10,364 trees and 88,838 messages. The OASST2 ready export contains 13,854 trees and 135,174 messages, including 64,513 English messages. Both official releases are licensed under Apache-2.0. See the [OASST1 dataset card](https://huggingface.co/datasets/OpenAssistant/oasst1) and [OASST2 dataset card](https://huggingface.co/datasets/OpenAssistant/oasst2).
 
 
-## Emotion-aware SFT dataset (GoEmotions + DailyDialog + EmpatheticDialogues)
+## Emotion-aware SFT dataset (GoEmotions)
 
-The CI pipeline prepares a unified, source-attributed emotional dataset from the
-training splits of three public datasets:
+The default CI pipeline uses **GoEmotions only** for emotion-recognition
+supervision. It preserves the original multi-label annotations and does not
+invent assistant replies to isolated comments. Every record includes
+`dataset_source`, `dataset_license`, and its emotion labels.
 
-- **GoEmotions** supplies fine-grained, multi-label emotion-recognition examples.
-  These are trained as explicit classification tasks; CatAI is not given invented
-  assistant replies to isolated Reddit comments.
-- **DailyDialog** supplies actual adjacent dialogue turns. The emotion annotation
-  on a user turn is used as context for the real next-speaker response.
-- **EmpatheticDialogues** supplies speaker/listener conversations. The listener's
-  real response is paired with the speaker's preceding turn and the dialogue's
-  annotated emotional context.
+DailyDialog (CC BY-NC-SA 4.0) and EmpatheticDialogues (CC BY-NC 4.0) converters
+remain available for experiments that have separately obtained permission,
+but neither source is downloaded or used by the default training workflow.
+They are not appropriate for a default commercially reusable training run.
+The default merge is now GoEmotions-only (Apache-2.0).
 
-The normalized output is \`data/catai_emotion.jsonl\`. Every record retains
-\`dataset_source\`, \`dataset_license\`, and emotion labels for provenance. The
-merge is deterministic and removes duplicate conversations. Generated JSONL
-files and downloaded archives are ignored by Git.
+Prepare it locally:
 
-Run the preparation locally:
-
-\`\`\`bash
+```bash
 python -m pip install pyarrow
 python data/prepare_emotion_datasets.py --source go_emotions --output data/go_emotions_emotion.jsonl
-python data/prepare_emotion_datasets.py --source daily_dialog --output data/daily_dialog_emotion.jsonl
-python data/prepare_emotion_datasets.py --source empathetic_dialogues --output data/empathetic_dialogues_emotion.jsonl
-python data/merge_emotion_datasets.py
-\`\`\`
+python data/merge_emotion_datasets.py --go-emotions data/go_emotions_emotion.jsonl
+```
 
-SFT samples from the merged emotion corpus alongside OpenAssistant and CatAI's
-personality examples. The workflow caps the number of draws per epoch so that a
-large source archive does not turn one SFT epoch into an unbounded multi-hour job;
-increase \`--samples-per-epoch\` when a larger training budget is available.
-
-**Licensing warning:** GoEmotions is Apache-2.0, but DailyDialog is CC BY-NC-SA
-4.0 and EmpatheticDialogues is CC BY-NC 4.0. The combined emotional corpus
-therefore contains non-commercial source material. Do not use the merged corpus
-or assume resulting checkpoints are cleared for commercial use without obtaining
-the required permissions. See the
-[GoEmotions dataset card](https://huggingface.co/datasets/google-research-datasets/go_emotions),
-[DailyDialog dataset card](https://huggingface.co/datasets/li2017dailydialog/daily_dialog),
-and [EmpatheticDialogues dataset card](https://huggingface.co/datasets/facebook/empathetic_dialogues).
-
-
-To validate and generate just the emotion corpus without launching any model
-training, manually run **Actions → CI → Run workflow** and select
-\`training_mode: emotions_only\`. The three source jobs run in parallel, followed
-by the merge and validation job; base training and both SFT stages are skipped.
-
+To prepare the GoEmotions corpus without launching model training, run
+**Actions → CI → Run workflow** and select `training_mode: emotions_only`.
 
 ## Updated base-training data and budget
 
 The Actions workflow defaults to the **tiny** preset (about 0.92M parameters)
-and 20M pretraining tokens, approximately 21.8 tokens per parameter. It rejects
-budgets below 10 tokens per parameter. A rough 20-token target:
+and a 20M-token pretraining cap (about 21.8 input tokens per parameter for the
+512-token BPE vocabulary). The workflow requires at least 21.1 input
+tokens/parameter to retain 20 after its 5% validation split, and the trainer
+checks the actual model vocabulary, parameter count, and train split before
+starting. SFT checks the recorded actual ratio again. A rough 20-token target:
 
 | Preset | Parameters | 20-token target |
 |---|---:|---:|
@@ -165,28 +142,42 @@ and [RedPajama-V2 paper](https://papers.nips.cc/paper/2024/file/d34497330b1fd653
 
 ## Additional SFT sources
 
-The default SFT sampling targets are:
+The default SFT sampling targets are deliberately weighted toward general
+assistant conversations instead of niche or tiny sources:
 
-| Source | Target share |
-|---|---:|
-| OpenAssistant 1 + 2 | 30% |
-| CatAI personality examples | 20% |
-| Emotion-aware examples | 30% |
-| Smol-SmolTalk | 10% |
-| Blended Skill Talk | 10% |
+| Source | Target share | Declared dataset license |
+|---|---:|---|
+| OpenAssistant 1 + 2 | 50% | Apache-2.0 |
+| UltraChat 200k | 15% | MIT |
+| GoEmotions | 10% | Apache-2.0 |
+| Smol-SmolTalk | 10% | Apache-2.0 |
+| Blended Skill Talk | 5% | CC BY 4.0 |
+| CatAI personality examples | 5% | CatAI-authored |
+| GSM8K | 5% | MIT |
 
-Smol-SmolTalk is adapted for models below 1B parameters. CatAI takes up to
-1,000 shorter examples and retains the upstream source label; its dataset card
-lists Apache-2.0. Blended Skill Talk adds up to 1,000 training conversations:
-the free participant becomes the user and the guided participant becomes the
-assistant. It is licensed CC BY 4.0. Both converters preserve dataset/license
-provenance in each record.
+CatAI samples up to 1,500 UltraChat 200k `train_sft` conversations and 1,000
+GSM8K `main/train` math problems. UltraChat records retain their original
+message roles; GSM8K records are formatted as user problems with their
+published worked answers. Both are declared MIT on their official Hugging Face
+dataset cards. The data preparation code keeps source and license metadata in
+each JSONL record.
 
-The existing emotion mixture still includes DailyDialog (CC BY-NC-SA 4.0) and
-EmpatheticDialogues (CC BY-NC 4.0). The combined emotional corpus therefore
-contains non-commercial source material; do not assume the resulting checkpoint
-is commercially cleared without separate permission and review.
+The old DailyDialog and EmpatheticDialogues sources are **not** used in this
+default mixture because their published dataset cards specify non-commercial
+licenses. Their converters are still present for users who obtain separate
+permission, but the default workflow no longer downloads or trains on them.
 
-The added dialogue sources start with small samples. Compare validation loss
-and the same CatAI evaluation prompts against the previous 45%/20%/35% SFT
-baseline before raising their shares or sample caps.
+See [Dataset licenses and provenance](docs/DATASET_LICENSES.md) before
+redistributing datasets or model artifacts. A license label in a dataset card
+is evidence of the dataset publisher's stated terms, not a guarantee that every
+underlying third-party text has been independently rights-cleared. In
+particular, the pretraining corpus includes Common Crawl-derived material:
+RedPajama-V2 directs users to Common Crawl's terms, and FineWeb-Edu is
+ODC-BY-1.0 while remaining subject to those source terms. Do not treat the
+entire CatAI corpus or resulting checkpoint as covered by MIT merely because
+some SFT datasets are MIT-licensed.
+
+The default training mix and sampling budget are starting points, not a
+quality guarantee. Compare the fixed evaluation prompts, held-out loss, and
+task-specific scores after each fresh full-pretraining run. SFT cannot reliably
+teach foundational language patterns that the base checkpoint has not learned.

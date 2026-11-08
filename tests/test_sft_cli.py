@@ -258,24 +258,32 @@ def test_sft_cli_balances_emotion_personality_and_openassistant_data(tmp_path):
     emotion_data = tmp_path / "emotion.jsonl"
     smol_data = tmp_path / "smol.jsonl"
     blended_data = tmp_path / "blended.jsonl"
+    ultrachat_data = tmp_path / "ultrachat.jsonl"
+    gsm8k_data = tmp_path / "gsm8k.jsonl"
     write_dataset(base_data, "OpenAssistant")
     write_dataset(personality_data, "CatAI")
     write_dataset(emotion_data, "Emotion")
     write_dataset(smol_data, "Smol-SmolTalk")
     write_dataset(blended_data, "Blended Skill Talk")
+    write_dataset(ultrachat_data, "UltraChat")
+    write_dataset(gsm8k_data, "GSM8K")
 
     output = tmp_path / "balanced-sft.pt"
     result = main([
         "--base-checkpoint", str(base_checkpoint),
         "--dataset", str(base_data),
         "--personality-dataset", str(personality_data),
-        "--personality-ratio", "0.2",
+        "--personality-ratio", "0.05",
         "--emotion-dataset", str(emotion_data),
-        "--emotion-ratio", "0.2",
+        "--emotion-ratio", "0.1",
         "--smol-smoltalk-dataset", str(smol_data),
         "--smol-smoltalk-ratio", "0.1",
         "--blended-skill-talk-dataset", str(blended_data),
-        "--blended-skill-talk-ratio", "0.1",
+        "--blended-skill-talk-ratio", "0.05",
+        "--ultrachat-dataset", str(ultrachat_data),
+        "--ultrachat-ratio", "0.15",
+        "--gsm8k-dataset", str(gsm8k_data),
+        "--gsm8k-ratio", "0.05",
         "--samples-per-epoch", "4",
         "--checkpoint", str(output),
         "--epochs", "1",
@@ -292,16 +300,65 @@ def test_sft_cli_balances_emotion_personality_and_openassistant_data(tmp_path):
     assert training["personality_examples"] == 2
     assert training["emotion_examples"] == 2
     assert training["sampling_ratios"] == {
-        "base": 0.4,
-        "emotion": 0.2,
-        "personality": 0.2,
+        "base": 0.5,
+        "emotion": 0.1,
+        "personality": 0.05,
         "smol_smoltalk": 0.1,
-        "blended_skill_talk": 0.1,
+        "blended_skill_talk": 0.05,
+        "ultrachat": 0.15,
+        "gsm8k": 0.05,
     }
-    assert training["emotion_ratio"] == 0.2
+    assert training["emotion_ratio"] == 0.1
     assert training["smol_smoltalk_examples"] == 2
     assert training["smol_smoltalk_ratio"] == 0.1
     assert training["blended_skill_talk_examples"] == 2
-    assert training["blended_skill_talk_ratio"] == 0.1
+    assert training["blended_skill_talk_ratio"] == 0.05
+    assert training["ultrachat_examples"] == 2
+    assert training["ultrachat_training_examples"] == 2
+    assert training["ultrachat_ratio"] == 0.15
+    assert training["gsm8k_examples"] == 2
+    assert training["gsm8k_training_examples"] == 2
+    assert training["gsm8k_ratio"] == 0.05
     assert training["samples_per_epoch"] == 4
     assert training["total_steps"] == 4
+
+
+def test_sft_cli_rejects_a_base_checkpoint_below_the_required_training_ratio(tmp_path):
+    tokenizer = CharTokenizer.default()
+    model = CatAI(
+        vocab_size=tokenizer.vocab_size,
+        max_seq_len=1024,
+        d_model=16,
+        n_heads=4,
+        n_layers=1,
+    )
+    base_checkpoint = tmp_path / "undertrained.pt"
+    save_checkpoint(
+        base_checkpoint,
+        model,
+        torch.optim.AdamW(model.parameters(), lr=1e-3),
+        step=10,
+        metadata={
+            "model": {
+                "max_seq_len": 1024,
+                "d_model": 16,
+                "n_heads": 4,
+                "n_layers": 1,
+                "parameter_count": 1000,
+            },
+            "tokenizer": {
+                "type": "char",
+                "vocabulary": list(tokenizer.vocabulary),
+            },
+            "training": {"total_tokens": 1000},
+        },
+    )
+
+    import pytest
+
+    with pytest.raises(ValueError, match="base checkpoint is undertrained"):
+        main([
+            "--base-checkpoint", str(base_checkpoint),
+            "--dataset", str(tmp_path / "not-needed-before-guard.jsonl"),
+            "--minimum-tokens-per-parameter", "20",
+        ])

@@ -19,6 +19,7 @@ def test_parser_accepts_training_options():
             "--tokenizer", "char",
             "--vocab-size", "128",
             "--max-tokens", "1000",
+            "--minimum-tokens-per-parameter", "20",
             "--validation-split", "0.05",
             "--patience", "2",
             "--device", "cpu",
@@ -39,6 +40,7 @@ def test_parser_accepts_training_options():
     assert args.tokenizer == "char"
     assert args.vocab_size == 128
     assert args.max_tokens == 1000
+    assert args.minimum_tokens_per_parameter == 20
     assert args.validation_split == 0.05
     assert args.patience == 2
     assert args.device == "cpu"
@@ -70,6 +72,7 @@ def test_parser_defaults_are_stable():
     assert args.tokenizer == "char"
     assert args.vocab_size == 256
     assert args.max_tokens is None
+    assert args.minimum_tokens_per_parameter == 0.0
     assert args.validation_split == 0.0
     assert args.patience is None
     assert args.device is None
@@ -104,3 +107,26 @@ def test_cli_trains_and_writes_checkpoint(tmp_path, capsys):
     assert "batch" in output
     assert "loss=" in output
     assert "saved checkpoint" in output
+
+
+def test_cli_rejects_an_underfunded_training_budget_before_training(tmp_path):
+    import pytest
+
+    corpus = tmp_path / "corpus.txt"
+    corpus.write_text("banana cat " * 200, encoding="utf-8")
+    checkpoint = tmp_path / "should-not-exist.pt"
+
+    with pytest.raises(ValueError, match="training budget is too small"):
+        main([
+            "--corpus", str(corpus),
+            "--checkpoint", str(checkpoint),
+            "--tokenizer", "bpe",
+            "--vocab-size", "8",
+            "--sequence-length", "16",
+            "--d-model", "16",
+            "--heads", "2",
+            "--layers", "1",
+            "--minimum-tokens-per-parameter", "100",
+            "--device", "cpu",
+        ])
+    assert not checkpoint.exists()

@@ -152,3 +152,19 @@ def test_empathetic_dialogues_bounds_situation_context_in_system_prompt():
     situation = system_prompt.split(marker, 1)[1]
     assert len(situation) <= 220
     assert situation.endswith("...")
+
+
+def test_default_emotion_merge_can_use_go_emotions_without_restricted_sources(tmp_path):
+    records = go_emotions_records([{"text": "I feel excited.", "labels": [17]}])
+    source = tmp_path / "go_emotions.jsonl"
+    source.write_text(
+        json.dumps(records[0], ensure_ascii=False) + chr(10),
+        encoding="utf-8",
+    )
+    output = tmp_path / "commercial_emotions.jsonl"
+    stats = merge_emotion_datasets(source, None, None, output)
+    merged = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+    assert stats["total"] == 1
+    assert set(stats) == {"go_emotions", "duplicates_removed", "total"}
+    assert merged[0]["dataset_license"] == "apache-2.0"
+    assert merged[0]["dataset_source"] == "go_emotions"
