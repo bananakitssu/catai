@@ -5,18 +5,34 @@ sources used by CatAI's default training workflow. It is a provenance aid, not
 legal advice or a guarantee that every underlying text is free of third-party
 rights.
 
-## Default supervised fine-tuning sources
+## Supervised fine-tuning sources and modes
 
 | Source | Dataset license stated by publisher | Default use |
 |---|---|---|
 | OpenAssistant OASST1 | Apache-2.0 | Yes |
 | OpenAssistant OASST2 | Apache-2.0 | Yes |
-| GoEmotions | Apache-2.0 | Yes |
+| GoEmotions | Apache-2.0 | No — separate classification experiment |
 | Smol-SmolTalk | Apache-2.0 | Yes |
 | Blended Skill Talk | CC BY 4.0 | Yes, with attribution |
 | UltraChat 200k | MIT | Yes |
-| GSM8K | MIT | Yes |
+| GSM8K | MIT | No — optional math-specialist experiment |
 | CatAI personality examples | Authored for CatAI | Yes |
+
+The default general conversational SFT mixture uses OpenAssistant (57%),
+UltraChat 200k (25%), Smol-SmolTalk (10%), Blended Skill Talk (5%), and
+CatAI-authored personality examples (3%). Its validation sample follows those
+same source ratios, and the reported loss is weighted by supervised
+assistant-token count.
+
+GoEmotions (Apache-2.0) is reserved for a separate emotion-classification
+experiment and is not mixed into general chat SFT. GSM8K (MIT) remains an
+optional math-specialist dataset and is not in the default chat mixture.
+
+GoEmotions contains label-prediction examples such as `Emotions: curiosity`.
+Those are useful for an emotion-classification experiment, but are deliberately
+not mixed into general chat SFT. GSM8K remains an optional math-specialist
+source; its step-by-step worked answers are not part of the default assistant
+mixture.
 
 Official dataset pages:
 
@@ -44,6 +60,9 @@ license is not an independent rights audit of every prompt or response.
 - [ODC-By 1.0 license](https://opendatacommons.org/licenses/by/)
 - [RedPajama-V2 dataset card and license notice](https://huggingface.co/datasets/togethercomputer/RedPajama-Data-V2)
 - [Common Crawl Terms of Use](https://commoncrawl.org/terms-of-use)
+
+The pretraining downloader writes a dedicated EOS boundary between documents;
+this is model-training structure, not a new dataset or a license change.
 
 Do not describe the complete pretraining corpus as MIT-licensed or assume that
 the license on a dataset's processing code licenses the underlying text.

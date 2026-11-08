@@ -32,7 +32,7 @@ python -m pip install -e ".[data]"
 python data/download_corpus.py --output data/corpus.txt --target-chars 100000000 --fineweb-edu-chars 15000000
 
 # Train a tiny BPE model with a 20M-token budget
-python -m catai --corpus data/corpus.txt --checkpoint catai.pt --model-size tiny --tokenizer bpe --vocab-size 512 --max-tokens 20000000 --validation-split 0.05
+python -m catai --corpus data/corpus.txt --checkpoint catai.pt --model-size tiny --tokenizer bpe --vocab-size 512 --max-tokens 200000000 --validation-split 0.05
 
 # Generate
 python -m catai.generate_cli --checkpoint catai.pt --prompt "The cat"
@@ -82,18 +82,14 @@ python data/download_oasst1.py --max-trees 100 --max-examples 1000
 The generated datasets and downloaded source archives are ignored by Git. The OASST1 ready export contains 10,364 trees and 88,838 messages. The OASST2 ready export contains 13,854 trees and 135,174 messages, including 64,513 English messages. Both official releases are licensed under Apache-2.0. See the [OASST1 dataset card](https://huggingface.co/datasets/OpenAssistant/oasst1) and [OASST2 dataset card](https://huggingface.co/datasets/OpenAssistant/oasst2).
 
 
-## Emotion-aware SFT dataset (GoEmotions)
+## Auxiliary emotion-recognition data (GoEmotions)
 
-The default CI pipeline uses **GoEmotions only** for emotion-recognition
-supervision. It preserves the original multi-label annotations and does not
-invent assistant replies to isolated comments. Every record includes
-`dataset_source`, `dataset_license`, and its emotion labels.
-
-DailyDialog (CC BY-NC-SA 4.0) and EmpatheticDialogues (CC BY-NC 4.0) converters
-remain available for experiments that have separately obtained permission,
-but neither source is downloaded or used by the default training workflow.
-They are not appropriate for a default commercially reusable training run.
-The default merge is now GoEmotions-only (Apache-2.0).
+GoEmotions is a **classification dataset**, not a conversational response
+dataset. Its examples teach the model to output labels such as `Emotions:
+curiosity`; those labels are not appropriate targets for ordinary chat. It is
+therefore excluded from the default conversational SFT mixture and retained
+as a separate `emotions_only` preparation experiment. Every record preserves
+`dataset_source`, `dataset_license`, and the original multi-label annotations.
 
 Prepare it locally:
 
@@ -103,17 +99,22 @@ python data/prepare_emotion_datasets.py --source go_emotions --output data/go_em
 python data/merge_emotion_datasets.py --go-emotions data/go_emotions_emotion.jsonl
 ```
 
-To prepare the GoEmotions corpus without launching model training, run
+To prepare the classifier data without training CatAI's chat model, run
 **Actions → CI → Run workflow** and select `training_mode: emotions_only`.
+
+DailyDialog (CC BY-NC-SA 4.0) and EmpatheticDialogues (CC BY-NC 4.0) converters
+remain available only for experiments with separate permission; neither is
+used in the default workflow because of its non-commercial restrictions.
 
 ## Updated base-training data and budget
 
 The Actions workflow defaults to the **tiny** preset (about 0.92M parameters)
-and a 20M-token pretraining cap (about 21.8 input tokens per parameter for the
-512-token BPE vocabulary). The workflow requires at least 21.1 input
-tokens/parameter to retain 20 after its 5% validation split, and the trainer
-checks the actual model vocabulary, parameter count, and train split before
-starting. SFT checks the recorded actual ratio again. A rough 20-token target:
+and a 200M-token pretraining cap (about 217.7 input tokens per parameter for
+the 512-token BPE vocabulary). After the 5% validation split, that is roughly
+206.8 training tokens per parameter. The trainer checks the actual model
+vocabulary, parameter count, train split, and presence of document EOS markers
+before starting; SFT checks the recorded training metadata again. A rough
+20-token compute-optimal reference target:
 
 | Preset | Parameters | 20-token target |
 |---|---:|---:|
@@ -131,7 +132,7 @@ The corpus combines:
   Gopher-style quality signals.
 - RedPajama's duplicate-ID Parquet artifacts plus a local SHA-256 pass for
   additional exact deduplication.
-- A bounded 15M-character FineWeb-Edu sample, filtered to score >= 3 and
+- A bounded 150M-character FineWeb-Edu sample, filtered to score >= 3 and
   language_score >= 0.8. It is placed first so it appears in the capped
   training-token prefix.
 
@@ -142,30 +143,38 @@ and [RedPajama-V2 paper](https://papers.nips.cc/paper/2024/file/d34497330b1fd653
 
 ## Additional SFT sources
 
-The default SFT sampling targets are deliberately weighted toward general
-assistant conversations instead of niche or tiny sources:
+The default SFT sampling targets emphasize **general assistant
+conversations** and keep specialist tasks out of the chat model:
 
 | Source | Target share | Declared dataset license |
 |---|---:|---|
-| OpenAssistant 1 + 2 | 50% | Apache-2.0 |
-| UltraChat 200k | 15% | MIT |
-| GoEmotions | 10% | Apache-2.0 |
+| OpenAssistant 1 + 2 | 57% | Apache-2.0 |
+| UltraChat 200k | 25% | MIT |
 | Smol-SmolTalk | 10% | Apache-2.0 |
 | Blended Skill Talk | 5% | CC BY 4.0 |
-| CatAI personality examples | 5% | CatAI-authored |
-| GSM8K | 5% | MIT |
+| CatAI personality examples | 3% | CatAI-authored |
 
-CatAI samples up to 1,500 UltraChat 200k `train_sft` conversations and 1,000
-GSM8K `main/train` math problems. UltraChat records retain their original
-message roles; GSM8K records are formatted as user problems with their
-published worked answers. Both are declared MIT on their official Hugging Face
-dataset cards. The data preparation code keeps source and license metadata in
-each JSONL record.
+CatAI samples up to 5,000 UltraChat 200k `train_sft` conversations and 2,500
+Smol-SmolTalk examples. The sources are compacted and checked against the
+model context; their loaded counts are not the same as their trainable counts.
+Generated JSONL retains source and declared-license metadata.
 
-The old DailyDialog and EmpatheticDialogues sources are **not** used in this
-default mixture because their published dataset cards specify non-commercial
-licenses. Their converters are still present for users who obtain separate
-permission, but the default workflow no longer downloads or trains on them.
+GoEmotions is reserved for the separate `emotions_only` experiment because
+its target is an emotion label, not a natural conversational response.
+GSM8K remains available through the optional MIT-licensed adapter for a
+separately evaluated math-specialist experiment, but its worked solutions are
+not included in general conversational SFT. This avoids teaching a small
+general-purpose model to answer ordinary questions with classification labels
+or unrelated step-by-step math traces.
+
+SFT now constructs a held-out validation sample using the same source ratios as
+the training sampler and reports loss per supervised assistant token. This
+prevents a large raw dataset from dominating validation merely because it has
+more rows, when its actual training share is small.
+
+The pretraining corpus writer adds a dedicated EOS token between documents so
+the model learns where unrelated source documents end, instead of being trained
+to continue seamlessly from the end of one web page into the next.
 
 See [Dataset licenses and provenance](docs/DATASET_LICENSES.md) before
 redistributing datasets or model artifacts. A license label in a dataset card
@@ -178,6 +187,8 @@ entire CatAI corpus or resulting checkpoint as covered by MIT merely because
 some SFT datasets are MIT-licensed.
 
 The default training mix and sampling budget are starting points, not a
-quality guarantee. Compare the fixed evaluation prompts, held-out loss, and
-task-specific scores after each fresh full-pretraining run. SFT cannot reliably
-teach foundational language patterns that the base checkpoint has not learned.
+quality guarantee. The previous full run showed that low training loss and a
+green workflow do not prove coherent generation: its base-model sample was
+already incoherent before SFT. Compare the fixed prompts and task-specific
+scores after every fresh full-pretraining run; SFT cannot reliably teach
+foundational language patterns that the base checkpoint has not learned.

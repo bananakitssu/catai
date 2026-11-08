@@ -11,6 +11,7 @@ import random
 import shutil
 import time
 from pathlib import Path
+from typing import TextIO
 from urllib.request import Request, urlopen
 
 TINY_SHAKESPEARE_URL = (
@@ -21,6 +22,8 @@ REDPAJAMA_BASE_URL = "https://data.together.xyz/redpajama-data-v2/v1.0.0"
 REDPAJAMA_DEFAULT_SNAPSHOT = "2023-06"
 REDPAJAMA_DEFAULT_LANGUAGE = "en"
 REDPAJAMA_DEFAULT_PARTITION = "head_middle"
+# Reserved pretraining document separator; tokenizers encode this as one EOS ID.
+DOCUMENT_EOS_MARKER = "<EOS>"
 
 
 def _download(url: str, timeout: int = 90) -> bytes:
@@ -35,6 +38,11 @@ def download_tiny_shakespeare(output: Path) -> None:
     if not text.strip():
         raise RuntimeError("downloaded Tiny Shakespeare corpus is empty")
     output.write_text(text, encoding="utf-8")
+
+
+def _write_document(destination: TextIO, text: str) -> None:
+    """Write one document followed by the tokenizer's dedicated EOS marker."""
+    destination.write(text.rstrip() + "\n" + DOCUMENT_EOS_MARKER + "\n\n")
 
 
 def _scores(signal_map: dict, name: str) -> list[float]:
@@ -261,7 +269,7 @@ def download_redpajama(
                 chunk = text[:target_chars - chars]
                 if len(chunk.split()) < 10:
                     continue
-                destination.write(chunk + "\n\n")
+                _write_document(destination, chunk)
                 chars += len(chunk)
                 docs += 1
             _progress(chars, target_chars, docs, processed, len(shard_ids), started)
@@ -312,7 +320,7 @@ def download_fineweb_edu(
             chunk = text.strip()[:target_chars - chars]
             if not chunk:
                 break
-            destination.write(chunk + "\n\n")
+            _write_document(destination, chunk)
             chars += len(chunk)
             docs += 1
             if chars >= target_chars:

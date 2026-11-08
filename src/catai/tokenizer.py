@@ -65,10 +65,19 @@ class CharTokenizer:
     def encode(self, text: str) -> list[int]:
         lookup = {token: i for i, token in enumerate(self.vocabulary)}
         unknown_id = self.unk_token_id
-        unknown = sorted(set(text) - lookup.keys())
-        if unknown and unknown_id is None:
-            raise ValueError(f"unknown characters: {unknown!r}")
-        return [lookup.get(char, unknown_id) for char in text]
+        eos_id = self.eos_token_id
+        parts = text.split(EOS_TOKEN)
+        result: list[int] = []
+        for index, part in enumerate(parts):
+            unknown = sorted(set(part) - lookup.keys())
+            if unknown and unknown_id is None:
+                raise ValueError(f"unknown characters: {unknown!r}")
+            result.extend(lookup.get(char, unknown_id) for char in part)
+            if index < len(parts) - 1:
+                if eos_id is None:
+                    raise ValueError(f"{EOS_TOKEN} is not in this tokenizer vocabulary")
+                result.append(eos_id)
+        return result
 
     def decode(self, tokens: list[int]) -> str:
         if any(token < 0 or token >= self.vocab_size for token in tokens):
@@ -91,6 +100,7 @@ class CharTokenizer:
         vocabulary is never smaller than the fixed base. This preserves the
         ability to invent unseen names while still covering the training data.
         """
+        text = text.replace(EOS_TOKEN, "")
         if not text:
             raise ValueError("training text must not be empty")
         return cls(_fixed_char_vocabulary(extra=text))
@@ -191,15 +201,22 @@ class BPETokenizer:
     def encode(self, text: str) -> list[int]:
         lookup = {token: i for i, token in enumerate(self.vocabulary)}
         unknown_id = self.unk_token_id
-        symbols = self._apply_merges(list(text))
+        eos_id = self.eos_token_id
+        parts = text.split(EOS_TOKEN)
         result: list[int] = []
-        for symbol in symbols:
-            token_id = lookup.get(symbol)
-            if token_id is None:
-                if unknown_id is None:
-                    raise ValueError(f"unknown text pieces: {[symbol]!r}")
-                token_id = unknown_id
-            result.append(token_id)
+        for index, part in enumerate(parts):
+            symbols = self._apply_merges(list(part))
+            for symbol in symbols:
+                token_id = lookup.get(symbol)
+                if token_id is None:
+                    if unknown_id is None:
+                        raise ValueError(f"unknown text pieces: {[symbol]!r}")
+                    token_id = unknown_id
+                result.append(token_id)
+            if index < len(parts) - 1:
+                if eos_id is None:
+                    raise ValueError(f"{EOS_TOKEN} is not in this tokenizer vocabulary")
+                result.append(eos_id)
         return result
 
     def decode(self, tokens: list[int]) -> str:
@@ -224,6 +241,9 @@ class BPETokenizer:
         extra_characters: str = "",
     ) -> "BPETokenizer":
         """Train BPE merges on a sample while optionally retaining corpus characters."""
+        # EOS is a structural token, never ordinary text for BPE learning.
+        text = text.replace(EOS_TOKEN, "")
+        extra_characters = extra_characters.replace(EOS_TOKEN, "")
         if not text:
             raise ValueError("training text must not be empty")
         if vocab_size < 3:

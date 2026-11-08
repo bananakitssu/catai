@@ -205,6 +205,12 @@ def test_sft_cli_restores_the_best_validation_epoch(tmp_path, monkeypatch):
     assert metadata["training"]["best_epoch"] == 2
     assert metadata["training"]["selected_epoch"] == 2
     assert metadata["training"]["best_validation_loss"] == 0.5
+    assert metadata["training"]["validation_examples"] == 2
+    assert metadata["training"]["validation_sampling_ratios"] == {
+        "base": 0.5,
+        "personality": 0.5,
+    }
+    assert metadata["training"]["validation_loss_unit"] == "per_assistant_token"
 
 
 def test_sft_cli_balances_emotion_personality_and_openassistant_data(tmp_path):
@@ -350,7 +356,7 @@ def test_sft_cli_rejects_a_base_checkpoint_below_the_required_training_ratio(tmp
                 "type": "char",
                 "vocabulary": list(tokenizer.vocabulary),
             },
-            "training": {"total_tokens": 1000},
+            "training": {"total_tokens": 1000, "document_eos_version": 1},
         },
     )
 
@@ -359,6 +365,47 @@ def test_sft_cli_rejects_a_base_checkpoint_below_the_required_training_ratio(tmp
     with pytest.raises(ValueError, match="base checkpoint is undertrained"):
         main([
             "--base-checkpoint", str(base_checkpoint),
+            "--dataset", str(tmp_path / "not-needed-before-guard.jsonl"),
+            "--minimum-tokens-per-parameter", "20",
+        ])
+
+
+def test_sft_cli_rejects_a_checkpoint_without_document_boundaries(tmp_path):
+    tokenizer = CharTokenizer.default()
+    model = CatAI(
+        vocab_size=tokenizer.vocab_size,
+        max_seq_len=1024,
+        d_model=16,
+        n_heads=4,
+        n_layers=1,
+    )
+    checkpoint = tmp_path / "legacy-no-document-eos.pt"
+    save_checkpoint(
+        checkpoint,
+        model,
+        torch.optim.AdamW(model.parameters(), lr=1e-3),
+        step=100,
+        metadata={
+            "model": {
+                "max_seq_len": 1024,
+                "d_model": 16,
+                "n_heads": 4,
+                "n_layers": 1,
+                "parameter_count": 1000,
+            },
+            "tokenizer": {
+                "type": "char",
+                "vocabulary": list(tokenizer.vocabulary),
+            },
+            "training": {"total_tokens": 100000, "document_eos_version": 0},
+        },
+    )
+
+    import pytest
+
+    with pytest.raises(ValueError, match="trained without explicit per-document EOS"):
+        main([
+            "--base-checkpoint", str(checkpoint),
             "--dataset", str(tmp_path / "not-needed-before-guard.jsonl"),
             "--minimum-tokens-per-parameter", "20",
         ])
