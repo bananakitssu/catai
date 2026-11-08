@@ -54,9 +54,10 @@ on:
         required: true
         default: false
       training_mode:
-        description: "Full retraining, SFT-only iteration, or emotion-data preparation without training"
+        description: "Run tests only, full retraining, SFT-only iteration, or emotion-data preparation"
         type: choice
         options:
+          - tests_only
           - full
           - sft_only
           - emotions_only
