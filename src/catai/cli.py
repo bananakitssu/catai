@@ -258,6 +258,7 @@ def main(argv: list[str] | None = None) -> int:
     saved_epoch_indices = None
     resume_epoch_loss = 0.0
     resume_epoch_batches = 0
+    elapsed_before_run = 0.0
 
     if args.resume_from:
         saved_metadata = load_checkpoint_metadata(args.resume_from)
@@ -289,6 +290,9 @@ def main(argv: list[str] | None = None) -> int:
         best_epoch = int(resume_state.get("best_epoch", 0))
         stale_epochs = int(resume_state.get("stale_epochs", 0))
         total_tokens = int(resume_state.get("total_tokens", 0))
+        elapsed_before_run = float(resume_state.get("elapsed_training_seconds", 0.0))
+        if elapsed_before_run < 0:
+            raise ValueError("resume sanity check failed: elapsed training time is negative")
         resume_epoch_loss = float(resume_state.get("current_epoch_loss", 0.0))
         resume_epoch_batches = int(resume_state.get("current_epoch_batches", 0))
         rng_state = resume_state.get("torch_rng_state")
@@ -347,6 +351,7 @@ def main(argv: list[str] | None = None) -> int:
             "base_step": base_step,
             "current_epoch_loss": current_epoch_loss,
             "current_epoch_batches": current_epoch_batches,
+            "elapsed_training_seconds": elapsed_before_run + max(time.perf_counter() - started_at, 0.0),
         }
         save_checkpoint(
             args.recovery_checkpoint,
@@ -414,12 +419,13 @@ def main(argv: list[str] | None = None) -> int:
                 )
 
             if completed_batch % progress_interval == 0 or completed_batch == total_batches:
-                elapsed = max(time.perf_counter() - started_at, 1e-9)
+                run_elapsed = max(time.perf_counter() - started_at, 1e-9)
+                elapsed = elapsed_before_run + run_elapsed
                 tokens_per_second = total_tokens / elapsed
                 completed_total = epoch * total_batches + completed_batch
                 total_training_batches = config.epochs * total_batches
                 remaining_batches = max(0, total_training_batches - completed_total)
-                eta_seconds = remaining_batches * elapsed / max(batches_this_run, 1)
+                eta_seconds = remaining_batches * run_elapsed / max(batches_this_run, 1)
                 progress = _progress_bar(completed_total, total_training_batches)
                 percent = 100.0 * completed_total / total_training_batches
                 print(
@@ -511,7 +517,7 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("training completed without producing an epoch loss")
     final_epoch = len(losses)
     final_loss = losses[-1]
-    elapsed = max(time.perf_counter() - started_at, 1e-9)
+    elapsed = elapsed_before_run + max(time.perf_counter() - started_at, 1e-9)
     save_checkpoint(
         args.checkpoint,
         model,
@@ -537,6 +543,7 @@ def main(argv: list[str] | None = None) -> int:
                 "document_eos_version": 1 if document_eos_count >= 2 else 0,
                 "document_eos_count": document_eos_count,
                 "tokens_per_second": total_tokens / elapsed,
+                "elapsed_seconds": elapsed,
             },
         },
     )
