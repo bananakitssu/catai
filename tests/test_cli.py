@@ -1,4 +1,4 @@
-from catai.checkpoint import load_training_metadata
+from catai.checkpoint import load_checkpoint_metadata, load_training_metadata
 from catai.cli import build_parser, main
 
 
@@ -101,6 +101,13 @@ def test_cli_trains_and_writes_checkpoint(tmp_path, capsys):
     assert metadata["epoch"] == 1
     assert metadata["step"] > 0
     assert isinstance(metadata["loss"], float)
+    training = load_checkpoint_metadata(checkpoint)["training"]
+    assert training["elapsed_seconds"] > 0
+    assert training["tokens_per_second"] > 0
+    assert abs(
+        training["tokens_per_second"]
+        - training["total_tokens"] / training["elapsed_seconds"]
+    ) < 1e-6
 
     output = capsys.readouterr().out
     assert "epoch 1/1" in output
