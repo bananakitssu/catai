@@ -308,7 +308,7 @@ def test_sft_cli_balances_emotion_personality_and_openassistant_data(tmp_path):
         "ultrachat": 0.15,
         "gsm8k": 0.05,
     }
-    assert training["emotion_ratio"] == 0.2
+    assert training["emotion_ratio"] == 0.1
     assert training["smol_smoltalk_examples"] == 2
     assert training["smol_smoltalk_ratio"] == 0.1
     assert training["blended_skill_talk_examples"] == 2
