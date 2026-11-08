@@ -64,7 +64,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--resume-from", default=None, help="Resume model, optimizer, and data position from a recovery checkpoint.")
     parser.add_argument("--recovery-checkpoint", default=None, help="Checkpoint updated during training so a later job can resume.")
     parser.add_argument("--checkpoint-every-batches", type=int, default=50, help="Save recovery state every N batches.")
-    parser.add_argument("--max-batches-per-run-fraction", type=float, default=None, help="Stop after this fraction of one epoch, saving a recovery checkpoint for the next job.")
+    parser.add_argument("--max-batches-per-run-fraction", type=float, default=None, help="Stop after this fraction of the full multi-epoch run, saving a recovery checkpoint for the next job.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducible training.")
     parser.add_argument("--device", default=None)
     return parser
@@ -296,14 +296,15 @@ def main(argv: list[str] | None = None) -> int:
     total_batches = (len(train_dataset) + args.batch_size - 1) // args.batch_size
     if total_batches < 1:
         raise ValueError("training dataset produced no batches")
+    total_training_batches = total_batches * config.epochs
     max_batches_this_run = None
     if args.max_batches_per_run_fraction is not None:
         max_batches_this_run = max(
-            1, math.ceil(total_batches * args.max_batches_per_run_fraction)
+            1, math.ceil(total_training_batches * args.max_batches_per_run_fraction)
         )
         print(
             f"This job will process at most {max_batches_this_run:,} batches "
-            f"({args.max_batches_per_run_fraction:.0%} of one epoch).",
+            f"({args.max_batches_per_run_fraction:.0%} of the full training run).",
             flush=True,
         )
 

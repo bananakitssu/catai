@@ -383,7 +383,7 @@ jobs:
           path: data/corpus.txt
           key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
 
-      - name: Train base model (first half)
+      - name: Train base model (quarter 1 of 4)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
