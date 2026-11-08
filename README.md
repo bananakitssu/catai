@@ -29,9 +29,9 @@ python data/generate_corpus.py --sentences 100000 --output data/train.txt
 
 # Build a curated real-text corpus
 python -m pip install -e ".[data]"
-python data/download_corpus.py --output data/corpus.txt --target-chars 100000000 --fineweb-edu-chars 15000000
+python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
 
-# Train a tiny BPE model with a 20M-token budget
+# Train a tiny BPE model with a 200M-token budget
 python -m catai --corpus data/corpus.txt --checkpoint catai.pt --model-size tiny --tokenizer bpe --vocab-size 512 --max-tokens 200000000 --validation-split 0.05
 
 # Generate
@@ -101,6 +101,9 @@ python data/merge_emotion_datasets.py --go-emotions data/go_emotions_emotion.jso
 
 To prepare the classifier data without training CatAI's chat model, run
 **Actions → CI → Run workflow** and select `training_mode: emotions_only`.
+
+To run the repository's compile checks and test suite without starting any
+training or dataset-preparation jobs, select `training_mode: tests_only`.
 
 DailyDialog (CC BY-NC-SA 4.0) and EmpatheticDialogues (CC BY-NC 4.0) converters
 remain available only for experiments with separate permission; neither is
