@@ -176,6 +176,15 @@ def main(argv: list[str] | None = None) -> int:
     ).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
     parameter_count = model.parameter_count()
+    document_eos_count = (
+        int((tokens == tokenizer.eos_token_id).sum().item())
+        if tokenizer.eos_token_id is not None else 0
+    )
+    if args.minimum_tokens_per_parameter > 0 and document_eos_count < 2:
+        raise ValueError(
+            "pretraining corpus is missing explicit per-document <EOS> markers; "
+            "rebuild it with the current corpus downloader and start a fresh full run"
+        )
     planned_training_tokens = len(train_dataset) * args.sequence_length * config.epochs
     tokens_per_parameter = planned_training_tokens / max(parameter_count, 1)
     print(
@@ -525,6 +534,8 @@ def main(argv: list[str] | None = None) -> int:
                 "seed": args.seed,
                 "total_steps": total_steps,
                 "total_tokens": total_tokens,
+                "document_eos_version": 1 if document_eos_count >= 2 else 0,
+                "document_eos_count": document_eos_count,
                 "tokens_per_second": total_tokens / elapsed,
             },
         },

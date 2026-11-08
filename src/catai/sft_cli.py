@@ -12,7 +12,6 @@ import torch
 from torch.utils.data import (
     ConcatDataset,
     DataLoader,
-    Subset,
     WeightedRandomSampler,
     random_split,
 )
@@ -177,6 +176,11 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError(
                 "base checkpoint lacks recorded training.total_tokens or model.parameter_count; "
                 "retrain it with the current CatAI trainer before SFT"
+            )
+        if training_metadata.get("document_eos_version") != 1:
+            raise ValueError(
+                "base checkpoint was trained without explicit per-document EOS boundaries; "
+                "run full pretraining with the current corpus format before SFT"
             )
         achieved_ratio = actual_tokens / parameter_count
         if achieved_ratio < args.minimum_tokens_per_parameter:
@@ -349,6 +353,7 @@ def main(argv: list[str] | None = None) -> int:
     train_parts = []
     validation_parts = []
     weights: list[float] = []
+    validation_weights: list[float] = []
     for source_index, (source_name, source_dataset, source_ratio) in enumerate(source_specs):
         if args.validation_split > 0.0:
             validation_size = max(1, int(len(source_dataset) * args.validation_split))
@@ -363,6 +368,9 @@ def main(argv: list[str] | None = None) -> int:
                 generator=torch.Generator().manual_seed(args.seed + source_index),
             )
             validation_parts.append(validation_part)
+            validation_weights.extend(
+                [source_ratio / len(validation_part)] * len(validation_part)
+            )
         else:
             train_part = source_dataset
         train_parts.append(train_part)
@@ -379,17 +387,21 @@ def main(argv: list[str] | None = None) -> int:
             if len(validation_parts) > 1
             else validation_parts[0]
         )
-        if (
-            args.max_validation_examples is not None
-            and len(validation_dataset) > args.max_validation_examples
-        ):
-            selection = torch.randperm(
-                len(validation_dataset),
-                generator=torch.Generator().manual_seed(args.seed + 1000),
-            )[:args.max_validation_examples].tolist()
-            validation_dataset = Subset(validation_dataset, selection)
+        validation_sample_count = (
+            args.max_validation_examples
+            if args.max_validation_examples is not None
+            else len(validation_dataset)
+        )
+        validation_sampler = WeightedRandomSampler(
+            validation_weights,
+            num_samples=validation_sample_count,
+            replacement=True,
+            generator=torch.Generator().manual_seed(args.seed + 1000),
+        )
         validation_loader = DataLoader(
-            validation_dataset, batch_size=args.batch_size, shuffle=False
+            validation_dataset,
+            batch_size=args.batch_size,
+            sampler=validation_sampler,
         )
 
     use_weighted_sampling = len(source_specs) > 1
@@ -656,6 +668,13 @@ def main(argv: list[str] | None = None) -> int:
                 "train_losses": losses,
                 "validation_losses": validation_losses,
                 "validation_split": args.validation_split,
+                "validation_examples": (
+                    len(validation_loader.sampler) if validation_loader is not None else 0
+                ),
+                "validation_sampling_ratios": (
+                    sampling_ratios if validation_loader is not None else {}
+                ),
+                "validation_loss_unit": "per_assistant_token",
                 "best_validation_loss": best_validation_loss if validation_loader is not None else None,
                 "best_epoch": best_epoch if best_epoch else None,
                 "selected_epoch": selected_epoch,

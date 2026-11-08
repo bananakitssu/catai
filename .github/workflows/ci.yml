@@ -9,7 +9,7 @@ on:
       chat_examples:
         description: "Maximum combined OASST1 + OASST2 chat examples for SFT"
         required: false
-        default: "4500"
+        default: "10000"
       sft_epochs:
         description: "SFT epochs"
         required: false
@@ -35,9 +35,9 @@ on:
         required: true
         default: "1024"
       max_tokens:
-        description: "Base pretraining token budget; default is 20M tokens for tiny"
+        description: "Base pretraining token budget; default is 200M tokens for tiny"
         required: false
-        default: "20000000"
+        default: "200000000"
       model_size:
         description: "Model preset; larger presets require proportionally more tokens"
         type: choice
@@ -106,8 +106,8 @@ jobs:
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           SFT_EPOCHS: ${{ inputs.sft_epochs || '1' }}
-          CHAT_EXAMPLES: ${{ inputs.chat_examples || '4500' }}
-          MAX_TOKENS: ${{ inputs.max_tokens || '20000000' }}
+          CHAT_EXAMPLES: ${{ inputs.chat_examples || '10000' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '200000000' }}
           MODEL_SIZE: ${{ inputs.model_size || 'tiny' }}
           TRAINING_MODE: ${{ inputs.training_mode || 'full' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -331,7 +331,7 @@ jobs:
           key: catai-oasst2-ready-v1
       - name: Merge and balance OASST1 + OASST2
         env:
-          CHAT_EXAMPLES: ${{ inputs.chat_examples || '4500' }}
+          CHAT_EXAMPLES: ${{ inputs.chat_examples || '10000' }}
         run: |
           python data/merge_chat_datasets.py \
             --oasst1 data/oasst1_chat.jsonl \
@@ -375,7 +375,7 @@ jobs:
           key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
-        run: python data/download_corpus.py --output data/corpus.txt --target-chars 100000000 --fineweb-edu-chars 15000000
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
       - name: Save corpus cache
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -388,7 +388,7 @@ jobs:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
           SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
-          MAX_TOKENS: ${{ inputs.max_tokens || '20000000' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '200000000' }}
           MODEL_SIZE: ${{ inputs.model_size || 'tiny' }}
         run: |
           # At 1024 context, reduce batch size to keep the attention activation
@@ -445,7 +445,7 @@ jobs:
           key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
-        run: python data/download_corpus.py --output data/corpus.txt --target-chars 100000000 --fineweb-edu-chars 15000000
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
       - name: Save corpus cache
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -462,7 +462,7 @@ jobs:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
           SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
-          MAX_TOKENS: ${{ inputs.max_tokens || '20000000' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '200000000' }}
           MODEL_SIZE: ${{ inputs.model_size || 'tiny' }}
         run: |
           if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
@@ -518,7 +518,7 @@ jobs:
           key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
-        run: python data/download_corpus.py --output data/corpus.txt --target-chars 100000000 --fineweb-edu-chars 15000000
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
       - name: Save corpus cache
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -535,7 +535,7 @@ jobs:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
           SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
-          MAX_TOKENS: ${{ inputs.max_tokens || '20000000' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '200000000' }}
           MODEL_SIZE: ${{ inputs.model_size || 'tiny' }}
         run: |
           if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
@@ -591,7 +591,7 @@ jobs:
           key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
-        run: python data/download_corpus.py --output data/corpus.txt --target-chars 100000000 --fineweb-edu-chars 15000000
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
       - name: Save corpus cache
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -608,7 +608,7 @@ jobs:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
           SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
-          MAX_TOKENS: ${{ inputs.max_tokens || '20000000' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '200000000' }}
           MODEL_SIZE: ${{ inputs.model_size || 'tiny' }}
         run: |
           if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
@@ -654,7 +654,7 @@ jobs:
           retention-days: 7
 
   emotion_go_emotions:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'emotions_only'
     needs: test
     runs-on: ubuntu-latest
     steps:
@@ -677,7 +677,7 @@ jobs:
           retention-days: 7
 
   emotion_merge:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'emotions_only'
     needs: [emotion_go_emotions]
     runs-on: ubuntu-latest
     steps:
@@ -727,7 +727,7 @@ jobs:
           python data/prepare_extra_sft_datasets.py \
             --source smol-smoltalk \
             --output data/smol_smoltalk_chat.jsonl \
-            --max-examples 1000 \
+            --max-examples 2500 \
             --seed 42
       - name: Upload Smol-SmolTalk examples
         uses: actions/upload-artifact@v4
@@ -753,26 +753,13 @@ jobs:
           python data/prepare_extra_sft_datasets.py \
             --source ultrachat \
             --output data/ultrachat_200k_chat.jsonl \
-            --max-examples 1500 \
+            --max-examples 5000 \
             --seed 42
       - name: Upload UltraChat examples
         uses: actions/upload-artifact@v4
         with:
           name: catai-extra-ultrachat
           path: data/ultrachat_200k_chat.jsonl
-          retention-days: 7
-      - name: Prepare bounded MIT-licensed GSM8K sample
-        run: |
-          python data/prepare_extra_sft_datasets.py \
-            --source gsm8k \
-            --output data/gsm8k_chat.jsonl \
-            --max-examples 1000 \
-            --seed 42
-      - name: Upload GSM8K examples
-        uses: actions/upload-artifact@v4
-        with:
-          name: catai-extra-gsm8k
-          path: data/gsm8k_chat.jsonl
           retention-days: 7
 
   sft:
@@ -783,9 +770,8 @@ jobs:
       github.event_name == 'workflow_dispatch' &&
       needs.test.result == 'success' &&
       (needs.base_training4.result == 'success' || inputs.training_mode == 'sft_only') &&
-      needs.emotion_merge.result == 'success' &&
       needs.extra_sft_data.result == 'success'
-    needs: [test, base_training4, emotion_merge, extra_sft_data]
+    needs: [test, base_training4, extra_sft_data]
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -865,11 +851,6 @@ jobs:
         with:
           name: catai-base-checkpoint
           path: .
-      - name: Download merged emotion dataset
-        uses: actions/download-artifact@v4
-        with:
-          name: catai-emotion-dataset
-          path: data
       - name: Download Smol-SmolTalk examples
         uses: actions/download-artifact@v4
         with:
@@ -884,11 +865,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: catai-extra-ultrachat
-          path: data
-      - name: Download GSM8K examples
-        uses: actions/download-artifact@v4
-        with:
-          name: catai-extra-gsm8k
           path: data
       - name: Restore OASST1 source cache
         id: oasst-cache
@@ -936,7 +912,7 @@ jobs:
           key: catai-oasst2-ready-v1
       - name: Merge and balance OASST1 + OASST2
         env:
-          CHAT_EXAMPLES: ${{ inputs.chat_examples || '4500' }}
+          CHAT_EXAMPLES: ${{ inputs.chat_examples || '10000' }}
         run: |
           python data/merge_chat_datasets.py \
             --oasst1 data/oasst1_chat.jsonl \
@@ -968,11 +944,6 @@ jobs:
           instruction_dataset = ChatSupervisedDataset(
               instruction_examples, tokenizer, sequence_length=sequence_length
           )
-          emotion_examples = load_chat_dataset("data/catai_emotion.jsonl")
-          emotion_sample = emotion_examples[: min(128, len(emotion_examples))]
-          emotion_dataset = ChatSupervisedDataset(
-              emotion_sample, tokenizer, sequence_length=sequence_length
-          )
           smol_examples = load_chat_dataset("data/smol_smoltalk_chat.jsonl")
           smol_dataset = ChatSupervisedDataset(
               smol_examples[: min(128, len(smol_examples))],
@@ -997,10 +968,6 @@ jobs:
               f"{instruction_dataset.compacted_examples:,} compacted, "
               f"{instruction_dataset.skipped_overlength_examples:,} skipped"
           )
-          print(
-              f"Emotion dataset: {len(emotion_examples):,} loaded; "
-              f"preflight checked {len(emotion_dataset):,} examples"
-          )
           PY
       - name: Supervised fine-tuning (SFT, epochs 1–2)
         env:
@@ -1013,18 +980,14 @@ jobs:
             --base-checkpoint catai.pt \
             --dataset data/oasst_chat.jsonl \
             --personality-dataset data/instruction_chat.jsonl \
-            --personality-ratio 0.05 \
-            --emotion-dataset data/catai_emotion.jsonl \
-            --emotion-ratio 0.10 \
+            --personality-ratio 0.03 \
             --smol-smoltalk-dataset data/smol_smoltalk_chat.jsonl \
             --smol-smoltalk-ratio 0.10 \
             --blended-skill-talk-dataset data/blended_skill_talk_chat.jsonl \
             --blended-skill-talk-ratio 0.05 \
             --ultrachat-dataset data/ultrachat_200k_chat.jsonl \
-            --ultrachat-ratio 0.15 \
-            --gsm8k-dataset data/gsm8k_chat.jsonl \
-            --gsm8k-ratio 0.05 \
-            --samples-per-epoch 4000 \
+            --ultrachat-ratio 0.25 \
+            --samples-per-epoch 6000 \
             --max-validation-examples 500 \
             --checkpoint catai-sft.pt \
             --epochs "$SFT_STAGE_EPOCHS" \
@@ -1057,9 +1020,8 @@ jobs:
       needs.test.result == 'success' &&
       needs.sft.result == 'success' &&
       (needs.base_training4.result == 'success' || inputs.training_mode == 'sft_only') &&
-      needs.emotion_merge.result == 'success' &&
       needs.extra_sft_data.result == 'success'
-    needs: [test, base_training4, emotion_merge, extra_sft_data, sft]
+    needs: [test, base_training4, extra_sft_data, sft]
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
@@ -1139,11 +1101,6 @@ jobs:
         with:
           name: catai-base-checkpoint
           path: .
-      - name: Download merged emotion dataset
-        uses: actions/download-artifact@v4
-        with:
-          name: catai-emotion-dataset
-          path: data
       - name: Download SFT recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -1163,11 +1120,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: catai-extra-ultrachat
-          path: data
-      - name: Download GSM8K examples
-        uses: actions/download-artifact@v4
-        with:
-          name: catai-extra-gsm8k
           path: data
       - name: Restore OASST1 source cache
         id: oasst-cache
@@ -1215,7 +1167,7 @@ jobs:
           key: catai-oasst2-ready-v1
       - name: Merge and balance OASST1 + OASST2
         env:
-          CHAT_EXAMPLES: ${{ inputs.chat_examples || '4500' }}
+          CHAT_EXAMPLES: ${{ inputs.chat_examples || '10000' }}
         run: |
           python data/merge_chat_datasets.py \
             --oasst1 data/oasst1_chat.jsonl \
@@ -1247,11 +1199,6 @@ jobs:
           instruction_dataset = ChatSupervisedDataset(
               instruction_examples, tokenizer, sequence_length=sequence_length
           )
-          emotion_examples = load_chat_dataset("data/catai_emotion.jsonl")
-          emotion_sample = emotion_examples[: min(128, len(emotion_examples))]
-          emotion_dataset = ChatSupervisedDataset(
-              emotion_sample, tokenizer, sequence_length=sequence_length
-          )
           smol_examples = load_chat_dataset("data/smol_smoltalk_chat.jsonl")
           smol_dataset = ChatSupervisedDataset(
               smol_examples[: min(128, len(smol_examples))],
@@ -1276,10 +1223,6 @@ jobs:
               f"{instruction_dataset.compacted_examples:,} compacted, "
               f"{instruction_dataset.skipped_overlength_examples:,} skipped"
           )
-          print(
-              f"Emotion dataset: {len(emotion_examples):,} loaded; "
-              f"preflight checked {len(emotion_dataset):,} examples"
-          )
           PY
       - name: Supervised fine-tuning (SFT 2, remaining epochs + evaluation)
         env:
@@ -1290,18 +1233,14 @@ jobs:
             --base-checkpoint catai.pt \
             --dataset data/oasst_chat.jsonl \
             --personality-dataset data/instruction_chat.jsonl \
-            --personality-ratio 0.05 \
-            --emotion-dataset data/catai_emotion.jsonl \
-            --emotion-ratio 0.10 \
+            --personality-ratio 0.03 \
             --smol-smoltalk-dataset data/smol_smoltalk_chat.jsonl \
             --smol-smoltalk-ratio 0.10 \
             --blended-skill-talk-dataset data/blended_skill_talk_chat.jsonl \
             --blended-skill-talk-ratio 0.05 \
             --ultrachat-dataset data/ultrachat_200k_chat.jsonl \
-            --ultrachat-ratio 0.15 \
-            --gsm8k-dataset data/gsm8k_chat.jsonl \
-            --gsm8k-ratio 0.05 \
-            --samples-per-epoch 4000 \
+            --ultrachat-ratio 0.25 \
+            --samples-per-epoch 6000 \
             --max-validation-examples 500 \
             --checkpoint catai-sft.pt \
             --resume-from catai-sft-recovery.pt \

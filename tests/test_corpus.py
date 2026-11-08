@@ -60,3 +60,21 @@ def test_bpe_corpus_vocab_stays_within_the_requested_budget(tmp_path):
     assert tokenizer.vocab_size <= 512
     assert tokenizer.unk_token_id is not None
     assert tokenizer.unk_token_id in tokens.tolist()
+
+
+def test_corpus_loader_preserves_explicit_document_end_tokens(tmp_path):
+    from catai.tokenizer import EOS_TOKEN
+
+    path = tmp_path / "documents.txt"
+    path.write_text("first document" + EOS_TOKEN + "\nsecond document", encoding="utf-8")
+    tokenizer, tokens = tokenizer_and_tokens(
+        path,
+        tokenizer_type="bpe",
+        vocab_size=64,
+        max_tokens=100,
+    )
+
+    eos_id = tokenizer.eos_token_id
+    eos_positions = (tokens == eos_id).nonzero(as_tuple=True)[0].tolist()
+    assert len(eos_positions) == 2  # inter-document EOS and final corpus EOS
+    assert eos_positions[0] == len(tokenizer.encode("first document"))

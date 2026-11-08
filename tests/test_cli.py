@@ -112,8 +112,13 @@ def test_cli_trains_and_writes_checkpoint(tmp_path, capsys):
 def test_cli_rejects_an_underfunded_training_budget_before_training(tmp_path):
     import pytest
 
+    from catai.tokenizer import EOS_TOKEN
+
     corpus = tmp_path / "corpus.txt"
-    corpus.write_text("banana cat " * 200, encoding="utf-8")
+    corpus.write_text(
+        ("banana cat " * 200) + EOS_TOKEN + "\n" + ("dog cat " * 200),
+        encoding="utf-8",
+    )
     checkpoint = tmp_path / "should-not-exist.pt"
 
     with pytest.raises(ValueError, match="training budget is too small"):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from array import array
 from pathlib import Path
 from typing import Protocol
 
@@ -79,6 +80,48 @@ def _encode_prefix(
     return token_ids
 
 
+def _encode_prefix_tensor(
+    tokenizer: Tokenizer,
+    text: str,
+    max_tokens: int | None,
+    *,
+    chunk_chars: int = 65_536,
+) -> torch.Tensor:
+    """Encode in bounded chunks without holding every token as a Python int."""
+    if max_tokens is not None and max_tokens < 1:
+        raise ValueError("max_tokens must be positive when provided")
+
+    token_ids = array("q")
+    start = 0
+    while start < len(text) and (
+        max_tokens is None or len(token_ids) < max_tokens
+    ):
+        end = min(start + chunk_chars, len(text))
+        if end < len(text) and not text[end - 1].isspace():
+            # Do not split a BPE word or the structural <EOS> marker.
+            limit = min(len(text), start + chunk_chars * 2)
+            while end < limit and not text[end - 1].isspace():
+                end += 1
+
+        chunk_ids = tokenizer.encode(text[start:end])
+        if max_tokens is not None:
+            remaining = max_tokens - len(token_ids)
+            token_ids.extend(chunk_ids[:remaining])
+        else:
+            token_ids.extend(chunk_ids)
+        start = end
+
+    if not token_ids:
+        raise ValueError("training corpus must contain at least one token")
+    eos_token_id = tokenizer.eos_token_id
+    if eos_token_id is not None and token_ids[-1] != eos_token_id:
+        token_ids.append(eos_token_id)
+
+    # Store IDs in a contiguous native int64 buffer so PyTorch can view it
+    # directly without first creating a Python list or making a second copy.
+    return torch.frombuffer(token_ids, dtype=torch.int64)
+
+
 def tokenizer_and_tokens(
     path: str | Path,
     *,
@@ -108,10 +151,5 @@ def tokenizer_and_tokens(
     else:
         raise ValueError("tokenizer_type must be 'char' or 'bpe'")
 
-    token_ids = _encode_prefix(tokenizer, text, max_tokens)
-    if not token_ids:
-        raise ValueError("training corpus must contain at least one token")
-    eos_token_id = tokenizer.eos_token_id
-    if eos_token_id is not None and token_ids[-1] != eos_token_id:
-        token_ids.append(eos_token_id)
-    return tokenizer, torch.tensor(token_ids, dtype=torch.long)
+    tokens = _encode_prefix_tensor(tokenizer, text, max_tokens)
+    return tokenizer, tokens

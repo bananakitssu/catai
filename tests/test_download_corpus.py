@@ -80,3 +80,18 @@ def test_redpajama_filter_joins_signals_by_id_with_missing_and_reordered_rows():
     assert stats["seen"] == 3
     assert stats["missing_signals"] == 1
     assert stats["kept"] == 2
+
+
+def test_each_pretraining_document_is_followed_by_an_eos_marker():
+    from io import StringIO
+
+    from data.download_corpus import DOCUMENT_EOS_MARKER, _write_document
+
+    output = StringIO()
+    _write_document(output, "First document text.")
+    _write_document(output, "Second document text.")
+
+    assert output.getvalue() == (
+        "First document text.\n" + DOCUMENT_EOS_MARKER + "\n\n"
+        "Second document text.\n" + DOCUMENT_EOS_MARKER + "\n\n"
+    )

@@ -259,19 +259,23 @@ def evaluate_sft(
     was_training = model.training
     model.eval()
     total_loss = 0.0
-    batches = 0
+    total_targets = 0
     try:
         with torch.no_grad():
             for batch in loader:
                 input_ids = batch["input_ids"].to(device)
                 labels = batch["labels"].to(device)
-                total_loss += float(
-                    supervised_causal_language_model_loss(model(input_ids), labels)
+                target_count = int(labels.ne(IGNORE_INDEX).sum().item())
+                if target_count == 0:
+                    continue
+                batch_loss = supervised_causal_language_model_loss(
+                    model(input_ids), labels
                 )
-                batches += 1
+                total_loss += float(batch_loss) * target_count
+                total_targets += target_count
     finally:
         model.train(was_training)
 
-    if batches == 0:
-        raise ValueError("loader must contain at least one batch")
-    return total_loss / batches
+    if total_targets == 0:
+        raise ValueError("loader must contain at least one trainable assistant target")
+    return total_loss / total_targets

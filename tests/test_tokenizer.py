@@ -110,3 +110,17 @@ def test_bpe_never_exceeds_requested_vocabulary_with_many_unicode_characters():
     assert tokenizer.unk_token_id is not None
     assert tokenizer.unk_token_id not in tokenizer.encode("hello world")
     assert tokenizer.unk_token_id in tokenizer.encode(rare_characters[-1])
+
+
+def test_char_tokenizer_encodes_document_boundaries_as_single_eos_tokens():
+    tokenizer = CharTokenizer.default()
+    encoded = tokenizer.encode("first document" + EOS_TOKEN + "second document")
+    assert encoded.count(tokenizer.eos_token_id) == 1
+    assert tokenizer.decode(encoded) == "first document"
+
+
+def test_bpe_tokenizer_encodes_document_boundaries_as_single_eos_tokens():
+    tokenizer = BPETokenizer.from_text("first document second document", vocab_size=64)
+    encoded = tokenizer.encode("first document" + EOS_TOKEN + "second document")
+    assert encoded.count(tokenizer.eos_token_id) == 1
+    assert tokenizer.decode(encoded) == "first document"

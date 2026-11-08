@@ -8,6 +8,7 @@ from catai.sft import (
     IGNORE_INDEX,
     ChatSupervisedDataset,
     chat_token_stream,
+    evaluate_sft,
     supervised_causal_language_model_loss,
     sft_train_step,
 )
@@ -371,3 +372,34 @@ def test_recursion_instruction_keeps_next_token_labels_aligned():
             else IGNORE_INDEX
         )
         assert sample["labels"][position].item() == expected
+
+
+def test_sft_validation_loss_is_weighted_by_assistant_target_tokens(monkeypatch):
+    from torch import nn
+    from torch.utils.data import DataLoader
+
+    class MarkerModel(nn.Module):
+        def forward(self, input_ids):
+            marker = input_ids[:, 0].float().view(-1, 1, 1)
+            return marker.expand(-1, input_ids.shape[1], 2)
+
+    def fake_loss(logits, labels):
+        return logits[0, 0, 0]
+
+    monkeypatch.setattr(
+        "catai.sft.supervised_causal_language_model_loss",
+        fake_loss,
+    )
+    loader = DataLoader([
+        {
+            "input_ids": torch.tensor([2, 0, 0, 0]),
+            "labels": torch.tensor([1, IGNORE_INDEX, IGNORE_INDEX, IGNORE_INDEX]),
+        },
+        {
+            "input_ids": torch.tensor([4, 0, 0, 0]),
+            "labels": torch.tensor([1, 1, 1, IGNORE_INDEX]),
+        },
+    ], batch_size=1)
+
+    loss = evaluate_sft(MarkerModel(), loader)
+    assert loss == pytest.approx(3.5)
