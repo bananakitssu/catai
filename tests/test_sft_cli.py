@@ -99,6 +99,7 @@ def test_sft_cli_fine_tunes_a_checkpoint(tmp_path):
     assert metadata["training"]["personality_examples"] == 1
     assert metadata["training"]["personality_ratio"] == 0.5
     assert metadata["training"]["total_steps"] == 2
+    assert metadata["training"]["seconds"] > 0
 
 
 

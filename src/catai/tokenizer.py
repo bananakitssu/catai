@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass
 import heapq
 
@@ -93,17 +94,17 @@ class CharTokenizer:
         return "".join(decoded)
 
     @classmethod
-    def from_text(cls, text: str) -> "CharTokenizer":
-        """Build a tokenizer that always includes printable ASCII.
+    def from_characters(cls, characters: Iterable[str]) -> "CharTokenizer":
+        """Build a tokenizer from a bounded set of observed characters."""
+        return cls(_fixed_char_vocabulary(extra="".join(set(characters))))
 
-        Any additional characters present in *text* are also kept so the
-        vocabulary is never smaller than the fixed base. This preserves the
-        ability to invent unseen names while still covering the training data.
-        """
+    @classmethod
+    def from_text(cls, text: str) -> "CharTokenizer":
+        """Build a tokenizer that always includes printable ASCII."""
         text = text.replace(EOS_TOKEN, "")
         if not text:
             raise ValueError("training text must not be empty")
-        return cls(_fixed_char_vocabulary(extra=text))
+        return cls.from_characters(text)
 
     @classmethod
     def default(cls) -> "CharTokenizer":
@@ -238,12 +239,13 @@ class BPETokenizer:
         text: str,
         vocab_size: int = 256,
         *,
-        extra_characters: str = "",
+        extra_characters: str | Iterable[str] = "",
     ) -> "BPETokenizer":
         """Train BPE merges on a sample while optionally retaining corpus characters."""
         # EOS is a structural token, never ordinary text for BPE learning.
         text = text.replace(EOS_TOKEN, "")
-        extra_characters = extra_characters.replace(EOS_TOKEN, "")
+        if isinstance(extra_characters, str):
+            extra_characters = extra_characters.replace(EOS_TOKEN, "")
         if not text:
             raise ValueError("training text must not be empty")
         if vocab_size < 3:

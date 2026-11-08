@@ -80,36 +80,74 @@ def _encode_prefix(
     return token_ids
 
 
-def _encode_prefix_tensor(
+def _read_tokenizer_inputs(
+    path: str | Path,
+    *,
+    encoding: str,
+    sample_chars: int,
+    scan_chunk_chars: int = 1_048_576,
+) -> tuple[str, set[str]]:
+    """Read a small tokenizer sample and collect unique characters by streaming."""
+    if sample_chars < 1:
+        raise ValueError("tokenizer_sample_chars must be positive")
+    if scan_chunk_chars < 1:
+        raise ValueError("scan_chunk_chars must be positive")
+
+    characters: set[str] = set()
+    with Path(path).open("r", encoding=encoding) as source:
+        sample = source.read(sample_chars)
+        if not sample:
+            raise ValueError("training corpus must not be empty")
+        characters.update(sample)
+        while chunk := source.read(scan_chunk_chars):
+            characters.update(chunk)
+    return sample, characters
+
+
+def _encode_prefix_tensor_from_file(
     tokenizer: Tokenizer,
-    text: str,
+    path: str | Path,
     max_tokens: int | None,
     *,
+    encoding: str = "utf-8",
     chunk_chars: int = 65_536,
 ) -> torch.Tensor:
-    """Encode in bounded chunks without holding every token as a Python int."""
+    """Encode a text file in bounded chunks without loading it all into memory."""
     if max_tokens is not None and max_tokens < 1:
         raise ValueError("max_tokens must be positive when provided")
+    if chunk_chars < 1:
+        raise ValueError("chunk_chars must be positive")
 
     token_ids = array("q")
-    start = 0
-    while start < len(text) and (
-        max_tokens is None or len(token_ids) < max_tokens
-    ):
-        end = min(start + chunk_chars, len(text))
-        if end < len(text) and not text[end - 1].isspace():
-            # Do not split a BPE word or the structural <EOS> marker.
-            limit = min(len(text), start + chunk_chars * 2)
-            while end < limit and not text[end - 1].isspace():
-                end += 1
+    if token_ids.itemsize != 8:
+        raise RuntimeError("the platform does not provide an 8-byte signed array type")
 
-        chunk_ids = tokenizer.encode(text[start:end])
-        if max_tokens is not None:
-            remaining = max_tokens - len(token_ids)
-            token_ids.extend(chunk_ids[:remaining])
-        else:
-            token_ids.extend(chunk_ids)
-        start = end
+    with Path(path).open("r", encoding=encoding) as source:
+        while max_tokens is None or len(token_ids) < max_tokens:
+            chunk = source.read(chunk_chars)
+            if not chunk:
+                break
+
+            # BPE merges never cross whitespace. Extend a partial final word
+            # so neither it nor a structural <EOS> marker is split between chunks.
+            if not chunk[-1].isspace():
+                tail: list[str] = []
+                while True:
+                    character = source.read(1)
+                    if not character:
+                        break
+                    tail.append(character)
+                    if character.isspace():
+                        break
+                if tail:
+                    chunk += "".join(tail)
+
+            chunk_ids = tokenizer.encode(chunk)
+            if max_tokens is None:
+                token_ids.extend(chunk_ids)
+            else:
+                remaining = max_tokens - len(token_ids)
+                token_ids.extend(chunk_ids[:remaining])
 
     if not token_ids:
         raise ValueError("training corpus must contain at least one token")
@@ -117,8 +155,8 @@ def _encode_prefix_tensor(
     if eos_token_id is not None and token_ids[-1] != eos_token_id:
         token_ids.append(eos_token_id)
 
-    # Store IDs in a contiguous native int64 buffer so PyTorch can view it
-    # directly without first creating a Python list or making a second copy.
+    # A contiguous native int64 buffer lets PyTorch view the IDs without
+    # first allocating a Python int for every token or making another copy.
     return torch.frombuffer(token_ids, dtype=torch.int64)
 
 
@@ -135,21 +173,26 @@ def tokenizer_and_tokens(
     if tokenizer_sample_chars < 1:
         raise ValueError("tokenizer_sample_chars must be positive")
 
-    text = load_text(path, encoding=encoding)
+    if tokenizer_type not in {"char", "bpe"}:
+        raise ValueError("tokenizer_type must be 'char' or 'bpe'")
+
+    sample, characters = _read_tokenizer_inputs(
+        path,
+        encoding=encoding,
+        sample_chars=tokenizer_sample_chars,
+    )
     if tokenizer_type == "char":
-        tokenizer: Tokenizer = CharTokenizer.from_text(text)
-    elif tokenizer_type == "bpe":
-        # Learn merges from a bounded prefix but pass the full character set
-        # as low-priority candidates. BPETokenizer caps its base alphabet and
-        # maps rare code points to UNK instead of inflating the model vocabulary.
-        sample = text[:tokenizer_sample_chars]
+        tokenizer: Tokenizer = CharTokenizer.from_characters(characters)
+    else:
+        # Learn merges from a bounded prefix while retaining the observed
+        # character set without materializing the entire corpus as one string.
         tokenizer = BPETokenizer.from_text(
             sample,
             vocab_size=vocab_size,
-            extra_characters=text,
+            extra_characters=characters,
         )
-    else:
-        raise ValueError("tokenizer_type must be 'char' or 'bpe'")
 
-    tokens = _encode_prefix_tensor(tokenizer, text, max_tokens)
+    tokens = _encode_prefix_tensor_from_file(
+        tokenizer, path, max_tokens, encoding=encoding
+    )
     return tokenizer, tokens
