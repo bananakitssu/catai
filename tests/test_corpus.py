@@ -78,3 +78,54 @@ def test_corpus_loader_preserves_explicit_document_end_tokens(tmp_path):
     eos_positions = (tokens == eos_id).nonzero(as_tuple=True)[0].tolist()
     assert len(eos_positions) == 2  # inter-document EOS and final corpus EOS
     assert eos_positions[0] == len(tokenizer.encode("first document"))
+
+
+
+def test_streaming_corpus_encoder_matches_whole_text_bpe_encoding(tmp_path):
+    from catai.corpus import _encode_prefix_tensor_from_file
+    from catai.tokenizer import BPETokenizer, EOS_TOKEN
+
+    text = (
+        "A banana is yellow and ripe.\n"
+        + EOS_TOKEN
+        + "\n"
+        + "A second document contains some more ordinary words.\n"
+    )
+    tokenizer = BPETokenizer.from_text(text, vocab_size=64)
+    path = tmp_path / "streamed.txt"
+    path.write_text(text, encoding="utf-8")
+
+    expected = tokenizer.encode(text)
+    if expected[-1] != tokenizer.eos_token_id:
+        expected.append(tokenizer.eos_token_id)
+
+    actual = _encode_prefix_tensor_from_file(
+        tokenizer, path, None, chunk_chars=11
+    )
+    assert actual.tolist() == expected
+
+
+def test_tokenizer_and_tokens_does_not_load_the_entire_corpus(tmp_path, monkeypatch):
+    import catai.corpus as corpus_module
+    from catai.tokenizer import EOS_TOKEN
+
+    path = tmp_path / "streamed-documents.txt"
+    path.write_text(
+        ("A banana is yellow.\n" + EOS_TOKEN + "\n") * 50,
+        encoding="utf-8",
+    )
+
+    def reject_full_text_load(*args, **kwargs):
+        raise AssertionError("tokenizer_and_tokens must stream the corpus")
+
+    monkeypatch.setattr(corpus_module, "load_text", reject_full_text_load)
+    tokenizer, tokens = corpus_module.tokenizer_and_tokens(
+        path,
+        tokenizer_type="bpe",
+        vocab_size=64,
+        max_tokens=100,
+        tokenizer_sample_chars=32,
+    )
+    assert tokenizer.eos_token_id is not None
+    assert 100 <= tokens.numel() <= 101
+    assert tokens[-1].item() == tokenizer.eos_token_id
