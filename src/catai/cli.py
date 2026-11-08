@@ -58,6 +58,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Number of leading corpus characters used to learn BPE merges.",
     )
     parser.add_argument("--max-tokens", type=int, default=None, help="Cap the training token budget.")
+    parser.add_argument("--minimum-tokens-per-parameter", type=float, default=0.0, help="Reject a planned training run below this actual train-token/parameter ratio.")
     parser.add_argument("--validation-split", type=float, default=0.0)
     parser.add_argument("--patience", type=int, default=None, help="Early-stop after this many non-improving validation epochs.")
     parser.add_argument("--resume-from", default=None, help="Resume model, optimizer, and data position from a recovery checkpoint.")
@@ -91,6 +92,8 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--d-model must be divisible by --heads")
     if args.seed < 0:
         raise ValueError("--seed must be non-negative")
+    if args.minimum_tokens_per_parameter < 0:
+        raise ValueError("--minimum-tokens-per-parameter must be non-negative")
     if args.tokenizer == "bpe" and args.vocab_size < 3:
         raise ValueError("--vocab-size must be at least 3")
     if args.tokenizer_sample_chars < 1:
@@ -173,11 +176,24 @@ def main(argv: list[str] | None = None) -> int:
     ).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
     parameter_count = model.parameter_count()
+    planned_training_tokens = len(train_dataset) * args.sequence_length * config.epochs
+    tokens_per_parameter = planned_training_tokens / max(parameter_count, 1)
     print(
-        f"parameters={parameter_count:,} training_tokens={len(tokens):,} "
-        f"tokens_per_parameter={len(tokens) / max(parameter_count, 1):.2f}",
+        f"parameters={parameter_count:,} corpus_tokens={len(tokens):,} "
+        f"planned_training_tokens={planned_training_tokens:,} "
+        f"tokens_per_parameter={tokens_per_parameter:.2f}",
         flush=True,
     )
+    if (
+        args.minimum_tokens_per_parameter > 0
+        and tokens_per_parameter < args.minimum_tokens_per_parameter
+    ):
+        raise ValueError(
+            f"training budget is too small: {planned_training_tokens:,} train tokens "
+            f"for {parameter_count:,} parameters ({tokens_per_parameter:.2f} tokens/parameter); "
+            f"at least {args.minimum_tokens_per_parameter:.2f} are required. "
+            "Increase --max-tokens or choose a smaller model."
+        )
 
     model_metadata = {
         "max_seq_len": args.sequence_length,

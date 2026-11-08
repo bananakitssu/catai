@@ -4,7 +4,9 @@ from data import prepare_extra_sft_datasets as extra_sft_datasets
 from data.prepare_extra_sft_datasets import (
     BLENDED_SKILL_TALK_SHA256,
     convert_blended_skill_talk_row,
+    convert_gsm8k_row,
     convert_smol_smoltalk_row,
+    convert_ultrachat_row,
 )
 
 
@@ -123,3 +125,73 @@ def test_smol_smoltalk_dataset_viewer_request_uses_default_train_split(monkeypat
     }
     assert captured["timeout"] == 60
     assert payload["num_rows_total"] == 460341
+
+
+def test_ultrachat_conversion_preserves_messages_and_mit_provenance():
+    item = convert_ultrachat_row({
+        "prompt_id": "prompt-123",
+        "messages": [
+            {"role": "user", "content": "Explain gravity simply."},
+            {"role": "assistant", "content": "Gravity attracts objects with mass."},
+        ],
+    })
+    assert item is not None
+    assert item["dataset_license"] == "MIT"
+    assert item["dataset_source"] == "ultrachat_200k"
+    assert item["dataset_repository"] == "HuggingFaceH4/ultrachat_200k"
+    assert item["messages"][-1]["content"] == "Gravity attracts objects with mass."
+    assert convert_ultrachat_row({"messages": []}) is None
+
+
+def test_gsm8k_conversion_preserves_published_answer_and_mit_provenance():
+    item = convert_gsm8k_row({
+        "question": "A box has 3 rows of 4 apples. How many apples?",
+        "answer": "3 * 4 = 12.\\n#### 12",
+    })
+    assert item is not None
+    assert item["dataset_license"] == "MIT"
+    assert item["dataset_source"] == "gsm8k"
+    assert item["dataset_repository"] == "openai/gsm8k"
+    assert "3 rows of 4 apples" in item["messages"][0]["content"]
+    assert item["messages"][1]["content"].endswith("#### 12")
+    assert convert_gsm8k_row({"question": "No answer"}) is None
+
+
+def test_dataset_viewer_fetch_uses_the_requested_repository_and_split(monkeypatch):
+    from urllib.parse import parse_qs, urlsplit
+
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def read(self):
+            return json.dumps({
+                "num_rows_total": 10,
+                "partial": False,
+                "rows": [{"row_idx": 0, "row": {"question": "Q", "answer": "A"}}],
+            }).encode("utf-8")
+
+    def fake_urlopen(request, timeout):
+        captured["url"] = request.full_url
+        captured["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr(extra_sft_datasets.urllib.request, "urlopen", fake_urlopen)
+    payload = extra_sft_datasets._fetch_dataset_viewer_page(
+        "openai/gsm8k", "main", "train", 0, 100
+    )
+    query = parse_qs(urlsplit(captured["url"]).query)
+    assert query == {
+        "dataset": ["openai/gsm8k"],
+        "config": ["main"],
+        "split": ["train"],
+        "offset": ["0"],
+        "length": ["100"],
+    }
+    assert captured["timeout"] == 60
+    assert payload["rows"][0]["row"]["question"] == "Q"

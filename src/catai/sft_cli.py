@@ -56,6 +56,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--smol-smoltalk-ratio", type=float, default=0.0, help="Target SFT share from --smol-smoltalk-dataset.")
     parser.add_argument("--blended-skill-talk-dataset", default=None, help="Optional CC-BY-4.0 Blended Skill Talk chat JSONL.")
     parser.add_argument("--blended-skill-talk-ratio", type=float, default=0.0, help="Target SFT share from --blended-skill-talk-dataset.")
+    parser.add_argument("--ultrachat-dataset", default=None, help="Optional MIT-licensed UltraChat 200k sample JSONL.")
+    parser.add_argument("--ultrachat-ratio", type=float, default=0.0, help="Target SFT share from --ultrachat-dataset.")
+    parser.add_argument("--gsm8k-dataset", default=None, help="Optional MIT-licensed GSM8K math instruction JSONL.")
+    parser.add_argument("--gsm8k-ratio", type=float, default=0.0, help="Target SFT share from --gsm8k-dataset.")
+    parser.add_argument("--minimum-tokens-per-parameter", type=float, default=0.0,
+                        help="Reject a base checkpoint below this recorded pretraining token/parameter ratio.")
     parser.add_argument(
         "--samples-per-epoch",
         type=int,
@@ -127,6 +133,8 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--sequence-length must be positive")
     if args.seed < 0:
         raise ValueError("--seed must be non-negative")
+    if args.minimum_tokens_per_parameter < 0:
+        raise ValueError("--minimum-tokens-per-parameter must be non-negative")
     if not 0.0 < args.personality_ratio < 1.0:
         raise ValueError("--personality-ratio must be greater than 0 and less than 1")
     if not 0.0 <= args.emotion_ratio < 1.0:
@@ -138,6 +146,8 @@ def main(argv: list[str] | None = None) -> int:
     for dataset_path, ratio, label in (
         (args.smol_smoltalk_dataset, args.smol_smoltalk_ratio, "smol-smoltalk"),
         (args.blended_skill_talk_dataset, args.blended_skill_talk_ratio, "blended-skill-talk"),
+        (args.ultrachat_dataset, args.ultrachat_ratio, "ultrachat"),
+        (args.gsm8k_dataset, args.gsm8k_ratio, "gsm8k"),
     ):
         if not 0.0 <= ratio < 1.0:
             raise ValueError(f"--{label}-ratio must be in [0, 1)")
@@ -155,6 +165,32 @@ def main(argv: list[str] | None = None) -> int:
     tokenizer_metadata = metadata.get("tokenizer")
     if not isinstance(model_metadata, dict) or not isinstance(tokenizer_metadata, dict):
         raise ValueError("base checkpoint is missing model/tokenizer metadata")
+
+    if args.minimum_tokens_per_parameter > 0:
+        training_metadata = metadata.get("training")
+        actual_tokens = (
+            training_metadata.get("total_tokens")
+            if isinstance(training_metadata, dict) else None
+        )
+        parameter_count = model_metadata.get("parameter_count")
+        if not isinstance(actual_tokens, int) or not isinstance(parameter_count, int) or parameter_count < 1:
+            raise ValueError(
+                "base checkpoint lacks recorded training.total_tokens or model.parameter_count; "
+                "retrain it with the current CatAI trainer before SFT"
+            )
+        achieved_ratio = actual_tokens / parameter_count
+        if achieved_ratio < args.minimum_tokens_per_parameter:
+            raise ValueError(
+                f"base checkpoint is undertrained: {actual_tokens:,} training tokens for "
+                f"{parameter_count:,} parameters ({achieved_ratio:.1f} tokens/parameter); "
+                f"at least {args.minimum_tokens_per_parameter:.1f} are required. "
+                "Run full pretraining and use its new checkpoint instead of reusing this one."
+            )
+        print(
+            f"Base checkpoint pretraining: {actual_tokens:,} tokens, "
+            f"{parameter_count:,} parameters ({achieved_ratio:.1f} tokens/parameter).",
+            flush=True,
+        )
 
     tokenizer = _load_tokenizer(tokenizer_metadata)
     sequence_length = (
@@ -245,11 +281,40 @@ def main(argv: list[str] | None = None) -> int:
             flush=True,
         )
 
+
+    ultrachat_dataset = None
+    ultrachat_examples_count = 0
+    if args.ultrachat_dataset:
+        ultrachat_examples = load_chat_dataset(args.ultrachat_dataset)
+        ultrachat_examples_count = len(ultrachat_examples)
+        ultrachat_dataset = ChatSupervisedDataset(ultrachat_examples, tokenizer, sequence_length)
+        print(
+            f"UltraChat 200k data: {ultrachat_examples_count} loaded, "
+            f"{ultrachat_dataset.compacted_examples} compacted, "
+            f"{ultrachat_dataset.skipped_overlength_examples} skipped",
+            flush=True,
+        )
+
+    gsm8k_dataset = None
+    gsm8k_examples_count = 0
+    if args.gsm8k_dataset:
+        gsm8k_examples = load_chat_dataset(args.gsm8k_dataset)
+        gsm8k_examples_count = len(gsm8k_examples)
+        gsm8k_dataset = ChatSupervisedDataset(gsm8k_examples, tokenizer, sequence_length)
+        print(
+            f"GSM8K data: {gsm8k_examples_count} loaded, "
+            f"{gsm8k_dataset.compacted_examples} compacted, "
+            f"{gsm8k_dataset.skipped_overlength_examples} skipped",
+            flush=True,
+        )
+
     optional_ratio = math.fsum((
         args.personality_ratio if personality_dataset is not None else 0.0,
         args.emotion_ratio if emotion_dataset is not None else 0.0,
         args.smol_smoltalk_ratio if smol_smoltalk_dataset is not None else 0.0,
         args.blended_skill_talk_ratio if blended_skill_talk_dataset is not None else 0.0,
+        args.ultrachat_ratio if ultrachat_dataset is not None else 0.0,
+        args.gsm8k_ratio if gsm8k_dataset is not None else 0.0,
     ))
     if optional_ratio >= 1.0:
         raise ValueError("all optional SFT sampling ratios must add up to less than 1.0")
@@ -268,6 +333,10 @@ def main(argv: list[str] | None = None) -> int:
         source_specs.append(("smol_smoltalk", smol_smoltalk_dataset, args.smol_smoltalk_ratio))
     if blended_skill_talk_dataset is not None:
         source_specs.append(("blended_skill_talk", blended_skill_talk_dataset, args.blended_skill_talk_ratio))
+    if ultrachat_dataset is not None:
+        source_specs.append(("ultrachat", ultrachat_dataset, args.ultrachat_ratio))
+    if gsm8k_dataset is not None:
+        source_specs.append(("gsm8k", gsm8k_dataset, args.gsm8k_ratio))
 
     dataset_sizes = {name: len(source_dataset) for name, source_dataset, _ in source_specs}
     sampling_ratios = {name: ratio for name, _, ratio in source_specs}
@@ -643,6 +712,20 @@ def main(argv: list[str] | None = None) -> int:
                 ),
                 "blended_skill_talk_ratio": (
                     args.blended_skill_talk_ratio if blended_skill_talk_dataset is not None else None
+                ),
+                "ultrachat_examples": ultrachat_examples_count,
+                "ultrachat_training_examples": (
+                    len(ultrachat_dataset) if ultrachat_dataset is not None else 0
+                ),
+                "ultrachat_ratio": (
+                    args.ultrachat_ratio if ultrachat_dataset is not None else None
+                ),
+                "gsm8k_examples": gsm8k_examples_count,
+                "gsm8k_training_examples": (
+                    len(gsm8k_dataset) if gsm8k_dataset is not None else 0
+                ),
+                "gsm8k_ratio": (
+                    args.gsm8k_ratio if gsm8k_dataset is not None else None
                 ),
                 "tokens_per_example": sequence_length,
                 "seconds": elapsed,
