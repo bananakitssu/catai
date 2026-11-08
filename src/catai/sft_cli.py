@@ -431,6 +431,7 @@ def main(argv: list[str] | None = None) -> int:
     resume_epoch_batches = 0
     start_epoch = 0
     resume_batch = 0
+    elapsed_before_run = 0.0
     saved_epoch_indices = None
     saved_next_batch_hash = None
     if args.resume_from:
@@ -467,6 +468,9 @@ def main(argv: list[str] | None = None) -> int:
         best_optimizer_state = resume_state.get("best_optimizer_state")
         stale_epochs = int(resume_state.get("stale_epochs", 0))
         total_steps = int(resume_state.get("total_steps", 0))
+        elapsed_before_run = float(resume_state.get("elapsed_training_seconds", 0.0))
+        if elapsed_before_run < 0:
+            raise ValueError("resume sanity check failed: elapsed training time is negative")
         resume_epoch_loss = float(resume_state.get("current_epoch_loss", 0.0))
         resume_epoch_batches = int(resume_state.get("current_epoch_batches", 0))
         rng_state = resume_state.get("torch_rng_state")
@@ -507,11 +511,13 @@ def main(argv: list[str] | None = None) -> int:
             "best_validation_loss": best_validation_loss,
             "best_epoch": best_epoch,
             "best_model_state": best_model_state,
+            "best_optimizer_state": best_optimizer_state,
             "stale_epochs": stale_epochs,
             "total_steps": total_steps,
             "base_step": base_step,
             "current_epoch_loss": resume_epoch_loss,
             "current_epoch_batches": resume_epoch_batches,
+            "elapsed_training_seconds": elapsed_before_run + max(time.perf_counter() - started_at, 0.0),
             "batch_size": args.batch_size,
             "seed": args.seed,
             "sequence_length": sequence_length,
@@ -646,7 +652,7 @@ def main(argv: list[str] | None = None) -> int:
             flush=True,
         )
 
-    elapsed = max(time.perf_counter() - started_at, 1e-9)
+    elapsed = elapsed_before_run + max(time.perf_counter() - started_at, 1e-9)
     selected_epoch = best_epoch if best_epoch else len(losses)
     selected_loss = losses[selected_epoch - 1]
     sft_model_metadata = dict(model_metadata)
