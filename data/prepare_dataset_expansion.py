@@ -101,8 +101,9 @@ EMOTION_LABELS_6 = ("sadness", "joy", "love", "anger", "fear", "surprise")
 EMOTION_LABELS_7 = ("anger", "fear", "joy", "love", "sadness", "surprise", "neutral")
 ROLE_ALIASES = {
     "human": "user", "prompter": "user", "usr": "user", "user": "user",
-    "gpt": "assistant", "bot": "assistant", "sys": "assistant",
+    "gpt": "assistant", "bot": "assistant", "sys": "system",
     "assistant": "assistant", "cat": "assistant", "anime_girl": "assistant",
+    "seeker": "user", "supporter": "assistant",
     "system": "system",
 }
 
