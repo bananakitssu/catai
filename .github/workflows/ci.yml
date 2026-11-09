@@ -676,6 +676,7 @@ jobs:
         run: |
           python - <<'PY'
           import sys
+          from pathlib import Path
           sys.path.insert(0, "src")
           from catai.chat_dataset import load_chat_dataset
 
@@ -685,6 +686,9 @@ jobs:
               "data/expanded_emotion.jsonl",
           )
           for path in paths:
+              if Path(path).stat().st_size == 0:
+                  print(f"{path}: no usable examples were produced")
+                  continue
               examples = load_chat_dataset(path)
               print(f"{path}: {len(examples):,} valid examples")
           PY
