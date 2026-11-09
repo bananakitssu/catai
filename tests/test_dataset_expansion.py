@@ -65,7 +65,7 @@ def test_dolly_context_is_preserved_as_user_context():
         expansion.CHAT_SOURCES["dolly"],
     )
     assert len(records) == 1
-    assert "Context:\nA short passage." in records[0]["messages"][0]["content"]
+    assert "Context: A short passage." in records[0]["messages"][0]["content"]
     assert records[0]["dataset_license"] == "CC-BY-SA-3.0"
 
 
