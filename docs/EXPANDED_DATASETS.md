@@ -44,7 +44,9 @@ SFT so CatAI does not learn to answer ordinary chat with emotion labels.
 
 Many Emotions is not an independent replacement for the existing GoEmotions
 pipeline. Its release includes GoEmotions-derived rows and other sources,
-including non-commercial DailyDialog data. The preparation code preserves
+including non-commercial DailyDialog data. CatAI samples the publisher's
+10,000-row balanced sample configuration, filters it to English, and excludes
+rows marked as exact-text label conflicts. The preparation code preserves
 per-row provenance and does not move these examples into the default
 commercial-capable training mix.
 
