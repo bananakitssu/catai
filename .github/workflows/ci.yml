@@ -54,13 +54,14 @@ on:
         required: true
         default: false
       training_mode:
-        description: "Run tests only, full retraining, SFT-only iteration, or emotion-data preparation"
+        description: "Run tests, full retraining, SFT-only, emotion-data, or expanded dataset preparation"
         type: choice
         options:
           - tests_only
           - full
           - sft_only
           - emotions_only
+          - datasets_only
         required: true
         default: full
       base_checkpoint_run_id:
@@ -653,6 +654,72 @@ jobs:
           name: catai-base-checkpoint
           path: catai.pt
           retention-days: 7
+
+  dataset_expansion:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'datasets_only'
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install CatAI
+        run: python -m pip install -e .
+      - name: Prepare bounded samples from the expanded Hugging Face shortlist
+        run: |
+          python data/prepare_dataset_expansion.py \
+            --max-examples-per-source 1000 \
+            --seed 42
+      - name: Validate generated chat and emotion records
+        run: |
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, "src")
+          from catai.chat_dataset import load_chat_dataset
+
+          paths = (
+              "data/expanded_chat.jsonl",
+              "data/research_chat.jsonl",
+              "data/expanded_emotion.jsonl",
+          )
+          for path in paths:
+              if Path(path).stat().st_size == 0:
+                  print(f"{path}: no usable examples were produced")
+                  continue
+              examples = load_chat_dataset(path)
+              print(f"{path}: {len(examples):,} valid examples")
+          PY
+      - name: Upload expanded chat datasets
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-expanded-chat-datasets
+          path: data/expanded_chat.jsonl
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload research-only chat datasets
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-research-chat-datasets
+          path: data/research_chat.jsonl
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload expanded emotion datasets
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-expanded-emotion-datasets
+          path: data/expanded_emotion.jsonl
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload dataset manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-expanded-dataset-manifest
+          path: data/expanded_datasets_manifest.json
+          if-no-files-found: error
+          retention-days: 14
 
   emotion_go_emotions:
     if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'emotions_only'

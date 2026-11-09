@@ -49,6 +49,36 @@ source identifiers and the declared license in the generated JSONL records.
 UltraChat was created from model-generated conversations; a declared dataset
 license is not an independent rights audit of every prompt or response.
 
+## Expanded dataset shortlist (optional preparation only)
+
+The `datasets_only` workflow prepares bounded samples from the additional
+Hugging Face sources documented in [EXPANDED_DATASETS.md](EXPANDED_DATASETS.md).
+This preparation track is separate from the default SFT mixture. The terms
+below are the publisher-stated terms or known upstream restrictions, not a
+legal clearance for model distribution.
+
+| Source | Stated terms / provenance | Prepared output |
+|---|---|---|
+| Cat-v2.8 | Apache-2.0 | Expanded chat |
+| catgirl-1m-corpus | Apache-2.0 | Expanded chat |
+| Anime Girl Chat Dataset (English) | CC BY 4.0 | Expanded chat |
+| OpenHermes 2.5 | No top-level license declared; composite of upstream sources | Research chat only |
+| UltraChat 200k | MIT; already used by the default SFT workflow | Expanded chat sample, do not double-count |
+| WizardLM Evol-Instruct V2 | MIT on HF card; mixed upstream provenance | Research chat only pending review |
+| Dolly 15K | CC BY-SA 3.0 | Research chat only pending review |
+| GPT4All Prompt Generations | Apache-2.0 on HF card; preserve source provenance | Expanded chat |
+| EmpatheticDialogues | Original upstream is CC BY-NC 4.0, despite a permissive label on one reformatted mirror | Research chat only |
+| ESCONV for LLM | Apache-2.0 on HF mirror card; upstream terms need review | Research chat only |
+| Emotion | HF card reports `other`, without a clear license grant | Emotion-recognition only |
+| Many Emotions | `other`; combines sources with different terms, including non-commercial data | Emotion-recognition only; preserve row-level provenance |
+| MELD | GPL-3.0 in the source repository; includes *Friends* dialogue | Emotion-recognition research only |
+
+Emotion-label datasets are not merged into general conversational SFT. The
+workflow produces separate approved-chat, research-chat, and emotion
+artifacts, with source and license metadata on every example. A research-only
+label means review is needed before using the data in a model intended for
+distribution; it does not mean the source is automatically unusable.
+
 ## Pretraining sources and important qualifications
 
 | Source | Published terms | Qualification |

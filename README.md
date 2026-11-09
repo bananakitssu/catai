@@ -109,6 +109,31 @@ DailyDialog (CC BY-NC-SA 4.0) and EmpatheticDialogues (CC BY-NC 4.0) converters
 remain available only for experiments with separate permission; neither is
 used in the default workflow because of its non-commercial restrictions.
 
+## Expanded Hugging Face chat and emotion datasets
+
+The optional **`datasets_only`** Actions mode prepares bounded samples from
+13 additional Hugging Face datasets: three catgirl/persona chat datasets,
+general conversation and instruction datasets, and three emotion-recognition
+datasets. It writes separate approved-chat, research-chat, and emotion
+artifacts, plus a source/license manifest.
+
+This is a preparation run, not a training or model-publishing run. It keeps
+emotion-label prediction tasks out of ordinary chat SFT, avoids silently
+mixing datasets with unknown, non-commercial, share-alike, or composite
+upstream terms into the default mixture, and preserves provenance for each
+example. UltraChat is already used by the standard SFT workflow; do not train
+on its expansion artifact at the same time as the existing UltraChat sample.
+
+See [the expanded dataset catalog](docs/EXPANDED_DATASETS.md) for every
+Hugging Face repository, license notes, and the generated artifacts. See
+[Dataset licenses and provenance](docs/DATASET_LICENSES.md) before using
+research-only samples in a model intended for distribution.
+
+To prepare the shortlist, run **Actions → CI → Run workflow** and select
+`training_mode: datasets_only`. The workflow samples up to 1,000 examples per
+source with a deterministic seed and uploads the resulting JSONL files and
+manifest as workflow artifacts. Dataset samples are not committed to Git.
+
 ## Updated base-training data and budget
 
 The Actions workflow defaults to the **tiny** preset (about 0.92M parameters)
