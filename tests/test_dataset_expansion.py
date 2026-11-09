@@ -78,6 +78,7 @@ def test_many_emotions_preserves_per_row_source_and_license():
             "dataset": "go_emotions",
             "license": "apache license 2.0",
             "language": "en",
+            "is_label_conflict": False,
             "source_id": "sample-1",
         },
         expansion.EMOTION_SOURCES["many_emotions"],
@@ -149,3 +150,21 @@ def test_meld_conversion_keeps_dialogue_context_and_label(monkeypatch):
     assert "Alex: Hello there." in anger["messages"][1]["content"]
     assert anger["dataset_license"].startswith("GPL-3.0")
     assert anger["dataset_metadata"]["dialogue_id"] == "1"
+
+
+
+def test_many_emotions_skips_non_english_and_conflicting_rows():
+    spec = expansion.EMOTION_SOURCES["many_emotions"]
+    base = {
+        "text": "I am delighted.",
+        "label": 2,
+        "dataset": "emotion",
+        "license": "educational/research",
+        "is_label_conflict": False,
+    }
+    assert expansion.convert_emotion_row(
+        "many_emotions", {**base, "language": "de"}, spec
+    ) is None
+    assert expansion.convert_emotion_row(
+        "many_emotions", {**base, "language": "en", "is_label_conflict": True}, spec
+    ) is None
