@@ -12,3 +12,9 @@ data/go_emotions_emotion.jsonl
 data/daily_dialog_emotion.jsonl
 data/empathetic_dialogues_emotion.jsonl
 data/catai_emotion.jsonl
+
+# Generated samples from the expanded Hugging Face dataset shortlist
+data/expanded_chat.jsonl
+data/research_chat.jsonl
+data/expanded_emotion.jsonl
+data/expanded_datasets_manifest.json
