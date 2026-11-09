@@ -268,10 +268,11 @@ def test_sampler_skips_one_persistently_rate_limited_page(monkeypatch):
             raise extra_sft_datasets.DatasetViewerRateLimitError(
                 "simulated Hugging Face 429"
             )
+        rows = [] if offset == 0 else [{"row_idx": offset, "row": {"value": offset}}]
         return {
             "num_rows_total": 2000,
             "partial": False,
-            "rows": [{"row_idx": offset, "row": {"value": offset}}],
+            "rows": rows,
         }
 
     monkeypatch.setattr(extra_sft_datasets.time, "sleep", lambda _seconds: None)
