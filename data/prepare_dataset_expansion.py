@@ -88,7 +88,7 @@ EMOTION_SOURCES: dict[str, dict[str, str]] = {
         "license": "other/unspecified on the HF dataset card",
     },
     "many_emotions": {
-        "repository": "ma2za/many_emotions", "config": "all", "split": "full",
+        "repository": "ma2za/many_emotions", "config": "sample", "split": "full",
         "license": "other/mixed; preserve the source-level license field on every row",
     },
     "meld": {
@@ -366,6 +366,12 @@ def convert_emotion_row(source: str, row: dict[str, Any],
             source, spec["repository"], spec["license"], text, [label],
         )
     if source == "many_emotions":
+        # Keep the default language aligned with CatAI's English chat corpus.
+        # The HF sample config also excludes known exact-text label conflicts.
+        if clean_text(row.get("language")).lower() != "en":
+            return None
+        if row.get("is_label_conflict") is True:
+            return None
         label = label_to_string(row.get("label"), EMOTION_LABELS_7)
         if label is None:
             return None
