@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import email.utils
 import hashlib
 import io
 import json
@@ -202,6 +203,32 @@ def convert_gsm8k_row(row: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+DATASET_VIEWER_MAX_ATTEMPTS = 6
+DATASET_VIEWER_PAGE_INTERVAL_SECONDS = 0.75
+DATASET_VIEWER_MAX_CONSECUTIVE_RATE_LIMITED_PAGES = 3
+
+
+class DatasetViewerRateLimitError(RuntimeError):
+    """Raised when the Dataset Viewer keeps returning HTTP 429 for one page."""
+
+
+def _dataset_viewer_retry_delay(retry_after: str | None, attempt: int) -> float:
+    """Return a bounded delay, honoring Retry-After seconds or HTTP-date values."""
+    delay: float | None = None
+    if retry_after:
+        try:
+            delay = float(retry_after)
+        except (TypeError, ValueError):
+            try:
+                retry_at = email.utils.parsedate_to_datetime(retry_after)
+                delay = retry_at.timestamp() - time.time()
+            except (TypeError, ValueError, OverflowError):
+                delay = None
+    if delay is None:
+        delay = min(60.0, float(2 ** (attempt + 1)))
+    return max(1.0, min(120.0, delay))
+
+
 def _fetch_dataset_viewer_page(
     dataset: str, config: str, split: str, offset: int, length: int = 100
 ) -> dict[str, Any]:
@@ -217,28 +244,43 @@ def _fetch_dataset_viewer_page(
     })
     request = urllib.request.Request(
         f"https://datasets-server.huggingface.co/rows?{query}",
-        headers={"User-Agent": "CatAI-SFT-dataset-preparation/1.0"},
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "CatAI-SFT-dataset-preparation/1.0",
+        },
     )
-    for attempt in range(4):
+    last_error: BaseException | None = None
+    for attempt in range(DATASET_VIEWER_MAX_ATTEMPTS):
         try:
             with urllib.request.urlopen(request, timeout=60) as response:
                 payload = json.loads(response.read().decode("utf-8"))
             break
-        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as exc:
-            if attempt == 3:
+        except urllib.error.HTTPError as exc:
+            last_error = exc
+            retryable = exc.code == 429 or 500 <= exc.code < 600
+            if not retryable:
                 raise RuntimeError(
-                    f"Could not fetch {dataset} rows at offset {offset} after 4 attempts"
+                    f"Dataset Viewer returned HTTP {exc.code} for {dataset} at offset {offset}"
                 ) from exc
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            last_error = exc
+        if attempt + 1 < DATASET_VIEWER_MAX_ATTEMPTS:
             retry_after = (
-                exc.headers.get("Retry-After")
-                if isinstance(exc, urllib.error.HTTPError) and exc.headers is not None
+                last_error.headers.get("Retry-After")
+                if isinstance(last_error, urllib.error.HTTPError) and last_error.headers is not None
                 else None
             )
-            try:
-                delay = max(1.0, min(30.0, float(retry_after)))
-            except (TypeError, ValueError):
-                delay = float(2 ** attempt)
-            time.sleep(delay)
+            time.sleep(_dataset_viewer_retry_delay(retry_after, attempt))
+            continue
+        if isinstance(last_error, urllib.error.HTTPError) and last_error.code == 429:
+            raise DatasetViewerRateLimitError(
+                f"Hugging Face rate-limited {dataset} at offset {offset} "
+                f"after {DATASET_VIEWER_MAX_ATTEMPTS} attempts"
+            ) from last_error
+        raise RuntimeError(
+            f"Could not fetch {dataset} rows at offset {offset} "
+            f"after {DATASET_VIEWER_MAX_ATTEMPTS} attempts"
+        ) from last_error
     if not isinstance(payload, dict):
         raise ValueError(f"Dataset Viewer returned an invalid {dataset} response")
     if payload.get("partial") is True:
@@ -263,8 +305,36 @@ def _sample_viewer_rows(
     pages_needed = (limit + 99) // 100
     max_pages = min(len(page_offsets), max(20, pages_needed * 5))
     selected: list[dict[str, Any]] = []
+    last_request_at = time.monotonic()
+    consecutive_rate_limited_pages = 0
     for offset in page_offsets[:max_pages]:
-        payload = first_page if offset == 0 else fetch_page(offset, min(100, total_rows - offset))
+        if offset == 0:
+            payload = first_page
+        else:
+            elapsed = time.monotonic() - last_request_at
+            if elapsed < DATASET_VIEWER_PAGE_INTERVAL_SECONDS:
+                time.sleep(DATASET_VIEWER_PAGE_INTERVAL_SECONDS - elapsed)
+            try:
+                payload = fetch_page(offset, min(100, total_rows - offset))
+            except DatasetViewerRateLimitError as exc:
+                consecutive_rate_limited_pages += 1
+                last_request_at = time.monotonic()
+                print(
+                    f"Warning: skipping {dataset_label} page at offset {offset} "
+                    f"after repeated Hugging Face HTTP 429 responses "
+                    f"({consecutive_rate_limited_pages}/"
+                    f"{DATASET_VIEWER_MAX_CONSECUTIVE_RATE_LIMITED_PAGES}).",
+                    file=sys.stderr,
+                )
+                if consecutive_rate_limited_pages >= DATASET_VIEWER_MAX_CONSECUTIVE_RATE_LIMITED_PAGES:
+                    raise RuntimeError(
+                        f"{dataset_label} Dataset Viewer rate-limited "
+                        f"{consecutive_rate_limited_pages} sampled pages in a row; "
+                        "stopping rather than continuing against a throttled API"
+                    ) from exc
+                continue
+            last_request_at = time.monotonic()
+            consecutive_rate_limited_pages = 0
         if payload.get("partial") is True:
             raise RuntimeError(f"{dataset_label} Dataset Viewer returned a partial page")
         if payload.get("num_rows_total") != total_rows:
