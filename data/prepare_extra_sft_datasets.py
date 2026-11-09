@@ -310,6 +310,7 @@ def _sample_viewer_rows(
     for offset in page_offsets[:max_pages]:
         if offset == 0:
             payload = first_page
+            consecutive_rate_limited_pages = 0
         else:
             elapsed = time.monotonic() - last_request_at
             if elapsed < DATASET_VIEWER_PAGE_INTERVAL_SECONDS:
