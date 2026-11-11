@@ -87,6 +87,49 @@ def test_smol_smoltalk_fetches_bounded_random_dataset_viewer_pages(monkeypatch, 
     assert all(offset >= 0 for offset, _ in calls)
 
 
+def test_smol_smoltalk_retries_dataset_viewer_service_unavailable(monkeypatch):
+    from urllib.error import HTTPError
+
+    sleeps = []
+    attempts = 0
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def read(self):
+            return json.dumps({
+                "num_rows_total": 1,
+                "partial": False,
+                "rows": [],
+            }).encode("utf-8")
+
+    def fake_urlopen(request, timeout):
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise HTTPError(
+                request.full_url,
+                503,
+                "Service Temporarily Unavailable",
+                {},
+                None,
+            )
+        return FakeResponse()
+
+    monkeypatch.setattr(extra_sft_datasets.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(extra_sft_datasets.time, "sleep", sleeps.append)
+
+    payload = extra_sft_datasets._fetch_smol_smoltalk_page(0, 100)
+
+    assert attempts == 3
+    assert sleeps == [2.0, 4.0]
+    assert payload["num_rows_total"] == 1
+
+
 def test_smol_smoltalk_dataset_viewer_request_uses_default_train_split(monkeypatch):
     captured = {}
 

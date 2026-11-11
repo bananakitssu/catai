@@ -394,50 +394,10 @@ def prepare_gsm8k(output: Path, limit: int, seed: int) -> int:
 
 
 def _fetch_smol_smoltalk_page(offset: int, length: int = 100) -> dict[str, Any]:
-    """Fetch one bounded page from the public Hugging Face Dataset Viewer API."""
-    if offset < 0 or not 1 <= length <= 100:
-        raise ValueError("Dataset Viewer offsets must be non-negative and page lengths must be 1..100")
-
-    query = urllib.parse.urlencode({
-        "dataset": SMOL_SMOLTALK_DATASET,
-        "config": "default",
-        "split": "train",
-        "offset": offset,
-        "length": length,
-    })
-    request = urllib.request.Request(
-        f"https://datasets-server.huggingface.co/rows?{query}",
-        headers={"User-Agent": "CatAI-SFT-dataset-preparation/1.0"},
+    """Fetch a bounded Smol-SmolTalk page with shared Dataset Viewer retries."""
+    return _fetch_dataset_viewer_page(
+        SMOL_SMOLTALK_DATASET, "default", "train", offset, length
     )
-
-    for attempt in range(4):
-        try:
-            with urllib.request.urlopen(request, timeout=60) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-            break
-        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as exc:
-            if attempt == 3:
-                raise RuntimeError(
-                    f"Could not fetch Smol-SmolTalk rows at offset {offset} after 4 attempts"
-                ) from exc
-            retry_after = (
-                exc.headers.get("Retry-After")
-                if isinstance(exc, urllib.error.HTTPError) and exc.headers is not None
-                else None
-            )
-            try:
-                delay = max(1.0, min(30.0, float(retry_after)))
-            except (TypeError, ValueError):
-                delay = float(2 ** attempt)
-            time.sleep(delay)
-
-    if not isinstance(payload, dict):
-        raise ValueError("Hugging Face Dataset Viewer returned an invalid rows response")
-    if payload.get("partial") is True:
-        raise RuntimeError(
-            "Hugging Face Dataset Viewer marked Smol-SmolTalk as partial; refusing to sample incomplete data"
-        )
-    return payload
 
 
 def prepare_smol_smoltalk(output: Path, limit: int, seed: int) -> int:
