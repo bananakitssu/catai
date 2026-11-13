@@ -35,7 +35,7 @@ on:
         required: true
         default: "1024"
       max_tokens:
-        description: "Base pretraining token budget; default is 200M tokens for tiny"
+        description: "Base pretraining token budget; default is 200M tokens for small"
         required: false
         default: "200000000"
       model_size:
@@ -385,7 +385,7 @@ jobs:
           path: data/corpus.txt
           key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
 
-      - name: Train base model (part 1 of 8)
+      - name: Train base model (part 1 of 32)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
