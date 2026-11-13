@@ -65,12 +65,14 @@ def test_parser_defaults_are_stable():
     assert args.learning_rate == 3e-4
     assert args.grad_clip == 1.0
     assert args.sequence_length == 1024
-    assert args.d_model == 128
-    assert args.heads == 4
-    assert args.layers == 4
-    assert args.model_size == "tiny"
+    assert args.d_model is None
+    assert args.heads is None
+    assert args.layers is None
+    assert args.model_size == "small"
     assert args.tokenizer == "char"
-    assert args.vocab_size == 256
+    assert args.vocab_size == 2048
+    assert args.warmup_fraction == 0.03
+    assert args.minimum_learning_rate_ratio == 0.1
     assert args.max_tokens is None
     assert args.minimum_tokens_per_parameter == 0.0
     assert args.validation_split == 0.0
@@ -104,6 +106,10 @@ def test_cli_trains_and_writes_checkpoint(tmp_path, capsys):
     training = load_checkpoint_metadata(checkpoint)["training"]
     assert training["elapsed_seconds"] > 0
     assert training["tokens_per_second"] > 0
+    assert 0.0 <= training["unk_token_fraction"] <= 1.0
+    assert training["unk_token_count"] >= 0
+    assert training["warmup_fraction"] == 0.03
+    assert training["minimum_learning_rate_ratio"] == 0.1
     assert abs(
         training["tokens_per_second"]
         - training["total_tokens"] / training["elapsed_seconds"]
