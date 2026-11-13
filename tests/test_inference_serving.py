@@ -358,3 +358,22 @@ def test_runtime_does_not_duplicate_canonical_system_prompt() -> None:
         inference_runtime.DEFAULT_SYSTEM_PROMPT + "\nUse concise answers."
     )
     assert len([message for message in prepared if message["role"] == "system"]) == 1
+
+
+@pytest.mark.parametrize(
+    "role",
+    [
+        "assistant:Gemini",
+        "assistant:Claude",
+        "assistant:ChatGPT",
+        "assistant:Qwen",
+        "assistant:DeepSeek",
+    ],
+)
+def test_runtime_multi_agent_assistant_roles_receive_sft_eos(role: str) -> None:
+    serialized = inference_runtime._serialize_messages([
+        {"role": "user", "content": "Question."},
+        {"role": role, "content": "Answer."},
+    ])
+
+    assert f"<|{role}|>\nAnswer.\n<EOS>" in serialized
