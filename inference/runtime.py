@@ -46,18 +46,30 @@ SUPPORTED_MESSAGE_ROLES = frozenset({
     "user",
     "assistant",
     "file",
+    "moderator",
     "tool_call:assistant",
     "tool_call:result->assistant",
+    "system-1",
     "mcp_tool_call:assistant",
     "mcp_tool_call:result->assistant",
     "error",
     "tool_call:error",
     "mcp_tool_call:error",
+    "assistant:Gemini",
+    "assistant:Claude",
+    "assistant:ChatGPT",
+    "assistant:Qwen",
+    "assistant:DeepSeek",
 })
 ASSISTANT_OUTPUT_ROLES = frozenset({
     "assistant",
     "tool_call:assistant",
     "mcp_tool_call:assistant",
+    "assistant:Gemini",
+    "assistant:Claude",
+    "assistant:ChatGPT",
+    "assistant:Qwen",
+    "assistant:DeepSeek",
 })
 
 
