@@ -63,14 +63,14 @@ not a legal clearance for model distribution.
 
 | Source | Stated terms / provenance | Prepared output |
 |---|---|---|
-| Cat-v2.8 | Apache-2.0 | Approved expanded SFT chat (15% total share) |
-| catgirl-1m-corpus | Apache-2.0 | Approved expanded SFT chat (15% total share) |
-| Anime Girl Chat Dataset (English) | CC BY 4.0 | Approved expanded SFT chat (15% total share) |
+| Cat-v2.8 | Apache-2.0 | Included in the shared 15% expanded-chat SFT pool |
+| catgirl-1m-corpus | Apache-2.0 | Included in the shared 15% expanded-chat SFT pool |
+| Anime Girl Chat Dataset (English) | CC BY 4.0 | Included in the shared 15% expanded-chat SFT pool |
 | OpenHermes 2.5 | No top-level license declared; composite of upstream sources | Research chat only |
 | UltraChat 200k | MIT; already used by the default SFT workflow | Prepared separately; excluded from the expanded SFT artifact to avoid double-counting |
 | WizardLM Evol-Instruct V2 | MIT on HF card; mixed upstream provenance | Research chat only pending review |
 | Dolly 15K | CC BY-SA 3.0 | Research chat only pending review |
-| GPT4All Prompt Generations | Apache-2.0 on HF card; preserve source provenance | Approved expanded SFT chat (15% total share) |
+| GPT4All Prompt Generations | Apache-2.0 on HF card; preserve source provenance | Included in the shared 15% expanded-chat SFT pool |
 | EmpatheticDialogues | Original upstream is CC BY-NC 4.0, despite a permissive label on one reformatted mirror | Research chat only |
 | ESCONV for LLM | Apache-2.0 on HF mirror card; upstream terms need review | Research chat only |
 | Emotion | HF card reports `other`, without a clear license grant | Emotion-recognition only |
