@@ -332,3 +332,29 @@ def test_runtime_message_serialization_matches_sft_eos_format() -> None:
         "<|assistant|>\n"
     )
     assert inference_runtime._serialize_messages(messages) == expected
+
+
+def test_runtime_prepends_canonical_system_prompt_to_custom_system_message() -> None:
+    prepared = inference_runtime._ensure_default_system_message([
+        {"role": "system", "content": "Use concise answers."},
+        {"role": "user", "content": "Hello."},
+    ])
+
+    assert prepared[0] == {
+        "role": "system",
+        "content": inference_runtime.DEFAULT_SYSTEM_PROMPT + "\nUse concise answers.",
+    }
+    assert prepared[1] == {"role": "user", "content": "Hello."}
+
+
+def test_runtime_does_not_duplicate_canonical_system_prompt() -> None:
+    prepared = inference_runtime._ensure_default_system_message([
+        {"role": "system", "content": inference_runtime.DEFAULT_SYSTEM_PROMPT},
+        {"role": "system", "content": "Use concise answers."},
+        {"role": "user", "content": "Hello."},
+    ])
+
+    assert prepared[0]["content"] == (
+        inference_runtime.DEFAULT_SYSTEM_PROMPT + "\nUse concise answers."
+    )
+    assert len([message for message in prepared if message["role"] == "system"]) == 1
