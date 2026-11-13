@@ -49,3 +49,33 @@ def test_training_loop_reduces_loss():
 
     assert len(losses) == 40
     assert losses[-1] < initial_loss
+
+
+def test_cosine_warmup_learning_rate_starts_at_warmup_floor_and_reaches_peak():
+    from catai.training import cosine_warmup_learning_rate
+
+    assert cosine_warmup_learning_rate(
+        1.0, 0, 100, warmup_fraction=0.1, minimum_learning_rate_ratio=0.2
+    ) == 0.1
+    assert cosine_warmup_learning_rate(
+        1.0, 9, 100, warmup_fraction=0.1, minimum_learning_rate_ratio=0.2
+    ) == 1.0
+
+
+def test_cosine_warmup_learning_rate_decays_to_configured_floor():
+    from catai.training import cosine_warmup_learning_rate
+
+    final = cosine_warmup_learning_rate(
+        2e-4, 99, 100, warmup_fraction=0.1, minimum_learning_rate_ratio=0.25
+    )
+    assert abs(final - 5e-5) < 1e-12
+
+
+def test_cosine_warmup_learning_rate_validates_inputs():
+    import pytest
+    from catai.training import cosine_warmup_learning_rate
+
+    with pytest.raises(ValueError):
+        cosine_warmup_learning_rate(1.0, 0, 0)
+    with pytest.raises(ValueError):
+        cosine_warmup_learning_rate(1.0, 0, 10, warmup_fraction=1.0)
