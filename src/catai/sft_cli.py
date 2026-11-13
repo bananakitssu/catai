@@ -57,6 +57,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--blended-skill-talk-ratio", type=float, default=0.0, help="Target SFT share from --blended-skill-talk-dataset.")
     parser.add_argument("--ultrachat-dataset", default=None, help="Optional MIT-licensed UltraChat 200k sample JSONL.")
     parser.add_argument("--ultrachat-ratio", type=float, default=0.0, help="Target SFT share from --ultrachat-dataset.")
+    parser.add_argument("--expanded-chat-dataset", default=None, help="Optional approved expanded chat JSONL, excluding the separately sampled UltraChat records.")
+    parser.add_argument("--expanded-chat-ratio", type=float, default=0.0, help="Target SFT share from --expanded-chat-dataset.")
     parser.add_argument("--gsm8k-dataset", default=None, help="Optional MIT-licensed GSM8K math instruction JSONL.")
     parser.add_argument("--gsm8k-ratio", type=float, default=0.0, help="Target SFT share from --gsm8k-dataset.")
     parser.add_argument("--minimum-tokens-per-parameter", type=float, default=0.0,
@@ -146,6 +148,7 @@ def main(argv: list[str] | None = None) -> int:
         (args.smol_smoltalk_dataset, args.smol_smoltalk_ratio, "smol-smoltalk"),
         (args.blended_skill_talk_dataset, args.blended_skill_talk_ratio, "blended-skill-talk"),
         (args.ultrachat_dataset, args.ultrachat_ratio, "ultrachat"),
+        (args.expanded_chat_dataset, args.expanded_chat_ratio, "expanded-chat"),
         (args.gsm8k_dataset, args.gsm8k_ratio, "gsm8k"),
     ):
         if not 0.0 <= ratio < 1.0:
@@ -299,6 +302,22 @@ def main(argv: list[str] | None = None) -> int:
             flush=True,
         )
 
+
+    expanded_chat_dataset = None
+    expanded_chat_examples_count = 0
+    if args.expanded_chat_dataset:
+        expanded_chat_examples = load_chat_dataset(args.expanded_chat_dataset)
+        expanded_chat_examples_count = len(expanded_chat_examples)
+        expanded_chat_dataset = ChatSupervisedDataset(
+            expanded_chat_examples, tokenizer, sequence_length
+        )
+        print(
+            f"Approved expanded chat data: {expanded_chat_examples_count} loaded, "
+            f"{expanded_chat_dataset.compacted_examples} compacted, "
+            f"{expanded_chat_dataset.skipped_overlength_examples} skipped",
+            flush=True,
+        )
+
     gsm8k_dataset = None
     gsm8k_examples_count = 0
     if args.gsm8k_dataset:
@@ -318,6 +337,7 @@ def main(argv: list[str] | None = None) -> int:
         args.smol_smoltalk_ratio if smol_smoltalk_dataset is not None else 0.0,
         args.blended_skill_talk_ratio if blended_skill_talk_dataset is not None else 0.0,
         args.ultrachat_ratio if ultrachat_dataset is not None else 0.0,
+        args.expanded_chat_ratio if expanded_chat_dataset is not None else 0.0,
         args.gsm8k_ratio if gsm8k_dataset is not None else 0.0,
     ))
     if optional_ratio >= 1.0:
@@ -339,6 +359,8 @@ def main(argv: list[str] | None = None) -> int:
         source_specs.append(("blended_skill_talk", blended_skill_talk_dataset, args.blended_skill_talk_ratio))
     if ultrachat_dataset is not None:
         source_specs.append(("ultrachat", ultrachat_dataset, args.ultrachat_ratio))
+    if expanded_chat_dataset is not None:
+        source_specs.append(("expanded_chat", expanded_chat_dataset, args.expanded_chat_ratio))
     if gsm8k_dataset is not None:
         source_specs.append(("gsm8k", gsm8k_dataset, args.gsm8k_ratio))
 
@@ -737,6 +759,13 @@ def main(argv: list[str] | None = None) -> int:
                 ),
                 "blended_skill_talk_ratio": (
                     args.blended_skill_talk_ratio if blended_skill_talk_dataset is not None else None
+                ),
+                "expanded_chat_examples": expanded_chat_examples_count,
+                "expanded_chat_training_examples": (
+                    len(expanded_chat_dataset) if expanded_chat_dataset is not None else 0
+                ),
+                "expanded_chat_ratio": (
+                    args.expanded_chat_ratio if expanded_chat_dataset is not None else None
                 ),
                 "ultrachat_examples": ultrachat_examples_count,
                 "ultrachat_training_examples": (
