@@ -2756,11 +2756,14 @@ jobs:
 
           paths = (
               "data/expanded_chat.jsonl",
+              "data/expanded_sft_chat.jsonl",
               "data/research_chat.jsonl",
               "data/expanded_emotion.jsonl",
           )
           for path in paths:
               if Path(path).stat().st_size == 0:
+                  if path == "data/expanded_sft_chat.jsonl":
+                      raise SystemExit("No approved expanded chat examples are available for SFT.")
                   print(f"{path}: no usable examples were produced")
                   continue
               examples = load_chat_dataset(path)
