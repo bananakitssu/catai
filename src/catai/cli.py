@@ -21,6 +21,7 @@ from .corpus import tokenizer_and_tokens
 from .dataset import TokenWindowDataset
 from .device import resolve_device
 from .model import CatAI
+from .tokenizer import tokenizer_from_metadata
 from .training import cosine_warmup_learning_rate, evaluate, train_step
 
 
@@ -127,12 +128,23 @@ def main(argv: list[str] | None = None) -> int:
     )
     torch.manual_seed(args.seed)
 
+    resume_metadata = (
+        load_checkpoint_metadata(args.resume_from) if args.resume_from else None
+    )
+    resume_tokenizer = None
+    if resume_metadata is not None:
+        saved_tokenizer_metadata = resume_metadata.get("tokenizer")
+        if not isinstance(saved_tokenizer_metadata, dict):
+            raise ValueError("resume checkpoint is missing tokenizer metadata")
+        resume_tokenizer = tokenizer_from_metadata(saved_tokenizer_metadata)
+
     tokenizer, tokens = tokenizer_and_tokens(
         args.corpus,
         tokenizer_type=args.tokenizer,
         vocab_size=args.vocab_size,
         max_tokens=config.max_tokens,
         tokenizer_sample_chars=args.tokenizer_sample_chars,
+        tokenizer=resume_tokenizer,
     )
     window_stride = (
         args.window_stride if args.window_stride is not None else args.sequence_length
@@ -278,7 +290,8 @@ def main(argv: list[str] | None = None) -> int:
     elapsed_before_run = 0.0
 
     if args.resume_from:
-        saved_metadata = load_checkpoint_metadata(args.resume_from)
+        assert resume_metadata is not None
+        saved_metadata = resume_metadata
         if saved_metadata.get("resume_config") != resume_config:
             raise ValueError(
                 "resume sanity check failed: base-training configuration or dataset size changed"
