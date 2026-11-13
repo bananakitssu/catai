@@ -267,6 +267,7 @@ def test_sft_cli_balances_emotion_personality_and_openassistant_data(tmp_path):
     blended_data = tmp_path / "blended.jsonl"
     ultrachat_data = tmp_path / "ultrachat.jsonl"
     gsm8k_data = tmp_path / "gsm8k.jsonl"
+    expanded_data = tmp_path / "expanded.jsonl"
     write_dataset(base_data, "OpenAssistant")
     write_dataset(personality_data, "CatAI")
     write_dataset(emotion_data, "Emotion")
@@ -274,6 +275,7 @@ def test_sft_cli_balances_emotion_personality_and_openassistant_data(tmp_path):
     write_dataset(blended_data, "Blended Skill Talk")
     write_dataset(ultrachat_data, "UltraChat")
     write_dataset(gsm8k_data, "GSM8K")
+    write_dataset(expanded_data, "Approved expanded chat")
 
     output = tmp_path / "balanced-sft.pt"
     result = main([
@@ -289,6 +291,8 @@ def test_sft_cli_balances_emotion_personality_and_openassistant_data(tmp_path):
         "--blended-skill-talk-ratio", "0.05",
         "--ultrachat-dataset", str(ultrachat_data),
         "--ultrachat-ratio", "0.15",
+        "--expanded-chat-dataset", str(expanded_data),
+        "--expanded-chat-ratio", "0.15",
         "--gsm8k-dataset", str(gsm8k_data),
         "--gsm8k-ratio", "0.05",
         "--samples-per-epoch", "4",
@@ -307,12 +311,13 @@ def test_sft_cli_balances_emotion_personality_and_openassistant_data(tmp_path):
     assert training["personality_examples"] == 2
     assert training["emotion_examples"] == 2
     assert training["sampling_ratios"] == {
-        "base": 0.5,
+        "base": 0.35,
         "emotion": 0.1,
         "personality": 0.05,
         "smol_smoltalk": 0.1,
         "blended_skill_talk": 0.05,
         "ultrachat": 0.15,
+        "expanded_chat": 0.15,
         "gsm8k": 0.05,
     }
     assert training["emotion_ratio"] == 0.1
@@ -323,6 +328,9 @@ def test_sft_cli_balances_emotion_personality_and_openassistant_data(tmp_path):
     assert training["ultrachat_examples"] == 2
     assert training["ultrachat_training_examples"] == 2
     assert training["ultrachat_ratio"] == 0.15
+    assert training["expanded_chat_examples"] == 2
+    assert training["expanded_chat_training_examples"] == 2
+    assert training["expanded_chat_ratio"] == 0.15
     assert training["gsm8k_examples"] == 2
     assert training["gsm8k_training_examples"] == 2
     assert training["gsm8k_ratio"] == 0.05
