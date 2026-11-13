@@ -47,9 +47,9 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Token stride between training windows (default: sequence length; use 1 for fully overlapping windows).",
     )
-    parser.add_argument("--d-model", type=int, default=128)
-    parser.add_argument("--heads", type=int, default=4)
-    parser.add_argument("--layers", type=int, default=4)
+    parser.add_argument("--d-model", type=int, default=None)
+    parser.add_argument("--heads", type=int, default=None)
+    parser.add_argument("--layers", type=int, default=None)
     parser.add_argument("--model-size", choices=tuple(MODEL_PRESETS), default="small", help="Model preset (small is the recommended default).")
     parser.add_argument("--tokenizer", choices=("char", "bpe"), default="char")
     parser.add_argument("--vocab-size", type=int, default=2048, help="Target vocabulary size for BPE.")
@@ -88,10 +88,6 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--sequence-length must be positive")
     if args.window_stride is not None and args.window_stride < 1:
         raise ValueError("--window-stride must be positive")
-    if args.d_model < 1 or args.heads < 1 or args.layers < 1:
-        raise ValueError("model dimensions must be positive")
-    if args.d_model % args.heads != 0:
-        raise ValueError("--d-model must be divisible by --heads")
     if args.seed < 0:
         raise ValueError("--seed must be non-negative")
     if args.minimum_tokens_per_parameter < 0:
@@ -112,14 +108,13 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--max-batches-per-run-fraction must be in (0, 1]")
 
     model_config = ModelConfig.from_preset(args.model_size)
-    if args.model_size != "tiny":
-        d_model, n_heads, n_layers = (
-            model_config.d_model,
-            model_config.n_heads,
-            model_config.n_layers,
-        )
-    else:
-        d_model, n_heads, n_layers = args.d_model, args.heads, args.layers
+    d_model = args.d_model if args.d_model is not None else model_config.d_model
+    n_heads = args.heads if args.heads is not None else model_config.n_heads
+    n_layers = args.layers if args.layers is not None else model_config.n_layers
+    if d_model < 1 or n_heads < 1 or n_layers < 1:
+        raise ValueError("model dimensions must be positive")
+    if d_model % n_heads != 0:
+        raise ValueError("--d-model must be divisible by --heads")
 
     config = TrainingConfig(
         batch_size=args.batch_size,
