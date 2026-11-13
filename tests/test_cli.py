@@ -103,7 +103,9 @@ def test_cli_trains_and_writes_checkpoint(tmp_path, capsys):
     assert metadata["epoch"] == 1
     assert metadata["step"] > 0
     assert isinstance(metadata["loss"], float)
-    training = load_checkpoint_metadata(checkpoint)["training"]
+    checkpoint_metadata = load_checkpoint_metadata(checkpoint)
+    training = checkpoint_metadata["training"]
+    assert checkpoint_metadata["model"]["model_size"] == "custom"
     assert training["elapsed_seconds"] > 0
     assert training["tokens_per_second"] > 0
     assert 0.0 <= training["unk_token_fraction"] <= 1.0
