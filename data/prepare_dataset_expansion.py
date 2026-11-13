@@ -150,6 +150,14 @@ def normalize_messages(raw: object) -> list[dict[str, str]] | None:
         return None
 
 
+def approved_chat_for_sft(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Exclude UltraChat because the standard SFT workflow samples it separately."""
+    return [
+        item for item in records
+        if item.get("dataset_source") != "ultrachat"
+    ]
+
+
 def _chat_record(source: str, messages: list[dict[str, str]], spec: dict[str, str],
                  extra: dict[str, Any] | None = None) -> dict[str, Any]:
     record: dict[str, Any] = {
@@ -509,9 +517,7 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
     # UltraChat is already sampled independently by the regular SFT workflow;
     # keep it in the complete approved artifact, but omit it from this file to
     # avoid giving the same source two separate sampling weights.
-    expanded_sft_chat = [
-        item for item in approved_chat if item.get("dataset_source") != "ultrachat"
-    ]
+    expanded_sft_chat = approved_chat_for_sft(approved_chat)
     counts = {
         "approved_chat": write_jsonl(args.chat_output, approved_chat),
         "approved_chat_for_sft": write_jsonl(args.sft_chat_output, expanded_sft_chat),
