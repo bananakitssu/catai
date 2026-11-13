@@ -61,6 +61,25 @@ ASSISTANT_OUTPUT_ROLES = frozenset({
 })
 
 
+def _ensure_default_system_message(
+    messages: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    """Prepend CatAI's trained state prompt and retain leading custom system text."""
+    remaining = list(messages)
+    supplied_system: list[str] = []
+    while remaining and remaining[0]["role"] == "system":
+        supplied_system.append(remaining.pop(0)["content"])
+
+    system_content = DEFAULT_SYSTEM_PROMPT
+    if supplied_system:
+        if supplied_system[0] == DEFAULT_SYSTEM_PROMPT:
+            supplied_system = supplied_system[1:]
+        if supplied_system:
+            system_content += "\n" + "\n".join(supplied_system)
+
+    return [{"role": "system", "content": system_content}, *remaining]
+
+
 def _serialize_messages(messages: list[dict[str, str]]) -> str:
     """Serialize history exactly like SFT, including assistant EOS targets."""
     parts: list[str] = []
@@ -486,8 +505,7 @@ def generate_stream(
         model_meta = metadata["model"]
         context_length = int(model_meta["max_seq_len"])
         encode, decode, eos = _tokenizer_from_metadata(metadata)
-        if not any(message["role"] == "system" for message in clean_messages):
-            clean_messages.insert(0, {"role": "system", "content": DEFAULT_SYSTEM_PROMPT})
+        clean_messages = _ensure_default_system_message(clean_messages)
         prompt = _serialize_messages(clean_messages)
         input_tokens = encode(prompt)[-context_length:]
         if not input_tokens:
