@@ -15,6 +15,7 @@ rights.
 | Smol-SmolTalk | Apache-2.0 | Yes |
 | Blended Skill Talk | CC BY 4.0 | Yes, with attribution |
 | UltraChat 200k | MIT | Yes |
+| Approved expanded chat | Apache-2.0 / CC BY 4.0 (publisher-stated) | Yes, at 15%; source provenance is retained |
 | GSM8K | MIT | No — optional math-specialist experiment |
 | CatAI personality examples | Authored for CatAI | Yes |
 
@@ -51,24 +52,25 @@ source identifiers and the declared license in the generated JSONL records.
 UltraChat was created from model-generated conversations; a declared dataset
 license is not an independent rights audit of every prompt or response.
 
-## Expanded dataset shortlist (optional preparation only)
+## Expanded dataset shortlist and default SFT inclusion
 
-The `datasets_only` workflow prepares bounded samples from the additional
+The `full` and `sft_only` workflows prepare bounded samples from the additional
 Hugging Face sources documented in [EXPANDED_DATASETS.md](EXPANDED_DATASETS.md).
-This preparation track is separate from the default SFT mixture. The terms
-below are the publisher-stated terms or known upstream restrictions, not a
-legal clearance for model distribution.
+The approved chat sources are included in the default SFT mixture at a 15%
+target share. Research-only and emotion-recognition sources are kept separate.
+The terms below are publisher-stated terms or known upstream restrictions,
+not a legal clearance for model distribution.
 
 | Source | Stated terms / provenance | Prepared output |
 |---|---|---|
-| Cat-v2.8 | Apache-2.0 | Expanded chat |
-| catgirl-1m-corpus | Apache-2.0 | Expanded chat |
-| Anime Girl Chat Dataset (English) | CC BY 4.0 | Expanded chat |
+| Cat-v2.8 | Apache-2.0 | Approved expanded SFT chat (15% total share) |
+| catgirl-1m-corpus | Apache-2.0 | Approved expanded SFT chat (15% total share) |
+| Anime Girl Chat Dataset (English) | CC BY 4.0 | Approved expanded SFT chat (15% total share) |
 | OpenHermes 2.5 | No top-level license declared; composite of upstream sources | Research chat only |
-| UltraChat 200k | MIT; already used by the default SFT workflow | Expanded chat sample, do not double-count |
+| UltraChat 200k | MIT; already used by the default SFT workflow | Prepared separately; excluded from the expanded SFT artifact to avoid double-counting |
 | WizardLM Evol-Instruct V2 | MIT on HF card; mixed upstream provenance | Research chat only pending review |
 | Dolly 15K | CC BY-SA 3.0 | Research chat only pending review |
-| GPT4All Prompt Generations | Apache-2.0 on HF card; preserve source provenance | Expanded chat |
+| GPT4All Prompt Generations | Apache-2.0 on HF card; preserve source provenance | Approved expanded SFT chat (15% total share) |
 | EmpatheticDialogues | Original upstream is CC BY-NC 4.0, despite a permissive label on one reformatted mirror | Research chat only |
 | ESCONV for LLM | Apache-2.0 on HF mirror card; upstream terms need review | Research chat only |
 | Emotion | HF card reports `other`, without a clear license grant | Emotion-recognition only |
