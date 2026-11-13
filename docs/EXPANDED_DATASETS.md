@@ -1,14 +1,12 @@
 # Expanded Hugging Face chat and emotion datasets
 
-CatAI's optional \`datasets_only\` workflow prepares a bounded, reproducible sample
-from the 13 additional Hugging Face datasets selected for the November 2026
-dataset expansion. It writes JSONL artifacts and a manifest; it does not start
-model training or commit downloaded data to Git.
-
-Run **Actions → CI → Run workflow** and select \`training_mode: datasets_only\`.
-The default sample cap is 1,000 examples per source, with seed 42. The manifest
-records prepared counts, publisher-stated terms, source repositories, and any
-source that could not be downloaded or converted.
+CatAI's dataset-expansion job prepares a bounded, reproducible sample from the
+13 additional Hugging Face datasets selected for the November 2026 expansion.
+Normal \`full\` and \`sft_only\` runs prepare this data automatically and train on
+the approved chat subset. The separate \`datasets_only\` mode prepares the full
+shortlist without starting model training. The default sample cap is 1,000
+examples per source, with seed 42. The manifest records prepared counts,
+publisher-stated terms, source repositories, and preparation errors.
 
 ## Catgirl and character-persona chat
 
@@ -52,15 +50,17 @@ commercial-capable training mix.
 
 ## Output artifacts
 
-- \`catai-expanded-chat-datasets\`: chat examples from the sources marked approved.
+- \`catai-expanded-chat-datasets\`: complete approved chat sample for auditing and separate experiments.
+- \`catai-expanded-sft-chat-datasets\`: approved SFT sample with UltraChat omitted because the main SFT workflow samples UltraChat independently.
 - \`catai-research-chat-datasets\`: chat examples whose licenses or provenance
   need review before use in a distributable model.
 - \`catai-expanded-emotion-datasets\`: emotion-recognition prompts, separate from
   general chat.
 - \`catai-expanded-dataset-manifest\`: source-level counts and preparation errors.
 
-The workflow only prepares and validates samples. It does not alter the
-existing default SFT source ratios, publish a checkpoint, or imply that a
-publisher's license label independently clears every underlying work.
+The regular training workflow assigns the SFT-specific expanded-chat sample a
+15% target share. The \`datasets_only\` mode only prepares artifacts and does
+not publish a checkpoint. A publisher's license label does not independently
+clear every underlying work.
 Review \`docs/DATASET_LICENSES.md\` and the current upstream cards before using
 any artifact in a model release.
