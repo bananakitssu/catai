@@ -168,3 +168,16 @@ def test_many_emotions_skips_non_english_and_conflicting_rows():
     assert expansion.convert_emotion_row(
         "many_emotions", {**base, "language": "en", "is_label_conflict": True}, spec
     ) is None
+
+
+def test_sft_expanded_chat_omits_ultrachat_duplicate():
+    records = [
+        {"dataset_source": "cat_v28", "messages": []},
+        {"dataset_source": "ultrachat", "messages": []},
+        {"dataset_source": "gpt4all", "messages": []},
+    ]
+
+    assert [
+        record["dataset_source"]
+        for record in expansion.approved_chat_for_sft(records)
+    ] == ["cat_v28", "gpt4all"]
