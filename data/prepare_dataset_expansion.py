@@ -506,13 +506,21 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
     random.Random(args.seed).shuffle(approved_chat)
     random.Random(args.seed + 1).shuffle(research_chat)
     random.Random(args.seed + 2).shuffle(emotion_examples)
+    # UltraChat is already sampled independently by the regular SFT workflow;
+    # keep it in the complete approved artifact, but omit it from this file to
+    # avoid giving the same source two separate sampling weights.
+    expanded_sft_chat = [
+        item for item in approved_chat if item.get("dataset_source") != "ultrachat"
+    ]
     counts = {
         "approved_chat": write_jsonl(args.chat_output, approved_chat),
+        "approved_chat_for_sft": write_jsonl(args.sft_chat_output, expanded_sft_chat),
         "research_chat": write_jsonl(args.research_chat_output, research_chat),
         "emotion": write_jsonl(args.emotion_output, emotion_examples),
     }
     report["outputs"] = {
-        "chat": str(args.chat_output), "research_chat": str(args.research_chat_output),
+        "chat": str(args.chat_output), "sft_chat": str(args.sft_chat_output),
+        "research_chat": str(args.research_chat_output),
         "emotion": str(args.emotion_output), "counts": counts,
     }
     report["sample_limit_per_source"] = args.max_examples_per_source
@@ -535,6 +543,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-examples-per-source", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--chat-output", type=Path, default=Path("data/expanded_chat.jsonl"))
+    parser.add_argument("--sft-chat-output", type=Path, default=Path("data/expanded_sft_chat.jsonl"))
     parser.add_argument("--research-chat-output", type=Path, default=Path("data/research_chat.jsonl"))
     parser.add_argument("--emotion-output", type=Path, default=Path("data/expanded_emotion.jsonl"))
     parser.add_argument("--manifest-output", type=Path, default=Path("data/expanded_datasets_manifest.json"))
@@ -545,7 +554,8 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--seed must be non-negative")
     report = prepare(args)
     print(
-        f"Prepared {report['outputs']['counts']['approved_chat']:,} approved-chat, "
+        f"Prepared {report['outputs']['counts']['approved_chat']:,} approved-chat "
+        f"({report['outputs']['counts']['approved_chat_for_sft']:,} SFT-eligible), "
         f"{report['outputs']['counts']['research_chat']:,} research-chat, and "
         f"{report['outputs']['counts']['emotion']:,} emotion examples."
     )
