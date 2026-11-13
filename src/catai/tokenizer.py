@@ -313,3 +313,31 @@ class BPETokenizer:
             merges.append(best)
 
         return cls(tuple(sorted(vocabulary)) + (UNK_TOKEN, EOS_TOKEN), tuple(merges))
+
+
+def tokenizer_from_metadata(metadata: dict) -> CharTokenizer | BPETokenizer:
+    """Reconstruct the exact tokenizer saved in a CatAI checkpoint."""
+    tokenizer_type = metadata.get("type")
+    vocabulary = metadata.get("vocabulary")
+    if not isinstance(vocabulary, list) or not all(
+        isinstance(token, str) for token in vocabulary
+    ):
+        raise ValueError("checkpoint has invalid tokenizer vocabulary")
+
+    if tokenizer_type == "char":
+        return CharTokenizer(tuple(vocabulary))
+    if tokenizer_type == "bpe":
+        merges = metadata.get("merges", [])
+        if not isinstance(merges, list):
+            raise ValueError("checkpoint has invalid BPE merge metadata")
+        normalized_merges: list[tuple[str, str]] = []
+        for pair in merges:
+            if (
+                not isinstance(pair, (list, tuple))
+                or len(pair) != 2
+                or not all(isinstance(token, str) for token in pair)
+            ):
+                raise ValueError("checkpoint has invalid BPE merge metadata")
+            normalized_merges.append((pair[0], pair[1]))
+        return BPETokenizer(tuple(vocabulary), tuple(normalized_merges))
+    raise ValueError("checkpoint has unsupported tokenizer metadata")
