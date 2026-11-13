@@ -7,8 +7,8 @@ from dataclasses import dataclass
 
 # (d_model, n_heads, n_layers)
 MODEL_PRESETS: dict[str, tuple[int, int, int]] = {
-    "tiny": (128, 4, 4),       # ~0.8–1M params (depends on vocab)
-    "small": (256, 8, 8),      # a few million
+    "tiny": (128, 4, 4),       # ~1.1M params with the default 2,048-token BPE vocabulary
+    "small": (256, 8, 8),      # ~7.0M params with the default 2,048-token BPE vocabulary
     "base": (512, 8, 12),      # tens of millions
     "medium": (768, 12, 16),   # larger experimental size
 }
