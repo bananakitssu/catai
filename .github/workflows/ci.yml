@@ -39,13 +39,11 @@ on:
         required: false
         default: "200000000"
       model_size:
-        description: "Recommended default: small. Medium needs a much larger token budget."
+        description: "Hosted CI supports tiny/small. Use the CLI with suitable hardware for base/medium."
         type: choice
         options:
           - tiny
           - small
-          - base
-          - medium
         required: true
         default: small
       publish_model:
@@ -132,10 +130,10 @@ jobs:
           positive_int("CHAT_EXAMPLES", 50000)
           if os.environ["TRAINING_MODE"] == "full":
               max_tokens = positive_int("MAX_TOKENS", 2500000000)
-              parameter_counts = {"tiny": 1115264, "small": 6951168, "base": 39596544, "medium": 114844416}
+              parameter_counts = {"tiny": 1115264, "small": 6951168}
               model_size = os.environ["MODEL_SIZE"]
               if model_size not in parameter_counts:
-                  raise SystemExit("MODEL_SIZE must be tiny, small, base, or medium")
+                  raise SystemExit("Hosted CI supports only the tiny and small presets.")
               tokens_per_parameter = max_tokens / parameter_counts[model_size]
               if tokens_per_parameter < 21.1:
                   raise SystemExit(
