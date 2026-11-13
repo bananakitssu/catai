@@ -18,11 +18,13 @@ rights.
 | GSM8K | MIT | No — optional math-specialist experiment |
 | CatAI personality examples | Authored for CatAI | Yes |
 
-The default general conversational SFT mixture uses OpenAssistant (57%),
-UltraChat 200k (25%), Smol-SmolTalk (10%), Blended Skill Talk (5%), and
-CatAI-authored personality examples (3%). Its validation sample follows those
-same source ratios, and the reported loss is weighted by supervised
-assistant-token count.
+The default general conversational SFT mixture uses OpenAssistant (42%),
+UltraChat 200k (25%), Smol-SmolTalk (10%), Blended Skill Talk (5%), approved
+expanded chat (15%), and CatAI-authored personality examples (3%). The
+expanded chat sample includes Cat-v2.8, catgirl-1m-corpus, Anime Girl Chat,
+and GPT4All Prompt Generations; UltraChat is excluded from that artifact to
+avoid duplicate sampling. Its validation sample follows the same source
+ratios, and reported loss is weighted by supervised assistant-token count.
 
 GoEmotions (Apache-2.0) is reserved for a separate emotion-classification
 experiment and is not mixed into general chat SFT. GSM8K (MIT) remains an
