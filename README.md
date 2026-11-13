@@ -124,7 +124,7 @@ To prepare the complete shortlist without training, run **Actions → CI → Run
 
 ## Updated base-training data and budget
 
-The Actions workflow defaults to the **small** preset (6,951,168 parameters), a 2,048-token BPE vocabulary, and a 200M-token pretraining cap. After the 5% validation split, that is about 27.3 training tokens per parameter. Base training uses 3% linear warmup followed by cosine decay to 10% of the peak learning rate. The small preset is split across 32 resumable Actions jobs so each job stays comfortably below the six-hour runner limit. The trainer checks the actual model
+The Actions workflow defaults to the **small** preset (6,951,168 parameters), a 2,048-token BPE vocabulary, and a 200M-token pretraining cap. After the 5% validation split, that is about 27.3 training tokens per parameter. Base training uses 3% linear warmup followed by cosine decay to 10% of the peak learning rate. The small preset is split across 32 resumable Actions jobs to reduce the risk of a six-hour per-job timeout. The trainer checks the actual model
 vocabulary, parameter count, train split, and presence of document EOS markers
 before starting; SFT checks the recorded training metadata again. A rough
 20-token compute-optimal reference target:
