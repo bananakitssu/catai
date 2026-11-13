@@ -124,3 +124,34 @@ def test_bpe_tokenizer_encodes_document_boundaries_as_single_eos_tokens():
     encoded = tokenizer.encode("first document" + EOS_TOKEN + "second document")
     assert encoded.count(tokenizer.eos_token_id) == 1
     assert tokenizer.decode(encoded) == "first document"
+
+
+def test_tokenizer_from_checkpoint_metadata_round_trips_char_and_bpe():
+    from catai.tokenizer import tokenizer_from_metadata
+
+    char_tokenizer = CharTokenizer.default()
+    restored_char = tokenizer_from_metadata({
+        "type": "char",
+        "vocabulary": list(char_tokenizer.vocabulary),
+    })
+    assert restored_char == char_tokenizer
+
+    bpe_tokenizer = BPETokenizer.from_text("the cat learns words about language", vocab_size=32)
+    restored_bpe = tokenizer_from_metadata({
+        "type": "bpe",
+        "vocabulary": list(bpe_tokenizer.vocabulary),
+        "merges": [list(pair) for pair in bpe_tokenizer.merges],
+    })
+    assert restored_bpe == bpe_tokenizer
+
+
+def test_tokenizer_from_checkpoint_metadata_rejects_invalid_merges():
+    import pytest
+    from catai.tokenizer import tokenizer_from_metadata
+
+    with pytest.raises(ValueError, match="BPE merge metadata"):
+        tokenizer_from_metadata({
+            "type": "bpe",
+            "vocabulary": ["a", "b", "<UNK>", "<EOS>"],
+            "merges": [["a", "b", "extra"]],
+        })
