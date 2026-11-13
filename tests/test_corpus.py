@@ -153,4 +153,5 @@ def test_corpus_loader_reuses_checkpoint_tokenizer_without_relearning(tmp_path, 
     )
 
     assert loaded_tokenizer == tokenizer
-    assert tokenizer.decode(tokens.tolist()) == text
+    assert tokenizer.decode(tokens.tolist()) == text.removesuffix(EOS_TOKEN)
+    assert tokens[-1].item() == tokenizer.eos_token_id
