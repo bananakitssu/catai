@@ -212,12 +212,19 @@ def main(argv: list[str] | None = None) -> int:
             "Increase --max-tokens or choose a smaller model."
         )
 
+    selected_preset = ModelConfig.from_preset(args.model_size)
+    model_size_label = (
+        args.model_size
+        if (d_model, n_heads, n_layers)
+        == (selected_preset.d_model, selected_preset.n_heads, selected_preset.n_layers)
+        else "custom"
+    )
     model_metadata = {
         "max_seq_len": args.sequence_length,
         "d_model": d_model,
         "n_heads": n_heads,
         "n_layers": n_layers,
-        "model_size": args.model_size,
+        "model_size": model_size_label,
         "parameter_count": parameter_count,
     }
     tokenizer_metadata = {
