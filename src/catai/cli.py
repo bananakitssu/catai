@@ -21,7 +21,8 @@ from .corpus import tokenizer_and_tokens
 from .dataset import TokenWindowDataset
 from .device import resolve_device
 from .model import CatAI
-from .training import evaluate, train_step
+from .tokenizer import tokenizer_from_metadata
+from .training import cosine_warmup_learning_rate, evaluate, train_step
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -32,6 +33,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--learning-rate", type=float, default=3e-4)
+    parser.add_argument("--warmup-fraction", type=float, default=0.03, help="Fraction of optimizer steps used for linear learning-rate warmup.")
+    parser.add_argument("--minimum-learning-rate-ratio", type=float, default=0.1, help="Cosine-decay floor as a fraction of the peak learning rate.")
     parser.add_argument("--grad-clip", type=float, default=1.0)
     parser.add_argument(
         "--sequence-length",
@@ -45,12 +48,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Token stride between training windows (default: sequence length; use 1 for fully overlapping windows).",
     )
-    parser.add_argument("--d-model", type=int, default=128)
-    parser.add_argument("--heads", type=int, default=4)
-    parser.add_argument("--layers", type=int, default=4)
-    parser.add_argument("--model-size", choices=tuple(MODEL_PRESETS), default="tiny", help="Use a larger model preset.")
+    parser.add_argument("--d-model", type=int, default=None)
+    parser.add_argument("--heads", type=int, default=None)
+    parser.add_argument("--layers", type=int, default=None)
+    parser.add_argument("--model-size", choices=tuple(MODEL_PRESETS), default="small", help="Model preset (small is the recommended default).")
     parser.add_argument("--tokenizer", choices=("char", "bpe"), default="char")
-    parser.add_argument("--vocab-size", type=int, default=256, help="Target vocabulary size for BPE.")
+    parser.add_argument("--vocab-size", type=int, default=2048, help="Target vocabulary size for BPE.")
     parser.add_argument(
         "--tokenizer-sample-chars",
         type=int,
@@ -86,14 +89,14 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--sequence-length must be positive")
     if args.window_stride is not None and args.window_stride < 1:
         raise ValueError("--window-stride must be positive")
-    if args.d_model < 1 or args.heads < 1 or args.layers < 1:
-        raise ValueError("model dimensions must be positive")
-    if args.d_model % args.heads != 0:
-        raise ValueError("--d-model must be divisible by --heads")
     if args.seed < 0:
         raise ValueError("--seed must be non-negative")
     if args.minimum_tokens_per_parameter < 0:
         raise ValueError("--minimum-tokens-per-parameter must be non-negative")
+    if not 0.0 <= args.warmup_fraction < 1.0:
+        raise ValueError("--warmup-fraction must be in [0, 1)")
+    if not 0.0 <= args.minimum_learning_rate_ratio <= 1.0:
+        raise ValueError("--minimum-learning-rate-ratio must be in [0, 1]")
     if args.tokenizer == "bpe" and args.vocab_size < 3:
         raise ValueError("--vocab-size must be at least 3")
     if args.tokenizer_sample_chars < 1:
@@ -106,14 +109,13 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--max-batches-per-run-fraction must be in (0, 1]")
 
     model_config = ModelConfig.from_preset(args.model_size)
-    if args.model_size != "tiny":
-        d_model, n_heads, n_layers = (
-            model_config.d_model,
-            model_config.n_heads,
-            model_config.n_layers,
-        )
-    else:
-        d_model, n_heads, n_layers = args.d_model, args.heads, args.layers
+    d_model = args.d_model if args.d_model is not None else model_config.d_model
+    n_heads = args.heads if args.heads is not None else model_config.n_heads
+    n_layers = args.layers if args.layers is not None else model_config.n_layers
+    if d_model < 1 or n_heads < 1 or n_layers < 1:
+        raise ValueError("model dimensions must be positive")
+    if d_model % n_heads != 0:
+        raise ValueError("--d-model must be divisible by --heads")
 
     config = TrainingConfig(
         batch_size=args.batch_size,
@@ -126,19 +128,37 @@ def main(argv: list[str] | None = None) -> int:
     )
     torch.manual_seed(args.seed)
 
+    resume_metadata = (
+        load_checkpoint_metadata(args.resume_from) if args.resume_from else None
+    )
+    resume_tokenizer = None
+    if resume_metadata is not None:
+        saved_tokenizer_metadata = resume_metadata.get("tokenizer")
+        if not isinstance(saved_tokenizer_metadata, dict):
+            raise ValueError("resume checkpoint is missing tokenizer metadata")
+        resume_tokenizer = tokenizer_from_metadata(saved_tokenizer_metadata)
+
     tokenizer, tokens = tokenizer_and_tokens(
         args.corpus,
         tokenizer_type=args.tokenizer,
         vocab_size=args.vocab_size,
         max_tokens=config.max_tokens,
         tokenizer_sample_chars=args.tokenizer_sample_chars,
+        tokenizer=resume_tokenizer,
     )
     window_stride = (
         args.window_stride if args.window_stride is not None else args.sequence_length
     )
+    unk_token_id = getattr(tokenizer, "unk_token_id", None)
+    unk_token_count = (
+        int((tokens == unk_token_id).sum().item())
+        if unk_token_id is not None else 0
+    )
+    unk_token_fraction = unk_token_count / max(len(tokens), 1)
     print(
         f"tokenizer={args.tokenizer} vocab_size={tokenizer.vocab_size} "
-        f"encoded_tokens={len(tokens):,} sequence_length={args.sequence_length}",
+        f"encoded_tokens={len(tokens):,} sequence_length={args.sequence_length} "
+        f"unk_tokens={unk_token_count:,} unk_fraction={unk_token_fraction:.4%}",
         flush=True,
     )
     dataset = TokenWindowDataset(
@@ -204,12 +224,19 @@ def main(argv: list[str] | None = None) -> int:
             "Increase --max-tokens or choose a smaller model."
         )
 
+    selected_preset = ModelConfig.from_preset(args.model_size)
+    model_size_label = (
+        args.model_size
+        if (d_model, n_heads, n_layers)
+        == (selected_preset.d_model, selected_preset.n_heads, selected_preset.n_layers)
+        else "custom"
+    )
     model_metadata = {
         "max_seq_len": args.sequence_length,
         "d_model": d_model,
         "n_heads": n_heads,
         "n_layers": n_layers,
-        "model_size": args.model_size,
+        "model_size": model_size_label,
         "parameter_count": parameter_count,
     }
     tokenizer_metadata = {
@@ -228,6 +255,8 @@ def main(argv: list[str] | None = None) -> int:
         "epochs": config.epochs,
         "batch_size": config.batch_size,
         "learning_rate": config.learning_rate,
+        "warmup_fraction": args.warmup_fraction,
+        "minimum_learning_rate_ratio": args.minimum_learning_rate_ratio,
         "grad_clip": config.grad_clip,
         "sequence_length": args.sequence_length,
         "window_stride": window_stride,
@@ -261,7 +290,8 @@ def main(argv: list[str] | None = None) -> int:
     elapsed_before_run = 0.0
 
     if args.resume_from:
-        saved_metadata = load_checkpoint_metadata(args.resume_from)
+        assert resume_metadata is not None
+        saved_metadata = resume_metadata
         if saved_metadata.get("resume_config") != resume_config:
             raise ValueError(
                 "resume sanity check failed: base-training configuration or dataset size changed"
@@ -317,9 +347,16 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(
             f"This job will process at most {max_batches_this_run:,} batches "
-            f"({args.max_batches_per_run_fraction:.0%} of the full training run).",
+            f"({args.max_batches_per_run_fraction:.3%} of the full training run).",
             flush=True,
         )
+    warmup_steps = max(1, int(total_training_batches * args.warmup_fraction)) if args.warmup_fraction else 0
+    print(
+        f"learning_rate_schedule=linear_warmup_cosine_decay "
+        f"peak={args.learning_rate:.8g} warmup_steps={warmup_steps:,} "
+        f"minimum_ratio={args.minimum_learning_rate_ratio:.3f}",
+        flush=True,
+    )
 
     progress_interval = max(1, total_batches // 10)
     started_at = time.perf_counter()
@@ -400,6 +437,15 @@ def main(argv: list[str] | None = None) -> int:
         for batch_offset in range(first_batch, len(batches_for_epoch)):
             indices = batches_for_epoch[batch_offset]
             batch = torch.stack([train_dataset[index] for index in indices]).to(device)
+            scheduled_lr = cosine_warmup_learning_rate(
+                args.learning_rate,
+                total_steps,
+                total_training_batches,
+                warmup_fraction=args.warmup_fraction,
+                minimum_learning_rate_ratio=args.minimum_learning_rate_ratio,
+            )
+            for parameter_group in optimizer.param_groups:
+                parameter_group["lr"] = scheduled_lr
             epoch_loss += train_step(
                 model, optimizer, batch, grad_clip=config.grad_clip
             )
@@ -542,6 +588,13 @@ def main(argv: list[str] | None = None) -> int:
                 "total_tokens": total_tokens,
                 "document_eos_version": 1 if document_eos_count >= 2 else 0,
                 "document_eos_count": document_eos_count,
+                "encoded_token_count": len(tokens),
+                "unk_token_count": unk_token_count,
+                "unk_token_fraction": unk_token_fraction,
+                "peak_learning_rate": args.learning_rate,
+                "warmup_fraction": args.warmup_fraction,
+                "minimum_learning_rate_ratio": args.minimum_learning_rate_ratio,
+                "warmup_steps": warmup_steps,
                 "tokens_per_second": total_tokens / elapsed,
                 "elapsed_seconds": elapsed,
             },

@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from catai.checkpoint import save_checkpoint
 from catai.model import CatAI
-from catai.tokenizer import CharTokenizer
+from catai.tokenizer import BPETokenizer, CharTokenizer, EOS_TOKEN
 from export_inference import export_checkpoint
 import runtime as inference_runtime
 import pytest
@@ -250,3 +250,130 @@ def test_generate_stream_accepts_native_tool_and_mcp_roles(
 
     assert "".join(event["text"] for event in events if event["event"] == "delta") == "ok"
     assert events[-1]["event"] == "done"
+
+
+def test_numpy_bpe_tokenizer_matches_training_tokenizer_including_eos() -> None:
+    tokenizer = BPETokenizer.from_text(
+        "The curious cat learns useful words. A small model studies language.",
+        vocab_size=64,
+    )
+    metadata = {
+        "tokenizer": {
+            "type": "bpe",
+            "vocabulary": list(tokenizer.vocabulary),
+            "merges": [list(pair) for pair in tokenizer.merges],
+        }
+    }
+    encode, decode, eos = inference_runtime._tokenizer_from_metadata(metadata)
+    source = "The curious cat." + EOS_TOKEN + "A small model."
+    expected = tokenizer.encode(source)
+
+    assert encode(source) == expected
+    assert eos == tokenizer.eos_token_id
+    assert decode(expected) == tokenizer.decode(expected)
+
+
+def test_numpy_forward_matches_pytorch_reference_with_bpe() -> None:
+    torch.manual_seed(8)
+    tokenizer = BPETokenizer.from_text(
+        "The cat learns language. Programming uses variables and functions.",
+        vocab_size=64,
+    )
+    model = CatAI(
+        vocab_size=tokenizer.vocab_size,
+        max_seq_len=32,
+        d_model=16,
+        n_heads=4,
+        n_layers=2,
+    ).eval()
+    weights = {
+        name: value.detach().cpu().numpy().astype(np.float32, copy=False)
+        for name, value in model.state_dict().items()
+    }
+    tokens = tokenizer.encode("The cat learns.")
+    with torch.no_grad():
+        expected = model(torch.tensor([tokens], dtype=torch.long))[0, -1].cpu().numpy()
+
+    actual = inference_runtime._forward(
+        weights,
+        {
+            "max_seq_len": 32,
+            "d_model": 16,
+            "n_heads": 4,
+            "n_layers": 2,
+        },
+        tokens,
+    )
+    np.testing.assert_allclose(actual, expected, rtol=2e-4, atol=2e-5)
+
+
+def test_runtime_default_system_prompt_matches_training_prompt() -> None:
+    from catai.chat_dataset import DEFAULT_STATE, state_system_message
+
+    assert inference_runtime.DEFAULT_SYSTEM_PROMPT == state_system_message(DEFAULT_STATE)["content"]
+
+
+def test_runtime_message_serialization_matches_sft_eos_format() -> None:
+    messages = [
+        {"role": "system", "content": "System context."},
+        {"role": "user", "content": "First question?"},
+        {"role": "assistant", "content": "First answer."},
+        {"role": "tool_call:assistant", "content": "demo tool call"},
+        {"role": "tool_call:result->assistant", "content": "Tool result."},
+        {"role": "user", "content": "Continue."},
+    ]
+    expected = (
+        "<|system|>\nSystem context.\n"
+        "<|user|>\nFirst question?\n"
+        "<|assistant|>\nFirst answer.\n<EOS>"
+        "<|tool_call:assistant|>\ndemo tool call\n<EOS>"
+        "<|tool_call:result->assistant|>\nTool result.\n"
+        "<|user|>\nContinue.\n"
+        "<|assistant|>\n"
+    )
+    assert inference_runtime._serialize_messages(messages) == expected
+
+
+def test_runtime_prepends_canonical_system_prompt_to_custom_system_message() -> None:
+    prepared = inference_runtime._ensure_default_system_message([
+        {"role": "system", "content": "Use concise answers."},
+        {"role": "user", "content": "Hello."},
+    ])
+
+    assert prepared[0] == {
+        "role": "system",
+        "content": inference_runtime.DEFAULT_SYSTEM_PROMPT + "\nUse concise answers.",
+    }
+    assert prepared[1] == {"role": "user", "content": "Hello."}
+
+
+def test_runtime_does_not_duplicate_canonical_system_prompt() -> None:
+    prepared = inference_runtime._ensure_default_system_message([
+        {"role": "system", "content": inference_runtime.DEFAULT_SYSTEM_PROMPT},
+        {"role": "system", "content": "Use concise answers."},
+        {"role": "user", "content": "Hello."},
+    ])
+
+    assert prepared[0]["content"] == (
+        inference_runtime.DEFAULT_SYSTEM_PROMPT + "\nUse concise answers."
+    )
+    assert len([message for message in prepared if message["role"] == "system"]) == 1
+
+
+@pytest.mark.parametrize(
+    "role",
+    [
+        "assistant:Gemini",
+        "assistant:Claude",
+        "assistant:ChatGPT",
+        "assistant:Qwen",
+        "assistant:DeepSeek",
+    ],
+)
+def test_runtime_multi_agent_assistant_roles_receive_sft_eos(role: str) -> None:
+    serialized = inference_runtime._serialize_messages([
+        {"role": "user", "content": "Question."},
+        {"role": role, "content": "Answer."},
+    ])
+
+    assert f"<|{role}|>\nAnswer.\n<EOS>" in serialized

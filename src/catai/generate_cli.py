@@ -10,7 +10,7 @@ from .checkpoint import load_checkpoint, load_checkpoint_metadata
 from .device import resolve_device
 from .generation import generate
 from .model import CatAI
-from .tokenizer import BPETokenizer, CharTokenizer
+from .tokenizer import tokenizer_from_metadata
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -28,27 +28,9 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _load_tokenizer(metadata: dict) -> CharTokenizer | BPETokenizer:
-    tokenizer_type = metadata.get("type")
-    vocabulary = metadata.get("vocabulary")
-    if not isinstance(vocabulary, list):
-        raise ValueError("checkpoint has invalid tokenizer vocabulary")
-
-    if tokenizer_type == "char":
-        return CharTokenizer(tuple(vocabulary))
-
-    if tokenizer_type == "bpe":
-        merges = metadata.get("merges", [])
-        if not isinstance(merges, list):
-            raise ValueError("checkpoint has invalid BPE merge metadata")
-        try:
-            normalized_merges = tuple(tuple(pair) for pair in merges)
-        except TypeError as exc:
-            raise ValueError("checkpoint has invalid BPE merge metadata") from exc
-        return BPETokenizer(tuple(vocabulary), normalized_merges)
-
-    raise ValueError("checkpoint has unsupported tokenizer metadata")
-
+def _load_tokenizer(metadata: dict):
+    """Backward-compatible wrapper for shared checkpoint tokenizer loading."""
+    return tokenizer_from_metadata(metadata)
 
 def main(argv: list[str] | None = None) -> int:
     """Load a checkpoint and generate text from a prompt."""

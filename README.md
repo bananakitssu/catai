@@ -1,6 +1,6 @@
 # catai
 
-A small decoder-only language model experiment ("maybe like a cat..."). The recommended CI training workflow uses BPE by default; the standalone CLI still offers the character tokenizer for lightweight experiments.
+A decoder-only language model experiment ("maybe like a cat..."). The recommended training preset is `small`, with a 2,048-token BPE vocabulary; `tiny` remains available for quick experiments and `medium` is intended for much larger token budgets. The standalone CLI also offers the character tokenizer.
 
 ## Architecture (current)
 
@@ -31,8 +31,8 @@ python data/generate_corpus.py --sentences 100000 --output data/train.txt
 python -m pip install -e ".[data]"
 python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
 
-# Train a tiny BPE model with a 200M-token budget
-python -m catai --corpus data/corpus.txt --checkpoint catai.pt --model-size tiny --tokenizer bpe --vocab-size 512 --max-tokens 200000000 --validation-split 0.05
+# Train the recommended small BPE model with a 200M-token budget
+python -m catai --corpus data/corpus.txt --checkpoint catai.pt --model-size small --tokenizer bpe --vocab-size 2048 --max-tokens 200000000 --validation-split 0.05 --warmup-fraction 0.03 --minimum-learning-rate-ratio 0.1
 
 # Generate
 python -m catai.generate_cli --checkpoint catai.pt --prompt "The cat"
@@ -111,45 +111,30 @@ used in the default workflow because of its non-commercial restrictions.
 
 ## Expanded Hugging Face chat and emotion datasets
 
-The optional **`datasets_only`** Actions mode prepares bounded samples from
-13 additional Hugging Face datasets: three catgirl/persona chat datasets,
-general conversation and instruction datasets, and three emotion-recognition
-datasets. It writes separate approved-chat, research-chat, and emotion
-artifacts, plus a source/license manifest.
+The `datasets_only` Actions mode remains available to inspect and download bounded samples from 13 additional Hugging Face datasets: three catgirl/persona chat datasets, general conversation and instruction datasets, and three emotion-recognition datasets. It writes separate approved-chat, research-chat, and emotion artifacts, plus a source/license manifest.
 
-This is a preparation run, not a training or model-publishing run. It keeps
-emotion-label prediction tasks out of ordinary chat SFT, avoids silently
-mixing datasets with unknown, non-commercial, share-alike, or composite
-upstream terms into the default mixture, and preserves provenance for each
-example. UltraChat is already used by the standard SFT workflow; do not train
-on its expansion artifact at the same time as the existing UltraChat sample.
+Normal `full` and `sft_only` training runs now prepare the approved chat subset automatically and include it in SFT at a 15% target share. The SFT-specific artifact excludes UltraChat because the standard workflow already samples UltraChat separately. Research-only and emotion-classification data remain excluded from ordinary assistant-response training, and all records retain source/license provenance.
 
 See [the expanded dataset catalog](docs/EXPANDED_DATASETS.md) for every
 Hugging Face repository, license notes, and the generated artifacts. See
 [Dataset licenses and provenance](docs/DATASET_LICENSES.md) before using
 research-only samples in a model intended for distribution.
 
-To prepare the shortlist, run **Actions → CI → Run workflow** and select
-`training_mode: datasets_only`. The workflow samples up to 1,000 examples per
-source with a deterministic seed and uploads the resulting JSONL files and
-manifest as workflow artifacts. Dataset samples are not committed to Git.
+To prepare the complete shortlist without training, run **Actions → CI → Run workflow** and select `training_mode: datasets_only`. Full and SFT-only training use the same bounded sample preparation automatically. Samples are not committed to Git.
 
 ## Updated base-training data and budget
 
-The Actions workflow defaults to the **tiny** preset (about 0.92M parameters)
-and a 200M-token pretraining cap (about 217.7 input tokens per parameter for
-the 512-token BPE vocabulary). After the 5% validation split, that is roughly
-206.8 training tokens per parameter. The trainer checks the actual model
+The Actions workflow defaults to the **small** preset (6,951,168 parameters), a 2,048-token BPE vocabulary, and a 200M-token pretraining cap. After the 5% validation split, that is about 27.3 training tokens per parameter. Base training uses 3% linear warmup followed by cosine decay to 10% of the peak learning rate. The small preset is split across 32 resumable Actions jobs to reduce the risk of a six-hour per-job timeout. The hosted workflow exposes only `tiny` and `small`; the `base` and `medium` presets remain available in the Python CLI for hardware and token budgets beyond the hosted runner design. The trainer checks the actual model
 vocabulary, parameter count, train split, and presence of document EOS markers
 before starting; SFT checks the recorded training metadata again. A rough
 20-token compute-optimal reference target:
 
 | Preset | Parameters | 20-token target |
 |---|---:|---:|
-| tiny | 918,656 | 20M tokens |
-| small | 6,557,952 | 131M tokens |
-| base | 38,810,112 | 776M tokens |
-| medium | 113,664,768 | 2.27B tokens |
+| tiny | 1,115,264 | 22M tokens |
+| small | 6,951,168 | 139M tokens |
+| base | 39,596,544 | 792M tokens |
+| medium | 114,844,416 | 2.30B tokens |
 
 These are scaling-law reference points, not a quality guarantee or universal
 rule for small models. CatAI logs the model's actual parameter count, training
@@ -176,15 +161,19 @@ conversations** and keep specialist tasks out of the chat model:
 
 | Source | Target share | Declared dataset license |
 |---|---:|---|
-| OpenAssistant 1 + 2 | 57% | Apache-2.0 |
+| OpenAssistant 1 + 2 | 42% | Apache-2.0 |
 | UltraChat 200k | 25% | MIT |
 | Smol-SmolTalk | 10% | Apache-2.0 |
 | Blended Skill Talk | 5% | CC BY 4.0 |
+| Approved expanded chat | 15% | Mixed: Apache-2.0 / CC BY 4.0 publisher-stated terms |
 | CatAI personality examples | 3% | CatAI-authored |
 
-CatAI samples up to 5,000 UltraChat 200k `train_sft` conversations and 2,500
-Smol-SmolTalk examples. The sources are compacted and checked against the
-model context; their loaded counts are not the same as their trainable counts.
+CatAI samples up to 5,000 UltraChat 200k `train_sft` conversations, 2,500
+Smol-SmolTalk examples, and up to 1,000 examples each from the approved
+expanded chat sources (Cat-v2.8, catgirl-1m-corpus, Anime Girl Chat, and
+GPT4All Prompt Generations). The expanded-chat portion is kept separate from
+UltraChat to prevent double weighting. Sources are compacted and checked
+against the model context; loaded counts are not the same as trainable counts.
 Generated JSONL retains source and declared-license metadata.
 
 GoEmotions is reserved for the separate `emotions_only` experiment because

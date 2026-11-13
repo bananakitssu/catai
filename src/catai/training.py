@@ -2,9 +2,58 @@
 
 from __future__ import annotations
 
+import math
+
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
+
+
+
+
+def cosine_warmup_learning_rate(
+    base_learning_rate: float,
+    step: int,
+    total_steps: int,
+    *,
+    warmup_fraction: float = 0.03,
+    minimum_learning_rate_ratio: float = 0.1,
+) -> float:
+    """Return a deterministic linear-warmup/cosine-decay learning rate.
+
+    step is zero-based and represents the update about to be performed.
+    The schedule is derived from the full run length, so recovery jobs can
+    resume it exactly without a separate scheduler state.
+    """
+    if base_learning_rate <= 0:
+        raise ValueError("base_learning_rate must be positive")
+    if total_steps < 1:
+        raise ValueError("total_steps must be positive")
+    if step < 0:
+        raise ValueError("step must be non-negative")
+    if not 0.0 <= warmup_fraction < 1.0:
+        raise ValueError("warmup_fraction must be in [0, 1)")
+    if not 0.0 <= minimum_learning_rate_ratio <= 1.0:
+        raise ValueError("minimum_learning_rate_ratio must be in [0, 1]")
+
+    if total_steps == 1:
+        return float(base_learning_rate)
+
+    warmup_steps = (
+        max(1, int(total_steps * warmup_fraction))
+        if warmup_fraction > 0.0 else 0
+    )
+    if warmup_steps and step < warmup_steps:
+        return float(base_learning_rate * (step + 1) / warmup_steps)
+
+    decay_steps = max(1, total_steps - warmup_steps)
+    decay_index = max(0, step - warmup_steps)
+    progress = min(1.0, decay_index / max(1, decay_steps - 1))
+    cosine = 0.5 * (1.0 + math.cos(math.pi * progress))
+    multiplier = minimum_learning_rate_ratio + (
+        1.0 - minimum_learning_rate_ratio
+    ) * cosine
+    return float(base_learning_rate * multiplier)
 
 
 def make_next_token_batch(tokens: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:

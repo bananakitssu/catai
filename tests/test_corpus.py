@@ -129,3 +129,29 @@ def test_tokenizer_and_tokens_does_not_load_the_entire_corpus(tmp_path, monkeypa
     assert tokenizer.eos_token_id is not None
     assert 100 <= tokens.numel() <= 101
     assert tokens[-1].item() == tokenizer.eos_token_id
+
+
+
+def test_corpus_loader_reuses_checkpoint_tokenizer_without_relearning(tmp_path, monkeypatch):
+    import catai.corpus as corpus_module
+    from catai.tokenizer import BPETokenizer, EOS_TOKEN
+
+    text = "The cat learns new words. " * 20 + EOS_TOKEN
+    path = tmp_path / "resume-corpus.txt"
+    path.write_text(text, encoding="utf-8")
+    tokenizer = BPETokenizer.from_text(text, vocab_size=64)
+
+    def fail_tokenizer_scan(*args, **kwargs):
+        raise AssertionError("resume must not relearn the checkpoint tokenizer")
+
+    monkeypatch.setattr(corpus_module, "_read_tokenizer_inputs", fail_tokenizer_scan)
+    loaded_tokenizer, tokens = corpus_module.tokenizer_and_tokens(
+        path,
+        tokenizer_type="bpe",
+        vocab_size=64,
+        tokenizer=tokenizer,
+    )
+
+    assert loaded_tokenizer == tokenizer
+    assert tokenizer.decode(tokens.tolist()) == text.removesuffix(EOS_TOKEN)
+    assert tokens[-1].item() == tokenizer.eos_token_id

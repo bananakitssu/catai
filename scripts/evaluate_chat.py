@@ -35,6 +35,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-repeat-ngram-size", type=int, default=3)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", default=None)
+    parser.add_argument("--max-unk-fraction", type=float, default=0.10, help="Fail if more than this fraction of generated tokens are UNK.")
     return parser
 
 
@@ -52,6 +53,8 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--no-repeat-ngram-size must be non-negative")
     if args.seed < 0:
         raise ValueError("--seed must be non-negative")
+    if not 0.0 <= args.max_unk_fraction <= 1.0:
+        raise ValueError("--max-unk-fraction must be in [0, 1]")
 
     metadata = load_checkpoint_metadata(args.checkpoint)
     model_metadata = metadata.get("model")
@@ -71,6 +74,8 @@ def main(argv: list[str] | None = None) -> int:
     model.to(device)
     load_checkpoint(args.checkpoint, model, map_location=device)
     torch.manual_seed(args.seed)
+    unk_token_id = getattr(tokenizer, "unk_token_id", None)
+    failed_checks: list[str] = []
 
     system_message = state_system_message(DEFAULT_STATE)
     for label, question in PROMPTS:
@@ -98,10 +103,23 @@ def main(argv: list[str] | None = None) -> int:
         )
         reply_ids = output_ids[0, len(prompt_tokens):].detach().cpu().tolist()
         reply = tokenizer.decode(reply_ids).strip()
+        visible_ids = [token for token in reply_ids if token != tokenizer.eos_token_id]
+        unk_fraction = (
+            sum(token == unk_token_id for token in visible_ids) / len(visible_ids)
+            if visible_ids else 0.0
+        )
         print(f"\n=== {label} ===")
         print(f"User: {question}")
-        print(f"CatAI: {reply or '[empty response]'}", flush=True)
+        print(f"CatAI: {reply or '[empty response]'}")
+        print(f"Generation tokens: {len(visible_ids)}; UNK fraction: {unk_fraction:.2%}", flush=True)
+        if not reply:
+            failed_checks.append(f"{label}: empty response")
+        if unk_fraction > args.max_unk_fraction:
+            failed_checks.append(f"{label}: UNK fraction {unk_fraction:.2%} exceeds {args.max_unk_fraction:.2%}")
 
+    if failed_checks:
+        raise SystemExit("Chat generation sanity checks failed: " + "; ".join(failed_checks))
+    print("Chat generation sanity checks passed; semantic quality still requires human review.")
     return 0
 
 

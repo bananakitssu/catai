@@ -7,8 +7,8 @@ from dataclasses import dataclass
 
 # (d_model, n_heads, n_layers)
 MODEL_PRESETS: dict[str, tuple[int, int, int]] = {
-    "tiny": (128, 4, 4),       # ~0.8–1M params (depends on vocab)
-    "small": (256, 8, 8),      # a few million
+    "tiny": (128, 4, 4),       # ~1.1M params with the default 2,048-token BPE vocabulary
+    "small": (256, 8, 8),      # ~7.0M params with the default 2,048-token BPE vocabulary
     "base": (512, 8, 12),      # tens of millions
     "medium": (768, 12, 16),   # larger experimental size
 }
@@ -18,9 +18,9 @@ MODEL_PRESETS: dict[str, tuple[int, int, int]] = {
 class ModelConfig:
     """Transformer dimensions for a named CatAI model size."""
 
-    d_model: int = 128
-    n_heads: int = 4
-    n_layers: int = 4
+    d_model: int = 256
+    n_heads: int = 8
+    n_layers: int = 8
 
     def __post_init__(self) -> None:
         if self.d_model < 1 or self.n_heads < 1 or self.n_layers < 1:

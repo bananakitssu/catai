@@ -168,6 +168,7 @@ def tokenizer_and_tokens(
     vocab_size: int = 512,
     max_tokens: int | None = None,
     tokenizer_sample_chars: int = 250_000,
+    tokenizer: Tokenizer | None = None,
 ) -> tuple[Tokenizer, torch.Tensor]:
     """Build a tokenizer from a corpus and return its token tensor."""
     if tokenizer_sample_chars < 1:
@@ -176,21 +177,27 @@ def tokenizer_and_tokens(
     if tokenizer_type not in {"char", "bpe"}:
         raise ValueError("tokenizer_type must be 'char' or 'bpe'")
 
-    sample, characters = _read_tokenizer_inputs(
-        path,
-        encoding=encoding,
-        sample_chars=tokenizer_sample_chars,
-    )
-    if tokenizer_type == "char":
-        tokenizer: Tokenizer = CharTokenizer.from_characters(characters)
-    else:
-        # Learn merges from a bounded prefix while retaining the observed
-        # character set without materializing the entire corpus as one string.
-        tokenizer = BPETokenizer.from_text(
-            sample,
-            vocab_size=vocab_size,
-            extra_characters=characters,
+    if tokenizer is None:
+        sample, characters = _read_tokenizer_inputs(
+            path,
+            encoding=encoding,
+            sample_chars=tokenizer_sample_chars,
         )
+        if tokenizer_type == "char":
+            tokenizer = CharTokenizer.from_characters(characters)
+        else:
+            # Learn merges from a bounded prefix while retaining the observed
+            # character set without materializing the entire corpus as one string.
+            tokenizer = BPETokenizer.from_text(
+                sample,
+                vocab_size=vocab_size,
+                extra_characters=characters,
+            )
+    elif (
+        (tokenizer_type == "char" and not isinstance(tokenizer, CharTokenizer))
+        or (tokenizer_type == "bpe" and not isinstance(tokenizer, BPETokenizer))
+    ):
+        raise ValueError("provided tokenizer type does not match tokenizer_type")
 
     tokens = _encode_prefix_tensor_from_file(
         tokenizer, path, max_tokens, encoding=encoding

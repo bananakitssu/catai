@@ -12,7 +12,7 @@ def test_training_config_rejects_invalid_values():
 
 
 def test_model_config_validates_dimensions():
-    assert ModelConfig() == ModelConfig(128, 4, 4)
+    assert ModelConfig() == ModelConfig(256, 8, 8)
     try:
         ModelConfig(d_model=10, n_heads=3)
     except ValueError:

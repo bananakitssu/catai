@@ -4,7 +4,7 @@ from catai.checkpoint import load_checkpoint_metadata, load_checkpoint_state
 from catai.cli import main
 
 
-def test_base_training_can_resume_from_a_mid_epoch_checkpoint(tmp_path: Path) -> None:
+def test_base_training_can_resume_from_a_mid_epoch_checkpoint(tmp_path: Path, monkeypatch) -> None:
     corpus = tmp_path / "corpus.txt"
     corpus.write_text("a small cat learns to talk. " * 100, encoding="utf-8")
     recovery = tmp_path / "base-recovery.pt"
@@ -20,7 +20,8 @@ def test_base_training_can_resume_from_a_mid_epoch_checkpoint(tmp_path: Path) ->
         "--d-model", "8",
         "--heads", "2",
         "--layers", "1",
-        "--tokenizer", "char",
+        "--tokenizer", "bpe",
+        "--vocab-size", "64",
         "--validation-split", "0.1",
         "--seed", "42",
         "--device", "cpu",
@@ -42,6 +43,12 @@ def test_base_training_can_resume_from_a_mid_epoch_checkpoint(tmp_path: Path) ->
     assert first_steps > 0
     assert first_state["stage"] == "base-training-recovery"
 
+    import catai.corpus as corpus_module
+
+    def reject_tokenizer_relearning(*args, **kwargs):
+        raise AssertionError("recovery must reuse the checkpoint tokenizer")
+
+    monkeypatch.setattr(corpus_module, "_read_tokenizer_inputs", reject_tokenizer_relearning)
     assert main(
         common_args
         + [
