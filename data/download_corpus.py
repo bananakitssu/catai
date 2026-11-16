@@ -547,7 +547,7 @@ def download_common_corpus(
                 "repository": COMMON_CORPUS_REPOSITORY,
                 "identifier": row.get("identifier"),
                 "collection": row.get("collection"),
-                "open_type": row.get("open_type"),
+                "open_type": row.get("open type", row.get("open_type")),
                 "license": license_name,
                 "date": row.get("date"),
                 "title": row.get("title"),
