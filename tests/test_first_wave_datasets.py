@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from data import prepare_first_wave_datasets as first_wave
 
 
@@ -146,6 +148,68 @@ def test_multiwoz_rejects_unknown_speaker_and_checksum_catalog_is_complete():
         "dialogues_016.json": "22eeed01c15a4fba6ac395a6708400672c5c07dbfbd6448bcb451f8697324881",
         "dialogues_017.json": "a1dba37c0fd1dba519500b57be0384219dd4a7bacaec94e124d431932724bd8d",
     }
+
+
+def test_multiwoz_download_uses_the_immutable_checksum_matching_revision():
+    assert first_wave.MULTIWOZ_UPSTREAM_REVISION == (
+        "73ab4c8b52170ab2d63c75997c9b914c7f650e44"
+    )
+    assert first_wave.MULTIWOZ_BASE_URL == (
+        "https://raw.githubusercontent.com/budzianowski/multiwoz/"
+        "73ab4c8b52170ab2d63c75997c9b914c7f650e44/"
+        "data/MultiWOZ_2.2/train/"
+    )
+
+
+def test_prepare_writes_multiwoz_failure_details_before_raising(tmp_path, monkeypatch):
+    # Keep this focused on failure-manifest persistence rather than network access.
+    monkeypatch.setattr(
+        first_wave,
+        "PAGE_SOURCES",
+        {"soda": first_wave.PAGE_SOURCES["soda"]},
+    )
+    monkeypatch.setattr(
+        first_wave,
+        "sample_viewer_rows",
+        lambda *args: [{
+            "dialogue": ["Hello.", "Hi there!"],
+            "speakers": ["A", "B"],
+        }],
+    )
+
+    def fail_multiwoz(limit, seed):
+        raise RuntimeError("pinned shard checksum mismatch")
+
+    monkeypatch.setattr(first_wave, "_download_multiwoz_examples", fail_multiwoz)
+    monkeypatch.setattr(
+        first_wave,
+        "_download_social_dialogue_rows",
+        lambda limit, seed: [{
+            "id": "social-1",
+            "output": json.dumps({
+                "dialogue": [
+                    {"speaker": "Rin", "line": "How are you?"},
+                    {"speaker": "Kai", "line": "Doing well, thanks."},
+                ],
+            }),
+        }],
+    )
+
+    manifest_path = tmp_path / "first_wave_manifest.json"
+    with pytest.raises(RuntimeError, match="missing: multiwoz"):
+        first_wave.prepare(
+            output=tmp_path / "first_wave.jsonl",
+            manifest_output=manifest_path,
+            max_examples_per_source=2,
+            seed=42,
+        )
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["missing_sources"] == ["multiwoz"]
+    assert {
+        "source": "multiwoz",
+        "error": "RuntimeError: pinned shard checksum mismatch",
+    } in manifest["errors"]
 
 
 def test_record_preserves_license_and_attribution_provenance():
