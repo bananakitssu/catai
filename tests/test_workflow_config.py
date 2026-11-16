@@ -82,7 +82,6 @@ def test_hosted_workflow_defaults_to_base_and_trains_on_approved_expansion() -> 
     assert workflow.count("needs.dataset_expansion.result == 'success'") == 2
 
 
-
 def test_hosted_base_corpus_budget_is_expanded_and_cache_is_invalidated() -> None:
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
     blocks = _base_training_blocks(workflow)
@@ -99,7 +98,7 @@ def test_hosted_base_corpus_budget_is_expanded_and_cache_is_invalidated() -> Non
             assert argument in block, f"{name} is missing {argument}"
 
     expansion = re.search(
-        r"^  corpus_expansion:\\n(?P<body>.*?)(?=^  [a-zA-Z0-9_]+:\\n|\\Z)",
+        r"^  corpus_expansion:\n(?P<body>.*?)(?=^  [a-zA-Z0-9_]+:\n|\Z)",
         workflow,
         re.MULTILINE | re.DOTALL,
     )
