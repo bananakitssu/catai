@@ -83,23 +83,23 @@ MULTIWOZ_BASE_URL = (
 )
 # SHA-256 values published in the Hugging Face multi_woz_v22 dataset_infos.json.
 MULTIWOZ_TRAIN_SHARDS: dict[str, str] = {
-    "dialogues_001.json": "895a8109bf01fa5ecf15ccdbd2dfe1628bd923f6b61dcd2e26b10ee5076a1596",
+    "dialogues_001.json": "2d1a5d92bb5ea1a6017f416f76b43e11bdad945b1f93acf870f2f671a98c3032",
     "dialogues_002.json": "2f3ea771d4e01cb2780357738cff7f7496b87d34c221cc240df74501312438d3",
-    "dialogues_003.json": "da24961d28486be2d8462ee4d86a809db819d588ba90ae1a783383d95eb85daa",
-    "dialogues_004.json": "30c1172db1071c853b16215d1946de908d68d2b6ff8da7801de307000a179106",
-    "dialogues_005.json": "eaf58716df5de99524b3e0e7edf477b74749512788a6a51f53f2bdd76768d39a",
-    "dialogues_006.json": "8e75fd543b1964bc5e7118085d977f479c98fcdf6d606b971f67a45fb1745c83",
-    "dialogues_007.json": "02323f8298439d713c6d7d226f4bd7ec246ec993ee11911b54f98cb8a598f206",
-    "dialogues_008.json": "1129fbed480352ae304f0ae5b4915c194e9619c43f1577ccb0d450e10d24ea98",
-    "dialogues_009.json": "87d9e43b1ba51a4a4688703da79d3a09b14d8013570545da24c597daa18e2f45",
-    "dialogues_010.json": "e7ad0d5da2909b08197295e45fe4695b9dc2f67d458374b2aab8db5094e97b26",
+    "dialogues_003.json": "74f73311936c7b4928b073698e5ea61dedad009dc45672963735684e1279521a",
+    "dialogues_004.json": "2f9f18b6cb0abbc58c86ca9291aa19baf80395521f9556cf02189c698c48bc52",
+    "dialogues_005.json": "eedbe5c649072a3c163e8da109f3c3fd0502425c63db584a11a9cadaa09c91db",
+    "dialogues_006.json": "2a51cfed1224110e4cdce80b051d3f7ebecd223d0b3d1c4ade0dd8fc484675fe",
+    "dialogues_007.json": "e062becf19b670a45b9333390b6a72f93fc2ed436371ba342499e6532912b1f3",
+    "dialogues_008.json": "9cd73cfae130e4d8c76854b6c0f393d68fb084f665a1c7527e04e3b26f877d1b",
+    "dialogues_009.json": "fff3f55ee9bd8ecc2492cdb8101e3d5908705e4edd65b3e8cbd7a825be18e47e",
+    "dialogues_010.json": "628db438d4f6ab62fb849d3e9df264845b921961052c19b336c8853e2bf4e8d8",
     "dialogues_011.json": "82e2d2900a037b866a01d05974734dd419e89b329fe29ef93b35eea96d27feb8",
-    "dialogues_012.json": "b6bf292325db67682dd7b6fafbf1051cc2262e92f7c37cab213e975888594bb2",
-    "dialogues_013.json": "c33fe4b3952c016e1e1645f472a7097f93dfb476a19940fd9386865ef9adf685",
-    "dialogues_014.json": "ce33dbbf93a40d0dcc671a9d6a2ed1f987914f5b5f05f6df493a5b342efda954",
-    "dialogues_015.json": "d895c0439bc2ad89ef1689896e3be630eadebc33dae77b42a426fd16a271718e",
-    "dialogues_016.json": "3e6bc0bca4262022ccbce0d5ce3150e536e7d21aeb9fbdef9e83cced4dfd124b",
-    "dialogues_017.json": "b6ab2cd9b6e8983364526845b7cbec1749338209bf7ac2313c25e1e2226ebab5",
+    "dialogues_012.json": "5b18461e0f3ff0698818e02a2e105f4f25727d88d02cc4706de19d138e9ceba0",
+    "dialogues_013.json": "0f90ba730400be770f753fc46e868189709e6ce06e97d780843ed09db16762b4",
+    "dialogues_014.json": "7bd668216f43f6713232c07dcaa1d84e490eeee15caa1b3d843c3075d4b84a10",
+    "dialogues_015.json": "5f551d134860595e7834eedab3ebe16e277953cc81b29f46104ef3070cddd4ac",
+    "dialogues_016.json": "22eeed01c15a4fba6ac395a6708400672c5c07dbfbd6448bcb451f8697324881",
+    "dialogues_017.json": "a1dba37c0fd1dba519500b57be0384219dd4a7bacaec94e124d431932724bd8d",
 }
 
 SOCIAL_DIALOGUES_URL = (
