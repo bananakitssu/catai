@@ -49,6 +49,22 @@ def test_everyday_conversations_uses_messages_and_falls_back_to_prompt_completio
     ]
 
 
+def test_two_speaker_dialogue_drops_incomplete_final_user_turn():
+    messages = first_wave._normalize_two_speaker_turns(
+        [
+            {"speaker": "A", "text": "Hello."},
+            {"speaker": "B", "text": "Hi!"},
+            {"speaker": "A", "text": "One more question."},
+        ],
+        speaker_key="speaker",
+        text_key="text",
+    )
+    assert messages == [
+        {"role": "user", "content": "Hello."},
+        {"role": "assistant", "content": "Hi!"},
+    ]
+
+
 def test_english_daily_dialogues_preserves_multi_turn_order():
     messages = first_wave.convert_english_daily_dialogues_row({
         "turns": [
