@@ -58,7 +58,7 @@ def test_hosted_base_training_is_a_32_stage_recovery_chain() -> None:
             assert "name: catai-base-checkpoint" in block
 
 
-def test_hosted_workflow_defaults_to_small_and_trains_on_approved_expansion() -> None:
+def test_hosted_workflow_defaults_to_base_and_trains_on_approved_expansion() -> None:
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
 
     model_options = re.search(
@@ -67,13 +67,16 @@ def test_hosted_workflow_defaults_to_small_and_trains_on_approved_expansion() ->
         re.DOTALL,
     )
     assert model_options is not None
-    assert "default: small" in workflow
-    assert "description: \"Hosted CI supports tiny/small." in model_options.group("body")
-    assert re.search(r"options:\n\s+- tiny\n\s+- small", model_options.group("body"))
-    assert "- base" not in model_options.group("body")
-    assert "- medium" not in model_options.group("body")
+    body = model_options.group("body")
+    assert "default: base" in body
+    assert 'description: "Hosted CI supports tiny, small, and base.' in body
+    assert re.search(r"options:\n\s+- tiny\n\s+- small\n\s+- base", body)
+    assert "- medium" not in body
 
     assert "data/expanded_sft_chat.jsonl" in workflow
     assert workflow.count("--expanded-chat-dataset data/expanded_sft_chat.jsonl") == 2
     assert workflow.count("--expanded-chat-ratio 0.15") == 2
+    assert workflow.count("--markdown-dataset data/markdown_sft_chat.jsonl") == 2
+    assert workflow.count("--markdown-ratio 0.05") == 2
+    assert "data/prepare_markdown_sft.py" in workflow
     assert workflow.count("needs.dataset_expansion.result == 'success'") == 2

@@ -3001,6 +3001,18 @@ jobs:
           name: catai-extra-ultrachat
           path: data/ultrachat_200k_chat.jsonl
           retention-days: 7
+      - name: Prepare CatAI Markdown formatting examples
+        run: |
+          python data/prepare_markdown_sft.py \
+            --output data/markdown_sft_chat.jsonl \
+            --max-examples 72 \
+            --seed 42
+      - name: Upload CatAI Markdown examples
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-markdown-sft
+          path: data/markdown_sft_chat.jsonl
+          retention-days: 7
 
   sft:
     # In SFT-only mode, all base-training stages are intentionally skipped. Explicitly
@@ -3107,6 +3119,11 @@ jobs:
         with:
           name: catai-extra-ultrachat
           path: data
+      - name: Download CatAI Markdown examples
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-markdown-sft
+          path: data
       - name: Download approved expanded chat examples
         uses: actions/download-artifact@v4
         with:
@@ -3200,6 +3217,14 @@ jobs:
               blended_examples[: min(128, len(blended_examples))],
               tokenizer, sequence_length=sequence_length,
           )
+          markdown_examples = load_chat_dataset("data/markdown_sft_chat.jsonl")
+          markdown_dataset = ChatSupervisedDataset(
+              markdown_examples, tokenizer, sequence_length=sequence_length,
+          )
+          print(
+              f"Markdown formatting: {len(markdown_examples):,} loaded; "
+              f"{len(markdown_dataset):,} preflighted"
+          )
           print(f"Smol-SmolTalk: {len(smol_examples):,} loaded; {len(smol_dataset):,} preflighted")
           print(f"Blended Skill Talk: {len(blended_examples):,} loaded; {len(blended_dataset):,} preflighted")
           print(
@@ -3235,6 +3260,8 @@ jobs:
             --ultrachat-ratio 0.25 \
             --expanded-chat-dataset data/expanded_sft_chat.jsonl \
             --expanded-chat-ratio 0.15 \
+            --markdown-dataset data/markdown_sft_chat.jsonl \
+            --markdown-ratio 0.05 \
             --samples-per-epoch 6000 \
             --max-validation-examples 500 \
             --checkpoint catai-sft.pt \
@@ -3370,6 +3397,11 @@ jobs:
         with:
           name: catai-extra-ultrachat
           path: data
+      - name: Download CatAI Markdown examples
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-markdown-sft
+          path: data
       - name: Download approved expanded chat examples
         uses: actions/download-artifact@v4
         with:
@@ -3463,6 +3495,14 @@ jobs:
               blended_examples[: min(128, len(blended_examples))],
               tokenizer, sequence_length=sequence_length,
           )
+          markdown_examples = load_chat_dataset("data/markdown_sft_chat.jsonl")
+          markdown_dataset = ChatSupervisedDataset(
+              markdown_examples, tokenizer, sequence_length=sequence_length,
+          )
+          print(
+              f"Markdown formatting: {len(markdown_examples):,} loaded; "
+              f"{len(markdown_dataset):,} preflighted"
+          )
           print(f"Smol-SmolTalk: {len(smol_examples):,} loaded; {len(smol_dataset):,} preflighted")
           print(f"Blended Skill Talk: {len(blended_examples):,} loaded; {len(blended_dataset):,} preflighted")
           print(
@@ -3496,6 +3536,8 @@ jobs:
             --ultrachat-ratio 0.25 \
             --expanded-chat-dataset data/expanded_sft_chat.jsonl \
             --expanded-chat-ratio 0.15 \
+            --markdown-dataset data/markdown_sft_chat.jsonl \
+            --markdown-ratio 0.05 \
             --samples-per-epoch 6000 \
             --max-validation-examples 500 \
             --checkpoint catai-sft.pt \
