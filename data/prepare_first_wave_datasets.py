@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Prepare CatAI's first-wave, license-tracked conversational datasets.
 
-Five sources use the Hugging Face Dataset Viewer. MultiWOZ 2.2 is downloaded
+Four sources use the Hugging Face Dataset Viewer. MultiWOZ 2.2 is downloaded
 from its upstream JSON shards with SHA-256 verification because its legacy HF
 dataset script disables the viewer. Raw data is kept outside Git.
 """
