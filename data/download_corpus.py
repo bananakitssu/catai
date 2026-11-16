@@ -501,7 +501,7 @@ def download_common_corpus(
         COMMON_CORPUS_REPOSITORY,
         split="train",
         streaming=True,
-    ).shuffle(seed=seed, buffer_size=256)
+    ).shuffle(seed=seed, buffer_size=32)
 
     chars = documents = rejected_language = rejected_license = rejected_text = duplicates = 0
     license_counts: dict[str, int] = {}
