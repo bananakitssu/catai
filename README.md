@@ -112,10 +112,6 @@ To start model training, choose `run_type: training` and select a separate
 - `sft_only`: supervised fine-tuning using a prior run's `catai-base-checkpoint`
   artifact; provide that run's ID in `base_checkpoint_run_id`.
 
-To run base-model pretraining without starting supervised fine-tuning, select
-`training_mode: base_only`. This runs the 32-stage base-training sequence and
-uploads the `catai-base-checkpoint` artifact; SFT and its extra chat-data jobs are
-skipped.
 
 DailyDialog (CC BY-NC-SA 4.0) and EmpatheticDialogues (CC BY-NC 4.0) converters
 remain available only for experiments with separate permission; neither is
