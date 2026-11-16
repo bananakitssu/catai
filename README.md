@@ -124,7 +124,7 @@ To prepare the complete shortlist without training, run **Actions → CI → Run
 
 ## Updated base-training data and budget
 
-The Actions workflow defaults to the **base** preset (39,596,544 parameters), a 2,048-token BPE vocabulary, and an 850M-token pretraining cap. After the 5% validation split, that is about 20.4 training tokens per parameter, meeting the workflow's 20-token training-data threshold. Base training uses 3% linear warmup followed by cosine decay to 10% of the peak learning rate. The base preset is split across 32 resumable Actions jobs to reduce the risk of a six-hour per-job timeout. The hosted workflow exposes `tiny`, `small`, and `base`; the larger `medium` preset remains available in the Python CLI for hardware and token budgets beyond the hosted runner design. The trainer checks the actual model
+The Actions workflow defaults to the **base** preset (39,596,544 parameters), a 2,048-token BPE vocabulary, and an 850M-token pretraining cap. After the 5% validation split, a fully populated 850M-token run provides about 20.4 training tokens per parameter, meeting the workflow's 20-token training-data threshold. The hosted corpus request is intentionally larger than the token cap because source characters do not map one-to-one to BPE tokens and filters reject some rows; the CLI checks the actual encoded corpus and refuses to train when the minimum is not met. Base training uses 3% linear warmup followed by cosine decay to 10% of the peak learning rate. The base preset is split across 32 resumable Actions jobs to reduce the risk of a six-hour per-job timeout. The hosted workflow exposes `tiny`, `small`, and `base`; the larger `medium` preset remains available in the Python CLI for hardware and token budgets beyond the hosted runner design. The trainer checks the actual model
 vocabulary, parameter count, train split, and presence of document EOS markers
 before starting; SFT checks the recorded training metadata again. A rough
 20-token compute-optimal reference target:
@@ -140,14 +140,31 @@ These are scaling-law reference points, not a quality guarantee or universal
 rule for small models. CatAI logs the model's actual parameter count, training
 token count, and achieved ratio.
 
+The hosted Base corpus build requests up to 1.89B source characters across
+four sources: 1.4B RedPajama-V2, 210M FineWeb-Edu, 140M Cosmopedia, and
+140M Common Corpus characters. Common Corpus is additionally capped at
+1,400 accepted documents. These are source-character ceilings, not a
+guaranteed token count; source filtering and availability can reduce the
+actual output. The generated manifest records the actual characters and
+documents accepted from every source.
+
+To build the same Base-scale corpus from the command line:
+
+```bash
+python data/download_corpus.py --output data/corpus.txt \
+  --target-chars 1400000000 --fineweb-edu-chars 210000000 \
+  --cosmopedia-chars 140000000 --common-corpus-chars 140000000 \
+  --common-corpus-max-documents 1400
+```
+
 The corpus combines:
 - English RedPajama-V2 `head_middle` documents filtered using published
-  Gopher-style quality signals.
-- RedPajama's duplicate-ID Parquet artifacts plus a local SHA-256 pass for
-  additional exact deduplication.
-- A bounded 150M-character FineWeb-Edu sample, filtered to score >= 3 and
-  language_score >= 0.8. It is placed first so it appears in the capped
-  training-token prefix.
+  Gopher-style quality signals, plus duplicate-ID Parquet filtering and a
+  local SHA-256 pass for additional exact deduplication.
+- FineWeb-Edu, filtered to score >= 3 and language_score >= 0.8.
+- Cosmopedia educational and story subsets, sampled with per-subset limits.
+- English Common Corpus documents that pass the explicit per-document
+  license allowlist.
 
 Install corpus dependencies using `python -m pip install -e ".[data]"`.
 FineWeb-Edu is ODC-BY-1.0 and remains subject to Common Crawl's terms. See the
