@@ -2972,7 +2972,7 @@ jobs:
 
 
   extra_sft_data:
-    if: github.event_name == 'workflow_dispatch' && (inputs.run_type == 'training' && inputs.training_type == 'full' || inputs.training_type == 'sft_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.run_type == 'training' && (inputs.training_type == 'full' || inputs.training_type == 'sft_only')
     needs: test
     runs-on: ubuntu-latest
     steps:
