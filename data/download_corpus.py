@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a filtered RedPajama-V2 + FineWeb-Edu corpus for CatAI."""
+"""Build a provenance-tracked mixture of filtered CatAI pretraining corpora."""
 from __future__ import annotations
 
 import argparse
