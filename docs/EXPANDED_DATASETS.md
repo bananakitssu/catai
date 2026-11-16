@@ -86,6 +86,12 @@ rows marked as exact-text label conflicts. The preparation code preserves
 per-row provenance and does not move these examples into the default
 commercial-capable training mix.
 
+When the GitHub Actions workflow is dispatched with `training_mode=datasets_only`,
+it prepares both the chat datasets and the expanded base-training corpus. The
+corpus job uses the same versioned cache key as full training, so a later full
+run can reuse the prepared corpus. It uploads the corpus manifest and
+per-document provenance sidecar without starting model training.
+
 ## Output artifacts
 
 - `catai-expanded-chat-datasets`: complete approved chat sample for auditing and separate experiments.
