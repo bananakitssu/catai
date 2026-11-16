@@ -80,3 +80,31 @@ def test_hosted_workflow_defaults_to_base_and_trains_on_approved_expansion() -> 
     assert workflow.count("--markdown-ratio 0.05") == 2
     assert "data/prepare_markdown_sft.py" in workflow
     assert workflow.count("needs.dataset_expansion.result == 'success'") == 2
+
+
+
+def test_hosted_base_corpus_budget_and_cache_are_updated_together() -> None:
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+
+    expected_cache_key = (
+        "catai-corpus-curated-v5-${{ hashFiles('data/download_corpus.py') }}"
+    )
+    assert "catai-corpus-curated-v4-" not in workflow
+    assert workflow.count(expected_cache_key) == 66
+
+    expected_inline_command = (
+        "python data/download_corpus.py --output data/corpus.txt "
+        "--target-chars 1300000000 --fineweb-edu-chars 200000000 "
+        "--cosmopedia-chars 130000000 --common-corpus-chars 130000000 "
+        "--common-corpus-max-documents 7000"
+    )
+    assert workflow.count(expected_inline_command) == 32
+
+    for flag in (
+        "--target-chars 1300000000",
+        "--fineweb-edu-chars 200000000",
+        "--cosmopedia-chars 130000000",
+        "--common-corpus-chars 130000000",
+        "--common-corpus-max-documents 7000",
+    ):
+        assert workflow.count(flag) == 33

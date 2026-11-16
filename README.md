@@ -29,7 +29,7 @@ python data/generate_corpus.py --sentences 100000 --output data/train.txt
 
 # Build a curated real-text corpus
 python -m pip install -e ".[data]"
-python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
+python data/download_corpus.py --output data/corpus.txt --target-chars 1300000000 --fineweb-edu-chars 200000000 --cosmopedia-chars 130000000 --common-corpus-chars 130000000 --common-corpus-max-documents 7000
 
 # Train the recommended small BPE model with a 200M-token budget
 python -m catai --corpus data/corpus.txt --checkpoint catai.pt --model-size small --tokenizer bpe --vocab-size 2048 --max-tokens 200000000 --validation-split 0.05 --warmup-fraction 0.03 --minimum-learning-rate-ratio 0.1
@@ -140,14 +140,22 @@ These are scaling-law reference points, not a quality guarantee or universal
 rule for small models. CatAI logs the model's actual parameter count, training
 token count, and achieved ratio.
 
-The corpus combines:
-- English RedPajama-V2 `head_middle` documents filtered using published
-  Gopher-style quality signals.
-- RedPajama's duplicate-ID Parquet artifacts plus a local SHA-256 pass for
-  additional exact deduplication.
-- A bounded 150M-character FineWeb-Edu sample, filtered to score >= 3 and
-  language_score >= 0.8. It is placed first so it appears in the capped
-  training-token prefix.
+The hosted workflow requests up to **1.76B source characters** across four
+interleaved corpora: 1.3B RedPajama-V2, 200M FineWeb-Edu, 130M Cosmopedia,
+and 130M Common Corpus. These are character targets, not promises of an exact
+encoded-token count; the workflow checks the actual tokenizer output before
+training. Each source is round-robin interleaved so the capped training prefix
+contains examples from every source.
+
+- English RedPajama-V2 `head_middle` documents are filtered using published
+  Gopher-style quality signals, duplicate-ID Parquet artifacts, and a local
+  SHA-256 exact-deduplication pass.
+- FineWeb-Edu is filtered to `score >= 3` and `language_score >= 0.8`.
+- Cosmopedia contributes educational and story subsets.
+- Common Corpus is restricted to English documents with an explicitly
+  allowlisted per-document license. Its hosted limit is 7,000 accepted
+  documents so the document cap does not prematurely stop the character
+  target.
 
 Install corpus dependencies using `python -m pip install -e ".[data]"`.
 FineWeb-Edu is ODC-BY-1.0 and remains subject to Common Crawl's terms. See the

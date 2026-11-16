@@ -156,3 +156,33 @@ def test_corpus_mix_round_robins_sources_and_preserves_row_provenance(tmp_path):
     ]
     assert records[1]["license"] == "Apache-2.0"
     assert counts == {"common_corpus": 2, "cosmopedia": 2}
+
+
+
+def test_common_corpus_document_limit_default_is_expanded(monkeypatch, tmp_path):
+    import inspect
+    import sys
+
+    from data import download_corpus
+
+    function_default = (
+        inspect.signature(download_corpus.build_training_corpus)
+        .parameters["common_corpus_max_documents"].default
+    )
+    captured = {}
+    monkeypatch.setattr(
+        download_corpus,
+        "build_training_corpus",
+        lambda output, **kwargs: captured.update(kwargs),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["download_corpus.py", "--output", str(tmp_path / "corpus.txt")],
+    )
+
+    download_corpus.main()
+
+    assert download_corpus.DEFAULT_COMMON_CORPUS_MAX_DOCUMENTS == 7_000
+    assert function_default == 7_000
+    assert captured["common_corpus_max_documents"] == 7_000
