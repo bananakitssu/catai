@@ -130,3 +130,113 @@ def test_record_preserves_license_and_attribution_provenance():
     assert record["dataset_attribution"] == "Original publisher"
     assert record["dataset_record_id"] == "row-7"
     assert record["dataset_repository"] == "publisher/dataset"
+
+
+
+def test_prepare_builds_all_six_sources_and_appends_to_existing_sft(tmp_path, monkeypatch):
+    source_rows = {
+        "allenai/soda": [{
+            "id": "soda-1",
+            "dialogue": ["I need directions.", "Where are you going?"],
+            "speakers": ["A", "B"],
+        }],
+        "HuggingFaceTB/everyday-conversations-llama3.1-2k": [{
+            "id": "everyday-1",
+            "messages": [
+                {"role": "user", "content": "Good morning."},
+                {"role": "assistant", "content": "Good morning!"},
+            ],
+        }],
+        "3nesdeniz/english-daily-dialogues-10k": [{
+            "id": 11,
+            "turns": [
+                {"speaker": "A", "text": "Are you free today?"},
+                {"speaker": "B", "text": "Yes, after lunch."},
+            ],
+        }],
+        "AppliedLucent/synthetic_conversations": [{
+            "id": "synthetic-1",
+            "conversations": [
+                {"from": "human", "value": "I want to learn Python."},
+                {"from": "gpt", "value": "Let's start with variables."},
+            ],
+        }],
+    }
+
+    def fake_sample(repository, config, split, limit, seed):
+        return source_rows[repository]
+
+    monkeypatch.setattr(first_wave, "sample_viewer_rows", fake_sample)
+    monkeypatch.setattr(
+        first_wave,
+        "_download_multiwoz_examples",
+        lambda limit, seed: [
+            first_wave.make_record(
+                "multiwoz",
+                [
+                    {"role": "user", "content": "Find a restaurant."},
+                    {"role": "assistant", "content": "What area do you prefer?"},
+                ],
+                repository=first_wave.MULTIWOZ_SPEC["repository"],
+                license_name=first_wave.MULTIWOZ_SPEC["license"],
+                attribution=first_wave.MULTIWOZ_SPEC["attribution"],
+                split="train",
+            )
+        ],
+    )
+    monkeypatch.setattr(
+        first_wave,
+        "_download_social_dialogue_rows",
+        lambda limit, seed: [{
+            "id": "social-1",
+            "output": json.dumps({
+                "dialogue": [
+                    {"speaker": "Rin", "line": "How was your weekend?"},
+                    {"speaker": "Kai", "line": "Really relaxing, thanks."},
+                ],
+            }),
+        }],
+    )
+
+    existing_path = tmp_path / "existing_sft.jsonl"
+    existing_path.write_text(
+        json.dumps({
+            "state": first_wave.default_state(),
+            "messages": [
+                {"role": "user", "content": "Existing prompt."},
+                {"role": "assistant", "content": "Existing answer."},
+            ],
+            "dataset_source": "existing",
+        }) + "\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "first_wave.jsonl"
+    manifest_path = tmp_path / "manifest.json"
+
+    manifest = first_wave.prepare(
+        output=output,
+        manifest_output=manifest_path,
+        max_examples_per_source=2,
+        seed=42,
+        append_to=existing_path,
+    )
+
+    first_wave_records = [
+        json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()
+    ]
+    merged_records = [
+        json.loads(line) for line in existing_path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert len(first_wave_records) == 6
+    assert {item["dataset_source"] for item in first_wave_records} == {
+        "soda",
+        "everyday_conversations",
+        "english_daily_dialogues",
+        "synthetic_conversations",
+        "multiwoz",
+        "synthetic_social_dialogues",
+    }
+    assert len(merged_records) == 7
+    assert manifest["total_sources"] == 6
+    assert manifest["outputs"]["merged_sft_examples"] == 7
+    assert json.loads(manifest_path.read_text(encoding="utf-8"))["total_sources"] == 6
