@@ -105,6 +105,11 @@ To prepare the classifier data without training CatAI's chat model, run
 To run the repository's compile checks and test suite without starting any
 training or dataset-preparation jobs, select `training_mode: tests_only`.
 
+To run base-model pretraining without starting supervised fine-tuning, select
+`training_mode: base_only`. This runs the 32-stage base-training sequence and
+uploads the `catai-base-checkpoint` artifact; SFT and its extra chat-data jobs are
+skipped.
+
 DailyDialog (CC BY-NC-SA 4.0) and EmpatheticDialogues (CC BY-NC 4.0) converters
 remain available only for experiments with separate permission; neither is
 used in the default workflow because of its non-commercial restrictions.
