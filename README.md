@@ -143,10 +143,12 @@ token count, and achieved ratio.
 The hosted Base corpus build requests up to 1.89B source characters across
 four sources: 1.4B RedPajama-V2, 210M FineWeb-Edu, 140M Cosmopedia, and
 140M Common Corpus characters. Common Corpus is additionally capped at
-1,400 accepted documents. These are source-character ceilings, not a
+7,000 accepted documents. These are source-character ceilings, not a
 guaranteed token count; source filtering and availability can reduce the
 actual output. The generated manifest records the actual characters and
-documents accepted from every source.
+documents accepted from every source. The Common Corpus downloader defaults to
+7,000 accepted documents because the previous 1,000-document default stopped
+well before its 100M-character request was filled.
 
 To build the same Base-scale corpus from the command line:
 
@@ -154,7 +156,7 @@ To build the same Base-scale corpus from the command line:
 python data/download_corpus.py --output data/corpus.txt \
   --target-chars 1400000000 --fineweb-edu-chars 210000000 \
   --cosmopedia-chars 140000000 --common-corpus-chars 140000000 \
-  --common-corpus-max-documents 1400
+  --common-corpus-max-documents 7000
 ```
 
 The corpus combines:
