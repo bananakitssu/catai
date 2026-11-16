@@ -149,6 +149,12 @@ def _normalize_two_speaker_turns(
         {"role": role_by_speaker[speaker], "content": text}
         for speaker, text in clean_turns
     ]
+    # Some dialogue corpora end with an unfinished user turn. Drop that tail
+    # rather than emitting a supervised example without a target assistant reply.
+    while messages and messages[-1]["role"] != "assistant":
+        messages.pop()
+    if len(messages) < 2:
+        return None
     try:
         normalized = validate_messages(messages)
     except ValueError:
