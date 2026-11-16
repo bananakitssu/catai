@@ -51,14 +51,6 @@ PAGE_SOURCES: dict[str, dict[str, str]] = {
         "attribution": "Enes Deniz",
         "notes": "Synthetic, template-derived daily conversations; attribution required.",
     },
-    "synthetic_social_dialogues": {
-        "repository": "agentlans/synthetic-social-dialogues",
-        "config": "default",
-        "split": "train",
-        "license": "CC-BY-4.0",
-        "attribution": "agentlans, Synthetic Social Dialogues",
-        "notes": "Synthetic two-speaker social scenarios; generated names and Western-cultural bias are documented limitations.",
-    },
     "synthetic_conversations": {
         "repository": "AppliedLucent/synthetic_conversations",
         "config": "default",
@@ -74,6 +66,15 @@ MULTIWOZ_SPEC = {
     "license": "Apache-2.0",
     "attribution": "MultiWOZ 2.2 authors; see dataset card and paper citation.",
     "notes": "Human-written, task-oriented, schema-driven dialogue; narrow domain distribution.",
+}
+
+SOCIAL_DIALOGUE_SPEC = {
+    "repository": "agentlans/synthetic-social-dialogues",
+    "config": "direct-jsonl-zstd",
+    "split": "train",
+    "license": "CC-BY-4.0",
+    "attribution": "agentlans, Synthetic Social Dialogues",
+    "notes": "Synthetic two-speaker social scenarios; generated names and Western-cultural bias are documented limitations.",
 }
 MULTIWOZ_BASE_URL = (
     "https://raw.githubusercontent.com/budzianowski/multiwoz/master/"
@@ -476,18 +477,18 @@ def prepare(
             converted.append(make_record(
                 "synthetic_social_dialogues",
                 messages,
-                repository=PAGE_SOURCES["synthetic_social_dialogues"]["repository"],
-                license_name=PAGE_SOURCES["synthetic_social_dialogues"]["license"],
-                attribution=PAGE_SOURCES["synthetic_social_dialogues"]["attribution"],
+                repository=SOCIAL_DIALOGUE_SPEC["repository"],
+                license_name=SOCIAL_DIALOGUE_SPEC["license"],
+                attribution=SOCIAL_DIALOGUE_SPEC["attribution"],
                 split="train",
                 source_id=row.get("id", row_index),
-                notes=PAGE_SOURCES["synthetic_social_dialogues"]["notes"],
+                notes=SOCIAL_DIALOGUE_SPEC["notes"],
             ))
         converted = _deduplicate(converted)[:max_examples_per_source]
         if not converted:
             raise RuntimeError("no sampled social-dialogue rows converted into valid conversations")
         manifest["sources"]["synthetic_social_dialogues"] = {
-            **PAGE_SOURCES["synthetic_social_dialogues"],
+            **SOCIAL_DIALOGUE_SPEC,
             "sampled_rows": len(rows),
             "usable_examples": len(converted),
             "download": "official Hugging Face train.jsonl.zst; Zstandard decompressed",
@@ -500,7 +501,7 @@ def prepare(
         })
 
     # Fail closed: an incomplete six-source wave must not silently enter training.
-    expected_sources = set(PAGE_SOURCES) | {"multiwoz"}
+    expected_sources = set(PAGE_SOURCES) | {"multiwoz", "synthetic_social_dialogues"}
     missing = expected_sources - set(manifest["sources"])
     if missing:
         manifest_output.parent.mkdir(parents=True, exist_ok=True)
