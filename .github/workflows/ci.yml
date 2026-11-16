@@ -52,17 +52,16 @@ on:
         required: true
         default: false
       training_mode:
-        description: "Run tests, base-only or full training, SFT-only, emotion-data, or expanded dataset preparation"
+        description: "Run tests, full retraining, SFT-only, emotion-data, or expanded dataset preparation"
         type: choice
         options:
           - tests_only
-          - base_only
           - full
           - sft_only
           - emotions_only
           - datasets_only
         required: true
-        default: base_only
+        default: full
       base_checkpoint_run_id:
         description: "For sft_only: Actions run ID containing the catai-base-checkpoint artifact"
         required: false
@@ -110,7 +109,7 @@ jobs:
           CHAT_EXAMPLES: ${{ inputs.chat_examples || '10000' }}
           MAX_TOKENS: ${{ inputs.max_tokens || '200000000' }}
           MODEL_SIZE: ${{ inputs.model_size || 'small' }}
-          TRAINING_MODE: ${{ inputs.training_mode || 'base_only' }}
+          TRAINING_MODE: ${{ inputs.training_mode || 'full' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
           SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
         run: |
@@ -129,7 +128,7 @@ jobs:
           positive_int("BASE_EPOCHS", 5)
           positive_int("SFT_EPOCHS", 10)
           positive_int("CHAT_EXAMPLES", 50000)
-          if os.environ["TRAINING_MODE"] in {"full", "base_only"}:
+          if os.environ["TRAINING_MODE"] == "full":
               max_tokens = positive_int("MAX_TOKENS", 2500000000)
               parameter_counts = {"tiny": 1115264, "small": 6951168}
               model_size = os.environ["MODEL_SIZE"]
@@ -186,14 +185,14 @@ jobs:
           exit "$test_status"
 
   base_training:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
       - name: Verify B2 publisher secrets before expensive training
-        if: inputs.publish_model == true && inputs.training_mode == 'full'
+        if: inputs.publish_model == true
         env:
           B2_KEY_ID: ${{ secrets.B2_KEY_ID }}
           B2_APPLICATION_KEY: ${{ secrets.B2_APPLICATION_KEY }}
@@ -293,14 +292,12 @@ jobs:
           print("Reused checkpoint tokenizer and context match the selected experiment.")
           PY
       - name: Restore OASST1 source cache
-        if: inputs.training_mode == 'full'
         id: oasst-cache
         uses: actions/cache/restore@v4
         with:
           path: data/oasst1_ready.trees.jsonl.gz
           key: catai-oasst1-ready-v1
       - name: Build OASST1 CatAI chat dataset
-        if: inputs.training_mode == 'full'
         run: |
           python data/download_oasst1.py \
             --source data/oasst1_ready.trees.jsonl.gz \
@@ -311,14 +308,12 @@ jobs:
             --max-depth 4 \
             --keep-source
       - name: Restore OASST2 source cache
-        if: inputs.training_mode == 'full'
         id: oasst2-cache
         uses: actions/cache/restore@v4
         with:
           path: data/oasst2_ready.trees.jsonl.gz
           key: catai-oasst2-ready-v1
       - name: Build OASST2 CatAI chat dataset
-        if: inputs.training_mode == 'full'
         run: |
           python data/download_oasst2.py \
             --source data/oasst2_ready.trees.jsonl.gz \
@@ -329,13 +324,12 @@ jobs:
             --max-depth 4 \
             --keep-source
       - name: Save OASST2 source cache
-        if: inputs.training_mode == 'full' && steps.oasst2-cache.outputs.cache-hit != 'true'
+        if: steps.oasst2-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: data/oasst2_ready.trees.jsonl.gz
           key: catai-oasst2-ready-v1
       - name: Merge and balance OASST1 + OASST2
-        if: inputs.training_mode == 'full'
         env:
           CHAT_EXAMPLES: ${{ inputs.chat_examples || '10000' }}
         run: |
@@ -347,7 +341,6 @@ jobs:
             --seed 42
 
       - name: Validate OASST1 and CatAI personality datasets
-        if: inputs.training_mode == 'full'
         run: |
           python - <<'PY'
           from catai.chat_dataset import load_chat_dataset
@@ -368,7 +361,7 @@ jobs:
           PY
 
       - name: Save OASST1 source cache
-        if: inputs.training_mode == 'full' && steps.oasst-cache.outputs.cache-hit != 'true'
+        if: steps.oasst-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: data/oasst1_ready.trees.jsonl.gz
@@ -447,7 +440,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training2:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -521,7 +514,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training3:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training2]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -595,7 +588,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training4:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training3]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -669,7 +662,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training5:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training4]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -743,7 +736,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training6:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training5]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -817,7 +810,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training7:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training6]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -891,7 +884,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training8:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training7]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -965,7 +958,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training9:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training8]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -1039,7 +1032,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training10:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training9]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -1113,7 +1106,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training11:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training10]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -1187,7 +1180,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training12:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training11]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -1261,7 +1254,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training13:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training12]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -1335,7 +1328,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training14:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training13]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -1409,7 +1402,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training15:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training14]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -1483,7 +1476,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training16:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training15]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -1557,7 +1550,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training17:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training16]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -1631,7 +1624,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training18:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training17]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -1705,7 +1698,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training19:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training18]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -1779,7 +1772,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training20:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training19]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -1853,7 +1846,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training21:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training20]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -1927,7 +1920,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training22:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training21]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -2001,7 +1994,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training23:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training22]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -2075,7 +2068,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training24:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training23]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -2149,7 +2142,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training25:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training24]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -2223,7 +2216,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training26:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training25]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -2297,7 +2290,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training27:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training26]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -2371,7 +2364,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training28:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training27]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -2445,7 +2438,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training29:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training28]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -2519,7 +2512,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training30:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training29]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -2593,7 +2586,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training31:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training30]
     runs-on: ubuntu-latest
     timeout-minutes: 360
@@ -2667,7 +2660,7 @@ jobs:
           path: catai-base-recovery.pt
           retention-days: 7
   base_training32:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'base_only')
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
     needs: [test, base_training31]
     runs-on: ubuntu-latest
     timeout-minutes: 360
