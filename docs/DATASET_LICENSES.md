@@ -83,6 +83,26 @@ artifacts, with source and license metadata on every example. A research-only
 label means review is needed before using the data in a model intended for
 distribution; it does not mean the source is automatically unusable.
 
+## First-wave conversational sources
+
+The first-wave chat workflow adds these publisher-declared terms to the
+approved SFT candidate pool:
+
+| Source | Publisher-stated dataset license | Attribution and conditions |
+|---|---|---|
+| SODA | CC BY 4.0 | Attribution is stored in each prepared record. |
+| MultiWOZ 2.2 | Apache-2.0 | Dataset card declares Apache-2.0; upstream training JSON shards are SHA-256 verified. |
+| Everyday Conversations (Llama 3.1 2K) | Apache-2.0 | Dataset card declares Apache-2.0. |
+| English Daily Dialogues 10K | CC BY 4.0 | Attribution is stored in each prepared record. |
+| Synthetic Social Dialogues | CC BY 4.0 | Attribution is stored in each prepared record; the direct JSONL.ZST source is sampled without executing dataset code. |
+| AppliedLucent Synthetic Conversations | Apache-2.0 | Dataset card declares Apache-2.0. |
+
+The loader stores `dataset_repository`, `dataset_split`, `dataset_license`,
+`dataset_attribution`, and an upstream row/dialogue identifier where
+available. CC BY material must retain attribution. These are publisher-stated
+licenses, not a legal opinion about every possible underlying right or model
+distribution scenario.
+
 ## Pretraining sources and important qualifications
 
 | Source | Published terms | Qualification |
@@ -93,6 +113,19 @@ distribution; it does not mean the source is automatically unusable.
 - [FineWeb-Edu dataset card](https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu)
 - [ODC-By 1.0 license](https://opendatacommons.org/licenses/by/)
 - [RedPajama-V2 dataset card and license notice](https://huggingface.co/datasets/togethercomputer/RedPajama-Data-V2)
+| Cosmopedia v0.1 | Apache-2.0 on the Hugging Face dataset card | Synthetic generated educational/story text; the sidecar retains subset, seed source, format, and audience metadata. |
+| PleIAs Common Corpus | Per-document license metadata; no single license is applied to every row | The base-corpus loader keeps English rows only when each row explicitly matches the conservative allowlist (public domain, CC0, attribution-only CC BY, MIT, Apache-2.0, ODC-BY, or Licence Ouverte). It rejects non-commercial, no-derivatives, ShareAlike, unknown, and blank terms. |
+
+The mixed base corpus is interleaved document-by-document so token-prefix
+training includes every configured source. The generated
+`data/corpus.txt.provenance.jsonl` records document-level metadata for
+Cosmopedia and Common Corpus, while `data/corpus.txt.manifest.json` records
+aggregate source counts and the Common Corpus license policy. These files are
+training-run artifacts, not committed training data.
+
+- [Cosmopedia dataset card](https://huggingface.co/datasets/HuggingFaceTB/cosmopedia)
+- [PleIAs Common Corpus dataset card](https://huggingface.co/datasets/PleIAs/common_corpus)
+
 - [Common Crawl Terms of Use](https://commoncrawl.org/terms-of-use)
 
 The pretraining downloader writes a dedicated EOS boundary between documents;

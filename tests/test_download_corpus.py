@@ -95,3 +95,64 @@ def test_each_pretraining_document_is_followed_by_an_eos_marker():
         "First document text.\n" + DOCUMENT_EOS_MARKER + "\n\n"
         "Second document text.\n" + DOCUMENT_EOS_MARKER + "\n\n"
     )
+
+
+
+def test_common_corpus_license_filter_is_conservative():
+    from data.download_corpus import common_corpus_license_allowed
+
+    assert common_corpus_license_allowed("Public Domain")
+    assert common_corpus_license_allowed("CC BY 4.0")
+    assert common_corpus_license_allowed("Creative Commons Attribution 3.0")
+    assert common_corpus_license_allowed("MIT License")
+    assert common_corpus_license_allowed("Apache License 2.0")
+    assert common_corpus_license_allowed("ODC-By 1.0")
+    assert not common_corpus_license_allowed("CC BY-NC 4.0")
+    assert not common_corpus_license_allowed("CC BY-SA 4.0")
+    assert not common_corpus_license_allowed("CC BY-ND 4.0")
+    assert not common_corpus_license_allowed("Various open data")
+    assert not common_corpus_license_allowed(None)
+
+
+def test_corpus_mix_round_robins_sources_and_preserves_row_provenance(tmp_path):
+    from data.download_corpus import _write_document, mix_corpus_files
+
+    first = tmp_path / "first.txt"
+    second = tmp_path / "second.txt"
+    first_manifest = tmp_path / "first.manifest.jsonl"
+    second_manifest = tmp_path / "second.manifest.jsonl"
+
+    with first.open("w", encoding="utf-8") as stream:
+        _write_document(stream, "First source document one.")
+        _write_document(stream, "First source document two.")
+    with second.open("w", encoding="utf-8") as stream:
+        _write_document(stream, "Second source document one.")
+        _write_document(stream, "Second source document two.")
+
+    first_manifest.write_text(
+        '{"dataset":"common_corpus","license":"CC BY 4.0","identifier":"doc-a"}\n'
+        '{"dataset":"common_corpus","license":"Public Domain","identifier":"doc-b"}\n',
+        encoding="utf-8",
+    )
+    second_manifest.write_text(
+        '{"dataset":"cosmopedia","license":"Apache-2.0","subset":"stories"}\n'
+        '{"dataset":"cosmopedia","license":"Apache-2.0","subset":"openstax"}\n',
+        encoding="utf-8",
+    )
+
+    output = tmp_path / "mixed.txt"
+    provenance = tmp_path / "mixed.provenance.jsonl"
+    counts = mix_corpus_files(output, provenance, [
+        (first, first_manifest, {"dataset": "common_corpus"}),
+        (second, second_manifest, {"dataset": "cosmopedia"}),
+    ])
+
+    content = output.read_text(encoding="utf-8")
+    assert content.index("First source document one.") < content.index("Second source document one.")
+    assert content.index("Second source document one.") < content.index("First source document two.")
+    records = [json.loads(line) for line in provenance.read_text(encoding="utf-8").splitlines()]
+    assert [item["identifier"] for item in records if item["dataset"] == "common_corpus"] == [
+        "doc-a", "doc-b"
+    ]
+    assert records[1]["license"] == "Apache-2.0"
+    assert counts == {"common_corpus": 2, "cosmopedia": 2}

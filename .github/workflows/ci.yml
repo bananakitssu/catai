@@ -371,8 +371,11 @@ jobs:
         id: corpus-cache
         uses: actions/cache/restore@v4
         with:
-          path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          path: |
+            data/corpus.txt
+            data/corpus.txt.provenance.jsonl
+            data/corpus.txt.manifest.json
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -380,8 +383,20 @@ jobs:
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          path: |
+            data/corpus.txt
+            data/corpus.txt.provenance.jsonl
+            data/corpus.txt.manifest.json
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
+      - name: Upload base corpus provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-corpus-provenance
+          path: |
+            data/corpus.txt.manifest.json
+            data/corpus.txt.provenance.jsonl
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Train base model (part 1 of 32)
         env:
@@ -443,7 +458,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -452,7 +467,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -517,7 +532,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -526,7 +541,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -591,7 +606,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -600,7 +615,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -665,7 +680,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -674,7 +689,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -739,7 +754,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -748,7 +763,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -813,7 +828,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -822,7 +837,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -887,7 +902,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -896,7 +911,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -961,7 +976,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -970,7 +985,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -1035,7 +1050,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -1044,7 +1059,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -1109,7 +1124,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -1118,7 +1133,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -1183,7 +1198,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -1192,7 +1207,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -1257,7 +1272,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -1266,7 +1281,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -1331,7 +1346,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -1340,7 +1355,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -1405,7 +1420,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -1414,7 +1429,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -1479,7 +1494,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -1488,7 +1503,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -1553,7 +1568,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -1562,7 +1577,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -1627,7 +1642,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -1636,7 +1651,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -1701,7 +1716,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -1710,7 +1725,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -1775,7 +1790,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -1784,7 +1799,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -1849,7 +1864,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -1858,7 +1873,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -1923,7 +1938,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -1932,7 +1947,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -1997,7 +2012,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -2006,7 +2021,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -2071,7 +2086,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -2080,7 +2095,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -2145,7 +2160,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -2154,7 +2169,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -2219,7 +2234,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -2228,7 +2243,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -2293,7 +2308,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -2302,7 +2317,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -2367,7 +2382,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -2376,7 +2391,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -2441,7 +2456,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -2450,7 +2465,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -2515,7 +2530,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -2524,7 +2539,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -2589,7 +2604,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -2598,7 +2613,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -2663,7 +2678,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download real text corpus
         if: steps.corpus-cache.outputs.cache-hit != 'true'
         run: python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
@@ -2672,7 +2687,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: data/corpus.txt
-          key: catai-corpus-curated-v3-${{ hashFiles('data/download_corpus.py') }}
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
       - name: Download base training recovery checkpoint
         uses: actions/download-artifact@v4
         with:
@@ -2737,13 +2752,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install CatAI
-        run: python -m pip install -e .
+      - name: Install CatAI and dataset readers
+        run: python -m pip install -e ".[data]"
       - name: Prepare bounded samples from the expanded Hugging Face shortlist
         run: |
           python data/prepare_dataset_expansion.py \
             --max-examples-per-source 1000 \
             --seed 42
+      - name: Prepare first-wave conversational datasets
+        run: |
+          python data/prepare_first_wave_datasets.py \
+            --max-examples-per-source 1000 \
+            --seed 42 \
+            --output data/first_wave_chat.jsonl \
+            --manifest-output data/first_wave_datasets_manifest.json \
+            --append-to data/expanded_sft_chat.jsonl
       - name: Validate generated chat and emotion records
         run: |
           python - <<'PY'
@@ -2754,6 +2777,7 @@ jobs:
 
           paths = (
               "data/expanded_chat.jsonl",
+              "data/first_wave_chat.jsonl",
               "data/expanded_sft_chat.jsonl",
               "data/research_chat.jsonl",
               "data/expanded_emotion.jsonl",
@@ -2800,6 +2824,69 @@ jobs:
         with:
           name: catai-expanded-dataset-manifest
           path: data/expanded_datasets_manifest.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload first-wave chat dataset
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-first-wave-chat-datasets
+          path: data/first_wave_chat.jsonl
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload first-wave dataset manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-first-wave-dataset-manifest
+          path: data/first_wave_datasets_manifest.json
+          if-no-files-found: error
+          retention-days: 14
+
+  corpus_expansion:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'datasets_only'
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus readers
+        run: python -m pip install -e ".[data]"
+      - name: Restore expanded base corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            data/corpus.txt
+            data/corpus.txt.provenance.jsonl
+            data/corpus.txt.manifest.json
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
+      - name: Prepare expanded base-training corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: |
+          python data/download_corpus.py \
+            --output data/corpus.txt \
+            --target-chars 1000000000 \
+            --fineweb-edu-chars 150000000
+      - name: Save expanded base corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            data/corpus.txt
+            data/corpus.txt.provenance.jsonl
+            data/corpus.txt.manifest.json
+          key: catai-corpus-curated-v4-${{ hashFiles('data/download_corpus.py') }}
+      - name: Upload base corpus provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-corpus-provenance
+          path: |
+            data/corpus.txt.manifest.json
+            data/corpus.txt.provenance.jsonl
           if-no-files-found: error
           retention-days: 14
 
