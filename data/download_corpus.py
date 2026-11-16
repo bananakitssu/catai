@@ -341,6 +341,7 @@ COSMOPEDIA_SUBSETS = (
     "auto_math_text",
 )
 COMMON_CORPUS_REPOSITORY = "PleIAs/common_corpus"
+DEFAULT_COMMON_CORPUS_MAX_DOCUMENTS = 7_000
 COMMON_CORPUS_LICENSE_POLICY = (
     "Keep English documents only when the per-document license explicitly "
     "matches public domain, CC0, attribution-only CC BY, MIT, Apache-2.0, "
@@ -483,7 +484,7 @@ def download_common_corpus(
     target_chars: int,
     seed: int,
     *,
-    max_documents: int = 1_000,
+    max_documents: int = DEFAULT_COMMON_CORPUS_MAX_DOCUMENTS,
 ) -> dict[str, object]:
     """Stream English Common Corpus text, accepting only explicitly allowed row licenses."""
     if target_chars <= 0:
@@ -679,7 +680,7 @@ def build_training_corpus(
     max_documents: int | None, seed: int,
     cosmopedia_chars: int = 100_000_000,
     common_corpus_chars: int = 100_000_000,
-    common_corpus_max_documents: int = 1_000,
+    common_corpus_max_documents: int = DEFAULT_COMMON_CORPUS_MAX_DOCUMENTS,
 ) -> None:
     """Build a round-robin mix of quality-filtered RedPajama, FineWeb, and new sources."""
     if fineweb_edu_chars < 0 or cosmopedia_chars < 0 or common_corpus_chars < 0:
@@ -787,7 +788,7 @@ def main() -> None:
     parser.add_argument("--fineweb-edu-chars", type=int, default=15_000_000)
     parser.add_argument("--cosmopedia-chars", type=int, default=100_000_000)
     parser.add_argument("--common-corpus-chars", type=int, default=100_000_000)
-    parser.add_argument("--common-corpus-max-documents", type=int, default=1_000)
+    parser.add_argument("--common-corpus-max-documents", type=int, default=DEFAULT_COMMON_CORPUS_MAX_DOCUMENTS)
     parser.add_argument("--snapshot", default=REDPAJAMA_DEFAULT_SNAPSHOT)
     parser.add_argument("--language", default=REDPAJAMA_DEFAULT_LANGUAGE)
     parser.add_argument("--partition", default=REDPAJAMA_DEFAULT_PARTITION)

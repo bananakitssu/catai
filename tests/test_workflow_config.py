@@ -90,7 +90,7 @@ def test_hosted_base_corpus_budget_is_expanded_and_cache_is_invalidated() -> Non
         "--fineweb-edu-chars 210000000",
         "--cosmopedia-chars 140000000",
         "--common-corpus-chars 140000000",
-        "--common-corpus-max-documents 1400",
+        "--common-corpus-max-documents 7000",
     )
 
     for name, block in blocks:
@@ -106,6 +106,6 @@ def test_hosted_base_corpus_budget_is_expanded_and_cache_is_invalidated() -> Non
     for argument in expected_arguments:
         assert argument in expansion.group("body")
 
-    cache_key = "catai-corpus-curated-v5-${{ hashFiles('data/download_corpus.py') }}"
+    cache_key = "catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}"
     assert "catai-corpus-curated-v4-" not in workflow
     assert workflow.count(f"key: {cache_key}") >= len(blocks) + 1
