@@ -2767,6 +2767,14 @@ jobs:
             --output data/first_wave_chat.jsonl \
             --manifest-output data/first_wave_datasets_manifest.json \
             --append-to data/expanded_sft_chat.jsonl
+      - name: Upload first-wave dataset manifest (including failures)
+        if: always() && hashFiles('data/first_wave_datasets_manifest.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-first-wave-dataset-manifest
+          path: data/first_wave_datasets_manifest.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Validate generated chat and emotion records
         run: |
           python - <<'PY'
@@ -2820,6 +2828,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: Upload dataset manifest
+        if: always() && hashFiles('data/expanded_datasets_manifest.json') != ''
         uses: actions/upload-artifact@v4
         with:
           name: catai-expanded-dataset-manifest
@@ -2831,13 +2840,6 @@ jobs:
         with:
           name: catai-first-wave-chat-datasets
           path: data/first_wave_chat.jsonl
-          if-no-files-found: error
-          retention-days: 14
-      - name: Upload first-wave dataset manifest
-        uses: actions/upload-artifact@v4
-        with:
-          name: catai-first-wave-dataset-manifest
-          path: data/first_wave_datasets_manifest.json
           if-no-files-found: error
           retention-days: 14
 

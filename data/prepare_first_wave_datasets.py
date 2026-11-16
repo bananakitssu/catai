@@ -62,11 +62,19 @@ PAGE_SOURCES: dict[str, dict[str, str]] = {
     },
 }
 
+# Pin to the upstream revision whose 17 train-shard sizes match the
+# SHA-256 catalog published in pfb30/multi_woz_v22@5bdb646.
+# The upstream master branch was edited after that catalog was generated.
+MULTIWOZ_UPSTREAM_REVISION = "73ab4c8b52170ab2d63c75997c9b914c7f650e44"
+MULTIWOZ_CHECKSUMS_REVISION = "5bdb646e874107188e86c6f7bff3b642a2073bfd"
+
 MULTIWOZ_SPEC = {
     "repository": "pfb30/multi_woz_v22",
     "license": "Apache-2.0",
     "attribution": "MultiWOZ 2.2 authors; see dataset card and paper citation.",
     "notes": "Human-written, task-oriented, schema-driven dialogue; narrow domain distribution.",
+    "upstream_repository": "budzianowski/multiwoz",
+    "upstream_revision": MULTIWOZ_UPSTREAM_REVISION,
 }
 
 SOCIAL_DIALOGUE_SPEC = {
@@ -78,8 +86,8 @@ SOCIAL_DIALOGUE_SPEC = {
     "notes": "Synthetic two-speaker social scenarios; generated names and Western-cultural bias are documented limitations.",
 }
 MULTIWOZ_BASE_URL = (
-    "https://raw.githubusercontent.com/budzianowski/multiwoz/master/"
-    "data/MultiWOZ_2.2/train/"
+    "https://raw.githubusercontent.com/budzianowski/multiwoz/"
+    f"{MULTIWOZ_UPSTREAM_REVISION}/data/MultiWOZ_2.2/train/"
 )
 # SHA-256 values published in the Hugging Face multi_woz_v22 dataset_infos.json.
 MULTIWOZ_TRAIN_SHARDS: dict[str, str] = {
@@ -467,7 +475,14 @@ def prepare(
             "split": "train",
             "sampled_examples": len(multiwoz),
             "usable_examples": len(multiwoz),
-            "integrity": "SHA-256 verified against Hugging Face dataset_infos.json",
+            "integrity": {
+                "algorithm": "sha256",
+                "checksums_repository": "pfb30/multi_woz_v22",
+                "checksums_revision": MULTIWOZ_CHECKSUMS_REVISION,
+                "upstream_repository": MULTIWOZ_SPEC["upstream_repository"],
+                "upstream_revision": MULTIWOZ_UPSTREAM_REVISION,
+                "verified_shards": sorted(MULTIWOZ_TRAIN_SHARDS),
+            },
         }
     except Exception as exc:
         manifest["errors"].append({
