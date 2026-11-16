@@ -29,10 +29,7 @@ python data/generate_corpus.py --sentences 100000 --output data/train.txt
 
 # Build a curated real-text corpus
 python -m pip install -e ".[data]"
-python data/download_corpus.py --output data/corpus.txt \
-  --target-chars 1400000000 --fineweb-edu-chars 210000000 \
-  --cosmopedia-chars 140000000 --common-corpus-chars 140000000 \
-  --common-corpus-max-documents 1400
+python data/download_corpus.py --output data/corpus.txt --target-chars 1000000000 --fineweb-edu-chars 150000000
 
 # Train the recommended small BPE model with a 200M-token budget
 python -m catai --corpus data/corpus.txt --checkpoint catai.pt --model-size small --tokenizer bpe --vocab-size 2048 --max-tokens 200000000 --validation-split 0.05 --warmup-fraction 0.03 --minimum-learning-rate-ratio 0.1
@@ -150,6 +147,15 @@ four sources: 1.4B RedPajama-V2, 210M FineWeb-Edu, 140M Cosmopedia, and
 guaranteed token count; source filtering and availability can reduce the
 actual output. The generated manifest records the actual characters and
 documents accepted from every source.
+
+To build the same Base-scale corpus from the command line:
+
+```bash
+python data/download_corpus.py --output data/corpus.txt \
+  --target-chars 1400000000 --fineweb-edu-chars 210000000 \
+  --cosmopedia-chars 140000000 --common-corpus-chars 140000000 \
+  --common-corpus-max-documents 1400
+```
 
 The corpus combines:
 - English RedPajama-V2 `head_middle` documents filtered using published
