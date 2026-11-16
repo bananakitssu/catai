@@ -193,7 +193,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Verify B2 publisher secrets before expensive training
-        if: inputs.publish_model == true
+        if: inputs.publish_model == true && inputs.training_mode == 'full'
         env:
           B2_KEY_ID: ${{ secrets.B2_KEY_ID }}
           B2_APPLICATION_KEY: ${{ secrets.B2_APPLICATION_KEY }}
@@ -293,12 +293,14 @@ jobs:
           print("Reused checkpoint tokenizer and context match the selected experiment.")
           PY
       - name: Restore OASST1 source cache
+        if: inputs.training_mode == 'full'
         id: oasst-cache
         uses: actions/cache/restore@v4
         with:
           path: data/oasst1_ready.trees.jsonl.gz
           key: catai-oasst1-ready-v1
       - name: Build OASST1 CatAI chat dataset
+        if: inputs.training_mode == 'full'
         run: |
           python data/download_oasst1.py \
             --source data/oasst1_ready.trees.jsonl.gz \
@@ -309,12 +311,14 @@ jobs:
             --max-depth 4 \
             --keep-source
       - name: Restore OASST2 source cache
+        if: inputs.training_mode == 'full'
         id: oasst2-cache
         uses: actions/cache/restore@v4
         with:
           path: data/oasst2_ready.trees.jsonl.gz
           key: catai-oasst2-ready-v1
       - name: Build OASST2 CatAI chat dataset
+        if: inputs.training_mode == 'full'
         run: |
           python data/download_oasst2.py \
             --source data/oasst2_ready.trees.jsonl.gz \
@@ -325,12 +329,13 @@ jobs:
             --max-depth 4 \
             --keep-source
       - name: Save OASST2 source cache
-        if: steps.oasst2-cache.outputs.cache-hit != 'true'
+        if: inputs.training_mode == 'full' && steps.oasst2-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: data/oasst2_ready.trees.jsonl.gz
           key: catai-oasst2-ready-v1
       - name: Merge and balance OASST1 + OASST2
+        if: inputs.training_mode == 'full'
         env:
           CHAT_EXAMPLES: ${{ inputs.chat_examples || '10000' }}
         run: |
@@ -342,6 +347,7 @@ jobs:
             --seed 42
 
       - name: Validate OASST1 and CatAI personality datasets
+        if: inputs.training_mode == 'full'
         run: |
           python - <<'PY'
           from catai.chat_dataset import load_chat_dataset
@@ -362,7 +368,7 @@ jobs:
           PY
 
       - name: Save OASST1 source cache
-        if: steps.oasst-cache.outputs.cache-hit != 'true'
+        if: inputs.training_mode == 'full' && steps.oasst-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: data/oasst1_ready.trees.jsonl.gz
