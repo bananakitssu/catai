@@ -1,4 +1,5 @@
 from catai.config import MODEL_PRESETS, ModelConfig, TrainingConfig
+from catai.model import CatAI
 
 
 def test_training_config_rejects_invalid_values():
@@ -33,3 +34,15 @@ def test_model_presets_are_scalable():
         pass
     else:
         raise AssertionError("expected unknown preset to fail")
+
+
+def test_base_preset_parameter_count_matches_actions_validation():
+    config = ModelConfig.from_preset("base")
+    model = CatAI(
+        vocab_size=2048,
+        max_seq_len=16,
+        d_model=config.d_model,
+        n_heads=config.n_heads,
+        n_layers=config.n_layers,
+    )
+    assert model.parameter_count() == 39_596_544
