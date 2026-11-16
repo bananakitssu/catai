@@ -80,3 +80,33 @@ def test_hosted_workflow_defaults_to_base_and_trains_on_approved_expansion() -> 
     assert workflow.count("--markdown-ratio 0.05") == 2
     assert "data/prepare_markdown_sft.py" in workflow
     assert workflow.count("needs.dataset_expansion.result == 'success'") == 2
+
+
+
+def test_hosted_base_corpus_budget_is_expanded_and_cache_is_invalidated() -> None:
+    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
+    blocks = _base_training_blocks(workflow)
+    expected_arguments = (
+        "--target-chars 1400000000",
+        "--fineweb-edu-chars 210000000",
+        "--cosmopedia-chars 140000000",
+        "--common-corpus-chars 140000000",
+        "--common-corpus-max-documents 1400",
+    )
+
+    for name, block in blocks:
+        for argument in expected_arguments:
+            assert argument in block, f"{name} is missing {argument}"
+
+    expansion = re.search(
+        r"^  corpus_expansion:\\n(?P<body>.*?)(?=^  [a-zA-Z0-9_]+:\\n|\\Z)",
+        workflow,
+        re.MULTILINE | re.DOTALL,
+    )
+    assert expansion is not None
+    for argument in expected_arguments:
+        assert argument in expansion.group("body")
+
+    cache_key = "catai-corpus-curated-v5-${{ hashFiles('data/download_corpus.py') }}"
+    assert "catai-corpus-curated-v4-" not in workflow
+    assert workflow.count(f"key: {cache_key}") >= len(blocks) + 1
