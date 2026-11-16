@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
 from catai.chat_dataset import default_state, validate_messages
@@ -431,7 +432,7 @@ def prepare(
                     license_name=spec["license"],
                     attribution=spec["attribution"],
                     split=spec["split"],
-                    source_id=row.get("id", row.get("dialogue_id", row_index)),
+                    source_id=row.get("id", row.get("dialogue_id", row.get("original_index", row_index))),
                     notes=spec["notes"],
                 ))
             random.Random(seed + index).shuffle(converted)
