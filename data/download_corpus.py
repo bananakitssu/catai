@@ -8,6 +8,7 @@ import hashlib
 import io
 import json
 import random
+import re
 import shutil
 import time
 from pathlib import Path
@@ -331,35 +332,451 @@ def download_fineweb_edu(
     return {"characters": chars, "documents": docs, "rejected": rejected}
 
 
+COSMOPEDIA_REPOSITORY = "HuggingFaceTB/cosmopedia"
+COSMOPEDIA_SUBSETS = (
+    "openstax",
+    "khanacademy",
+    "stanford",
+    "stories",
+    "auto_math_text",
+)
+COMMON_CORPUS_REPOSITORY = "PleIAs/common_corpus"
+COMMON_CORPUS_LICENSE_POLICY = (
+    "Keep English documents only when the per-document license explicitly "
+    "matches public domain, CC0, attribution-only CC BY, MIT, Apache-2.0, "
+    "ODC-BY, or Licence Ouverte. Reject NC, ND, ShareAlike, unknown, and blank terms."
+)
+
+
+def common_corpus_license_allowed(value: object) -> bool:
+    """Conservatively accept only explicit public-domain/permissive licenses."""
+    if not isinstance(value, str) or not value.strip():
+        return False
+    license_text = re.sub(r"\s+", " ", value.strip()).upper()
+    compact = re.sub(r"[^A-Z0-9]+", " ", license_text).strip()
+
+    # These restrictions override any permissive-looking fragment.
+    if any(term in compact for term in (
+        "NON COMMERCIAL", "NONCOMMERCIAL", "NO DERIVATIVES",
+        "SHARE ALIKE", "SHAREALIKE",
+    )):
+        return False
+    if re.search(r"(?:^| )(?:NC|ND|SA)(?: |$)", compact):
+        return False
+
+    if "PUBLIC DOMAIN" in license_text or re.search(r"\bCC0(?:\b|[- ])", license_text):
+        return True
+    if re.search(r"\bCC[\s-]*BY(?:[\s-]*(?:2(?:\.0|\.5)?|3(?:\.0)?|4(?:\.0)?))?(?:\b|$)", license_text):
+        return True
+    if "CREATIVE COMMONS ATTRIBUTION" in license_text:
+        return True
+    if re.fullmatch(r"MIT(?: LICENSE)?", compact):
+        return True
+    if re.search(r"\bAPACHE(?: LICENSE)?[\s-]*2(?:\.0)?\b", license_text):
+        return True
+    if re.search(r"\bODC[\s-]*BY(?:[\s-]*1(?:\.0)?)?\b", license_text):
+        return True
+    if "LICENCE OUVERTE" in license_text or "OPEN GOVERNMENT LICENCE V3" in license_text:
+        return True
+    return False
+
+
+def _write_provenance_record(destination: TextIO, record: dict[str, object]) -> None:
+    destination.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n")
+
+
+def download_cosmopedia(
+    output: Path,
+    target_chars: int,
+    seed: int,
+) -> dict[str, object]:
+    """Stream a bounded, deterministic mix of Cosmopedia's educational/story subsets."""
+    if target_chars <= 0:
+        raise ValueError("--cosmopedia-chars must be positive")
+    try:
+        from datasets import load_dataset
+    except ImportError as exc:
+        raise RuntimeError("Cosmopedia requires datasets; install .[data].") from exc
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    provenance_path = output.with_name(output.name + ".manifest.jsonl")
+    chars = documents = rejected = duplicates = 0
+    subset_stats: dict[str, dict[str, int]] = {}
+    seen_digests: set[str] = set()
+    per_subset_target = (target_chars + len(COSMOPEDIA_SUBSETS) - 1) // len(COSMOPEDIA_SUBSETS)
+
+    with output.open("w", encoding="utf-8") as destination, provenance_path.open(
+        "w", encoding="utf-8"
+    ) as provenance:
+        for subset_index, subset in enumerate(COSMOPEDIA_SUBSETS):
+            subset_chars = subset_documents = subset_rejected = 0
+            dataset = load_dataset(
+                COSMOPEDIA_REPOSITORY,
+                subset,
+                split="train",
+                streaming=True,
+            ).shuffle(seed=seed + subset_index, buffer_size=1_000)
+            for row in dataset:
+                text = row.get("text") if isinstance(row, dict) else None
+                if not isinstance(text, str) or len(text.strip()) < 100:
+                    subset_rejected += 1
+                    continue
+                normalized = text.strip()
+                digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+                if digest in seen_digests:
+                    duplicates += 1
+                    continue
+                seen_digests.add(digest)
+                remaining = min(
+                    target_chars - chars,
+                    per_subset_target - subset_chars,
+                )
+                if remaining <= 0:
+                    break
+                chunk = normalized[:remaining]
+                if len(chunk.split()) < 20:
+                    subset_rejected += 1
+                    continue
+                _write_document(destination, chunk)
+                _write_provenance_record(provenance, {
+                    "dataset": "cosmopedia",
+                    "repository": COSMOPEDIA_REPOSITORY,
+                    "license": "Apache-2.0 (dataset card)",
+                    "subset": subset,
+                    "seed_data": row.get("seed_data"),
+                    "format": row.get("format"),
+                    "audience": row.get("audience"),
+                })
+                chars += len(chunk)
+                subset_chars += len(chunk)
+                documents += 1
+                subset_documents += 1
+                if chars >= target_chars or subset_chars >= per_subset_target:
+                    break
+            subset_stats[subset] = {
+                "characters": subset_chars,
+                "documents": subset_documents,
+                "rejected": subset_rejected,
+            }
+            rejected += subset_rejected
+            if chars >= target_chars:
+                break
+
+    if chars == 0:
+        raise RuntimeError("Cosmopedia yielded no usable text")
+    print(
+        f"Cosmopedia: {chars:,} chars from {documents:,} docs; "
+        f"{duplicates:,} duplicates and {rejected:,} rejected."
+    )
+    return {
+        "characters": chars,
+        "documents": documents,
+        "rejected": rejected,
+        "duplicates": duplicates,
+        "subsets": subset_stats,
+        "license": "Apache-2.0 (publisher-declared; generated text uses external seed sources)",
+    }
+
+
+def download_common_corpus(
+    output: Path,
+    target_chars: int,
+    seed: int,
+    *,
+    max_documents: int = 1_000,
+) -> dict[str, object]:
+    """Stream English Common Corpus text, accepting only explicitly allowed row licenses."""
+    if target_chars <= 0:
+        raise ValueError("--common-corpus-chars must be positive")
+    if max_documents < 1:
+        raise ValueError("--common-corpus-max-documents must be positive")
+    try:
+        from datasets import load_dataset
+    except ImportError as exc:
+        raise RuntimeError("Common Corpus requires datasets; install .[data].") from exc
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    provenance_path = output.with_name(output.name + ".manifest.jsonl")
+    dataset = load_dataset(
+        COMMON_CORPUS_REPOSITORY,
+        split="train",
+        streaming=True,
+    ).shuffle(seed=seed, buffer_size=256)
+
+    chars = documents = rejected_language = rejected_license = rejected_text = duplicates = 0
+    license_counts: dict[str, int] = {}
+    seen_digests: set[str] = set()
+    with output.open("w", encoding="utf-8") as destination, provenance_path.open(
+        "w", encoding="utf-8"
+    ) as provenance:
+        for row in dataset:
+            if not isinstance(row, dict):
+                rejected_text += 1
+                continue
+            language = str(row.get("language", "")).strip().lower()
+            if language not in {"english", "en"}:
+                rejected_language += 1
+                continue
+            license_name = row.get("license")
+            if not common_corpus_license_allowed(license_name):
+                rejected_license += 1
+                continue
+            text = row.get("text")
+            if not isinstance(text, str):
+                rejected_text += 1
+                continue
+            normalized = text.strip()
+            if len(normalized.split()) < 50 or len(normalized) < 250:
+                rejected_text += 1
+                continue
+            digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+            if digest in seen_digests:
+                duplicates += 1
+                continue
+            seen_digests.add(digest)
+            remaining = target_chars - chars
+            if remaining <= 0:
+                break
+            chunk = normalized[:remaining]
+            if len(chunk.split()) < 30:
+                rejected_text += 1
+                continue
+            _write_document(destination, chunk)
+            _write_provenance_record(provenance, {
+                "dataset": "common_corpus",
+                "repository": COMMON_CORPUS_REPOSITORY,
+                "identifier": row.get("identifier"),
+                "collection": row.get("collection"),
+                "open_type": row.get("open_type"),
+                "license": license_name,
+                "date": row.get("date"),
+                "title": row.get("title"),
+                "creator": row.get("creator"),
+                "language": row.get("language"),
+            })
+            license_counts[str(license_name)] = license_counts.get(str(license_name), 0) + 1
+            chars += len(chunk)
+            documents += 1
+            if chars >= target_chars or documents >= max_documents:
+                break
+
+    if chars == 0:
+        raise RuntimeError(
+            "Common Corpus produced no English documents with an explicitly approved license"
+        )
+    print(
+        f"Common Corpus: {chars:,} chars from {documents:,} docs; "
+        f"{rejected_language:,} non-English, {rejected_license:,} license-rejected, "
+        f"{rejected_text:,} invalid and {duplicates:,} duplicate rows rejected."
+    )
+    return {
+        "characters": chars,
+        "documents": documents,
+        "rejected_language": rejected_language,
+        "rejected_license": rejected_license,
+        "rejected_text": rejected_text,
+        "duplicates": duplicates,
+        "license_counts": license_counts,
+        "license_policy": COMMON_CORPUS_LICENSE_POLICY,
+    }
+
+
+def _iter_corpus_documents(
+    path: Path,
+    provenance_path: Path | None,
+    fallback_metadata: dict[str, object],
+):
+    """Yield document text paired with its sidecar provenance (or source defaults)."""
+    metadata_stream = (
+        provenance_path.open("r", encoding="utf-8")
+        if provenance_path is not None and provenance_path.is_file()
+        else None
+    )
+    try:
+        with path.open("r", encoding="utf-8") as source:
+            document_lines: list[str] = []
+            for line in source:
+                if line.rstrip("\r\n") == DOCUMENT_EOS_MARKER:
+                    document = "".join(document_lines).strip()
+                    document_lines = []
+                    if not document:
+                        continue
+                    metadata = dict(fallback_metadata)
+                    if metadata_stream is not None:
+                        metadata_line = metadata_stream.readline()
+                        if not metadata_line:
+                            raise ValueError(
+                                f"provenance sidecar ended before corpus documents in {path}"
+                            )
+                        parsed = json.loads(metadata_line)
+                        if not isinstance(parsed, dict):
+                            raise ValueError(f"invalid provenance record in {provenance_path}")
+                        metadata.update(parsed)
+                    yield document, metadata
+                else:
+                    document_lines.append(line)
+            trailing = "".join(document_lines).strip()
+            if trailing:
+                metadata = dict(fallback_metadata)
+                if metadata_stream is not None:
+                    metadata_line = metadata_stream.readline()
+                    if not metadata_line:
+                        raise ValueError(
+                            f"provenance sidecar ended before trailing corpus document in {path}"
+                        )
+                    parsed = json.loads(metadata_line)
+                    if not isinstance(parsed, dict):
+                        raise ValueError(f"invalid provenance record in {provenance_path}")
+                    metadata.update(parsed)
+                yield trailing, metadata
+            if metadata_stream is not None and metadata_stream.readline():
+                raise ValueError(
+                    f"provenance sidecar has more records than corpus documents in {provenance_path}"
+                )
+    finally:
+        if metadata_stream is not None:
+            metadata_stream.close()
+
+
+def mix_corpus_files(
+    output: Path,
+    provenance_output: Path,
+    sources: list[tuple[Path, Path | None, dict[str, object]]],
+) -> dict[str, int]:
+    """Round-robin source documents so prefix-capped training sees every corpus."""
+    output.parent.mkdir(parents=True, exist_ok=True)
+    provenance_output.parent.mkdir(parents=True, exist_ok=True)
+    iterators = [
+        iter(_iter_corpus_documents(path, sidecar, metadata))
+        for path, sidecar, metadata in sources
+    ]
+    active = [True] * len(iterators)
+    counts: dict[str, int] = {}
+    with output.open("w", encoding="utf-8") as destination, provenance_output.open(
+        "w", encoding="utf-8"
+    ) as provenance:
+        while any(active):
+            for index, iterator in enumerate(iterators):
+                if not active[index]:
+                    continue
+                try:
+                    document, metadata = next(iterator)
+                except StopIteration:
+                    active[index] = False
+                    continue
+                _write_document(destination, document)
+                _write_provenance_record(provenance, metadata)
+                source_name = str(metadata.get("dataset", "unknown"))
+                counts[source_name] = counts.get(source_name, 0) + 1
+    if not any(counts.values()):
+        raise RuntimeError("mixed corpus contains no documents")
+    return counts
+
+
 def build_training_corpus(
     output: Path, *, target_chars: int, fineweb_edu_chars: int,
     snapshot: str, language: str, partition: str,
     max_documents: int | None, seed: int,
+    cosmopedia_chars: int = 100_000_000,
+    common_corpus_chars: int = 100_000_000,
+    common_corpus_max_documents: int = 1_000,
 ) -> None:
-    """Write FineWeb-Edu first so it is included in prefix-capped training."""
+    """Build a round-robin mix of quality-filtered RedPajama, FineWeb, and new sources."""
+    if fineweb_edu_chars < 0 or cosmopedia_chars < 0 or common_corpus_chars < 0:
+        raise ValueError("corpus source character budgets must be non-negative")
     output.parent.mkdir(parents=True, exist_ok=True)
     rp_path = output.with_name(output.name + ".redpajama")
     edu_path = output.with_name(output.name + ".fineweb-edu")
-    mixed_path = output.with_name(output.name + ".part")
+    cosmopedia_path = output.with_name(output.name + ".cosmopedia")
+    common_path = output.with_name(output.name + ".common-corpus")
+    mixed_manifest = output.with_name(output.name + ".provenance.jsonl")
+    sources: list[tuple[Path, Path | None, dict[str, object]]] = []
+    summary: dict[str, object] = {
+        "format": "catai-base-corpus-manifest",
+        "version": 1,
+        "seed": seed,
+        "sources": {},
+        "provenance_file": str(mixed_manifest),
+        "common_corpus_license_policy": COMMON_CORPUS_LICENSE_POLICY,
+    }
+    temporary_paths = [rp_path, edu_path, cosmopedia_path, common_path]
     try:
-        download_redpajama(
+        rp_stats = download_redpajama(
             rp_path, target_chars, snapshot, language, partition, max_documents, seed
         )
+        sources.append((rp_path, None, {
+            "dataset": "redpajama-v2",
+            "repository": "togethercomputer/RedPajama-Data-V2",
+            "license": "Common Crawl Terms of Use; see dataset card",
+        }))
+        summary["sources"]["redpajama-v2"] = rp_stats
+
         if fineweb_edu_chars > 0:
-            download_fineweb_edu(edu_path, fineweb_edu_chars, seed)
-            with mixed_path.open("wb") as destination:
-                with edu_path.open("rb") as source:
-                    shutil.copyfileobj(source, destination)
-                destination.write(b"\n\n")
-                with rp_path.open("rb") as source:
-                    shutil.copyfileobj(source, destination)
-            mixed_path.replace(output)
-        else:
-            rp_path.replace(output)
+            edu_stats = download_fineweb_edu(edu_path, fineweb_edu_chars, seed)
+            sources.append((edu_path, None, {
+                "dataset": "fineweb-edu",
+                "repository": "HuggingFaceFW/fineweb-edu",
+                "license": "ODC-BY-1.0; Common Crawl and source terms also apply",
+            }))
+            summary["sources"]["fineweb-edu"] = edu_stats
+
+        if cosmopedia_chars > 0:
+            cosmopedia_stats = download_cosmopedia(cosmopedia_path, cosmopedia_chars, seed)
+            sources.append((
+                cosmopedia_path,
+                cosmopedia_path.with_name(cosmopedia_path.name + ".manifest.jsonl"),
+                {
+                    "dataset": "cosmopedia",
+                    "repository": COSMOPEDIA_REPOSITORY,
+                    "license": "Apache-2.0 (dataset card)",
+                },
+            ))
+            summary["sources"]["cosmopedia"] = cosmopedia_stats
+            temporary_paths.append(
+                cosmopedia_path.with_name(cosmopedia_path.name + ".manifest.jsonl")
+            )
+
+        if common_corpus_chars > 0:
+            common_stats = download_common_corpus(
+                common_path,
+                common_corpus_chars,
+                seed,
+                max_documents=common_corpus_max_documents,
+            )
+            sources.append((
+                common_path,
+                common_path.with_name(common_path.name + ".manifest.jsonl"),
+                {
+                    "dataset": "common_corpus",
+                    "repository": COMMON_CORPUS_REPOSITORY,
+                    "license": "Per-document; see provenance sidecar",
+                },
+            ))
+            summary["sources"]["common-corpus"] = common_stats
+            temporary_paths.append(
+                common_path.with_name(common_path.name + ".manifest.jsonl")
+            )
+
+        document_counts = mix_corpus_files(output, mixed_manifest, sources)
+        summary["mixed_document_counts"] = document_counts
+        summary["total_documents"] = sum(document_counts.values())
+        summary["total_source_chars"] = sum(
+            int(item.get("characters", 0))
+            for item in summary["sources"].values()
+            if isinstance(item, dict)
+        )
+        manifest_path = output.with_name(output.name + ".manifest.json")
+        manifest_path.write_text(
+            json.dumps(summary, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        print(
+            f"Mixed corpus: {summary['total_documents']:,} documents from "
+            f"{len(document_counts)} sources; provenance: {mixed_manifest}"
+        )
     finally:
-        rp_path.unlink(missing_ok=True)
-        edu_path.unlink(missing_ok=True)
-        mixed_path.unlink(missing_ok=True)
+        for path in temporary_paths:
+            path.unlink(missing_ok=True)
 
 
 def main() -> None:
@@ -368,6 +785,9 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=Path("data/corpus.txt"))
     parser.add_argument("--target-chars", type=int, default=100_000_000)
     parser.add_argument("--fineweb-edu-chars", type=int, default=15_000_000)
+    parser.add_argument("--cosmopedia-chars", type=int, default=100_000_000)
+    parser.add_argument("--common-corpus-chars", type=int, default=100_000_000)
+    parser.add_argument("--common-corpus-max-documents", type=int, default=1_000)
     parser.add_argument("--snapshot", default=REDPAJAMA_DEFAULT_SNAPSHOT)
     parser.add_argument("--language", default=REDPAJAMA_DEFAULT_LANGUAGE)
     parser.add_argument("--partition", default=REDPAJAMA_DEFAULT_PARTITION)
@@ -378,9 +798,17 @@ def main() -> None:
         download_tiny_shakespeare(args.output)
         return
     build_training_corpus(
-        args.output, target_chars=args.target_chars, fineweb_edu_chars=args.fineweb_edu_chars,
-        snapshot=args.snapshot, language=args.language, partition=args.partition,
-        max_documents=args.max_documents, seed=args.seed,
+        args.output,
+        target_chars=args.target_chars,
+        fineweb_edu_chars=args.fineweb_edu_chars,
+        cosmopedia_chars=args.cosmopedia_chars,
+        common_corpus_chars=args.common_corpus_chars,
+        common_corpus_max_documents=args.common_corpus_max_documents,
+        snapshot=args.snapshot,
+        language=args.language,
+        partition=args.partition,
+        max_documents=args.max_documents,
+        seed=args.seed,
     )
 
 
