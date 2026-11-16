@@ -5,14 +5,15 @@ from data import prepare_first_wave_datasets as first_wave
 
 def test_soda_dialogue_maps_two_speakers_to_user_and_assistant():
     messages = first_wave.convert_soda_row({
-        "dialogue": ["Hello there.", "Hi! How can I help?", "What is HTTP?"],
-        "speakers": ["Alex", "Sam", "Alex"],
+        "dialogue": ["Hello there.", "Hi! How can I help?", "What is HTTP?", "I can explain that."],
+        "speakers": ["Alex", "Sam", "Alex", "Sam"],
     })
 
     assert messages == [
         {"role": "user", "content": "Hello there."},
         {"role": "assistant", "content": "Hi! How can I help?"},
         {"role": "user", "content": "What is HTTP?"},
+        {"role": "assistant", "content": "I can explain that."},
     ]
 
 
