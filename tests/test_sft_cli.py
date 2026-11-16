@@ -268,6 +268,7 @@ def test_sft_cli_balances_emotion_personality_and_openassistant_data(tmp_path):
     ultrachat_data = tmp_path / "ultrachat.jsonl"
     gsm8k_data = tmp_path / "gsm8k.jsonl"
     expanded_data = tmp_path / "expanded.jsonl"
+    markdown_data = tmp_path / "markdown.jsonl"
     write_dataset(base_data, "OpenAssistant")
     write_dataset(personality_data, "CatAI")
     write_dataset(emotion_data, "Emotion")
@@ -276,6 +277,7 @@ def test_sft_cli_balances_emotion_personality_and_openassistant_data(tmp_path):
     write_dataset(ultrachat_data, "UltraChat")
     write_dataset(gsm8k_data, "GSM8K")
     write_dataset(expanded_data, "Approved expanded chat")
+    write_dataset(markdown_data, "Markdown formatting")
 
     output = tmp_path / "balanced-sft.pt"
     result = main([
@@ -293,6 +295,8 @@ def test_sft_cli_balances_emotion_personality_and_openassistant_data(tmp_path):
         "--ultrachat-ratio", "0.15",
         "--expanded-chat-dataset", str(expanded_data),
         "--expanded-chat-ratio", "0.15",
+        "--markdown-dataset", str(markdown_data),
+        "--markdown-ratio", "0.05",
         "--gsm8k-dataset", str(gsm8k_data),
         "--gsm8k-ratio", "0.05",
         "--samples-per-epoch", "4",
@@ -311,7 +315,7 @@ def test_sft_cli_balances_emotion_personality_and_openassistant_data(tmp_path):
     assert training["personality_examples"] == 2
     assert training["emotion_examples"] == 2
     assert training["sampling_ratios"] == {
-        "base": 0.35,
+        "base": 0.3,
         "emotion": 0.1,
         "personality": 0.05,
         "smol_smoltalk": 0.1,
@@ -319,6 +323,7 @@ def test_sft_cli_balances_emotion_personality_and_openassistant_data(tmp_path):
         "ultrachat": 0.15,
         "expanded_chat": 0.15,
         "gsm8k": 0.05,
+        "markdown": 0.05,
     }
     assert training["emotion_ratio"] == 0.1
     assert training["smol_smoltalk_examples"] == 2
@@ -334,6 +339,9 @@ def test_sft_cli_balances_emotion_personality_and_openassistant_data(tmp_path):
     assert training["gsm8k_examples"] == 2
     assert training["gsm8k_training_examples"] == 2
     assert training["gsm8k_ratio"] == 0.05
+    assert training["markdown_examples"] == 2
+    assert training["markdown_training_examples"] == 2
+    assert training["markdown_ratio"] == 0.05
     assert training["samples_per_epoch"] == 4
     assert training["total_steps"] == 4
 

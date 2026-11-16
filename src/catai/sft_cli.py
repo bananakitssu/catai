@@ -59,6 +59,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ultrachat-ratio", type=float, default=0.0, help="Target SFT share from --ultrachat-dataset.")
     parser.add_argument("--expanded-chat-dataset", default=None, help="Optional approved expanded chat JSONL, excluding the separately sampled UltraChat records.")
     parser.add_argument("--expanded-chat-ratio", type=float, default=0.0, help="Target SFT share from --expanded-chat-dataset.")
+    parser.add_argument("--markdown-dataset", default=None, help="Optional CatAI-authored Markdown-formatting SFT JSONL.")
+    parser.add_argument("--markdown-ratio", type=float, default=0.0, help="Target SFT share drawn from --markdown-dataset.")
     parser.add_argument("--gsm8k-dataset", default=None, help="Optional MIT-licensed GSM8K math instruction JSONL.")
     parser.add_argument("--gsm8k-ratio", type=float, default=0.0, help="Target SFT share from --gsm8k-dataset.")
     parser.add_argument("--minimum-tokens-per-parameter", type=float, default=0.0,
@@ -149,6 +151,7 @@ def main(argv: list[str] | None = None) -> int:
         (args.blended_skill_talk_dataset, args.blended_skill_talk_ratio, "blended-skill-talk"),
         (args.ultrachat_dataset, args.ultrachat_ratio, "ultrachat"),
         (args.expanded_chat_dataset, args.expanded_chat_ratio, "expanded-chat"),
+        (args.markdown_dataset, args.markdown_ratio, "markdown"),
         (args.gsm8k_dataset, args.gsm8k_ratio, "gsm8k"),
     ):
         if not 0.0 <= ratio < 1.0:
@@ -318,6 +321,21 @@ def main(argv: list[str] | None = None) -> int:
             flush=True,
         )
 
+    markdown_dataset = None
+    markdown_examples_count = 0
+    if args.markdown_dataset:
+        markdown_examples = load_chat_dataset(args.markdown_dataset)
+        markdown_examples_count = len(markdown_examples)
+        markdown_dataset = ChatSupervisedDataset(
+            markdown_examples, tokenizer, sequence_length
+        )
+        print(
+            f"Markdown formatting data: {markdown_examples_count} loaded, "
+            f"{markdown_dataset.compacted_examples} compacted, "
+            f"{markdown_dataset.skipped_overlength_examples} skipped",
+            flush=True,
+        )
+
     gsm8k_dataset = None
     gsm8k_examples_count = 0
     if args.gsm8k_dataset:
@@ -338,6 +356,7 @@ def main(argv: list[str] | None = None) -> int:
         args.blended_skill_talk_ratio if blended_skill_talk_dataset is not None else 0.0,
         args.ultrachat_ratio if ultrachat_dataset is not None else 0.0,
         args.expanded_chat_ratio if expanded_chat_dataset is not None else 0.0,
+        args.markdown_ratio if markdown_dataset is not None else 0.0,
         args.gsm8k_ratio if gsm8k_dataset is not None else 0.0,
     ))
     if optional_ratio >= 1.0:
@@ -361,6 +380,8 @@ def main(argv: list[str] | None = None) -> int:
         source_specs.append(("ultrachat", ultrachat_dataset, args.ultrachat_ratio))
     if expanded_chat_dataset is not None:
         source_specs.append(("expanded_chat", expanded_chat_dataset, args.expanded_chat_ratio))
+    if markdown_dataset is not None:
+        source_specs.append(("markdown", markdown_dataset, args.markdown_ratio))
     if gsm8k_dataset is not None:
         source_specs.append(("gsm8k", gsm8k_dataset, args.gsm8k_ratio))
 
@@ -780,6 +801,13 @@ def main(argv: list[str] | None = None) -> int:
                 ),
                 "gsm8k_ratio": (
                     args.gsm8k_ratio if gsm8k_dataset is not None else None
+                ),
+                "markdown_examples": markdown_examples_count,
+                "markdown_training_examples": (
+                    len(markdown_dataset) if markdown_dataset is not None else 0
+                ),
+                "markdown_ratio": (
+                    args.markdown_ratio if markdown_dataset is not None else None
                 ),
                 "tokens_per_example": sequence_length,
                 "seconds": elapsed,
