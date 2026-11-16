@@ -100,10 +100,17 @@ python data/merge_emotion_datasets.py --go-emotions data/go_emotions_emotion.jso
 ```
 
 To prepare the classifier data without training CatAI's chat model, run
-**Actions → CI → Run workflow** and select `training_mode: emotions_only`.
+**Actions → CI → Run workflow** and select `run_type: emotions_only`.
 
 To run the repository's compile checks and test suite without starting any
-training or dataset-preparation jobs, select `training_mode: tests_only`.
+training or dataset-preparation jobs, select `run_type: tests_only`.
+
+To start model training, choose `run_type: training` and select a separate
+`training_type`:
+- `base` (default): base-model pretraining only; runs the 32 base-training stages.
+- `full`: base-model pretraining followed by supervised fine-tuning.
+- `sft_only`: supervised fine-tuning using a prior run's `catai-base-checkpoint`
+  artifact; provide that run's ID in `base_checkpoint_run_id`.
 
 To run base-model pretraining without starting supervised fine-tuning, select
 `training_mode: base_only`. This runs the 32-stage base-training sequence and
@@ -118,14 +125,14 @@ used in the default workflow because of its non-commercial restrictions.
 
 The `datasets_only` Actions mode remains available to inspect and download bounded samples from 13 additional Hugging Face datasets: three catgirl/persona chat datasets, general conversation and instruction datasets, and three emotion-recognition datasets. It writes separate approved-chat, research-chat, and emotion artifacts, plus a source/license manifest.
 
-Normal `full` and `sft_only` training runs now prepare the approved chat subset automatically and include it in SFT at a 15% target share. The SFT-specific artifact excludes UltraChat because the standard workflow already samples UltraChat separately. Research-only and emotion-classification data remain excluded from ordinary assistant-response training, and all records retain source/license provenance.
+Normal `training_type: full` and `training_type: sft_only` runs now prepare the approved chat subset automatically and include it in SFT at a 15% target share. The SFT-specific artifact excludes UltraChat because the standard workflow already samples UltraChat separately. Research-only and emotion-classification data remain excluded from ordinary assistant-response training, and all records retain source/license provenance.
 
 See [the expanded dataset catalog](docs/EXPANDED_DATASETS.md) for every
 Hugging Face repository, license notes, and the generated artifacts. See
 [Dataset licenses and provenance](docs/DATASET_LICENSES.md) before using
 research-only samples in a model intended for distribution.
 
-To prepare the complete shortlist without training, run **Actions → CI → Run workflow** and select `training_mode: datasets_only`. Full and SFT-only training use the same bounded sample preparation automatically. Samples are not committed to Git.
+To prepare the complete shortlist without training, run **Actions → CI → Run workflow** and select `run_type: datasets_only`. Full and SFT-only training types use the same bounded sample preparation automatically. Samples are not committed to Git.
 
 ## Updated base-training data and budget
 
