@@ -2737,13 +2737,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install CatAI
-        run: python -m pip install -e .
+      - name: Install CatAI and dataset readers
+        run: python -m pip install -e ".[data]"
       - name: Prepare bounded samples from the expanded Hugging Face shortlist
         run: |
           python data/prepare_dataset_expansion.py \
             --max-examples-per-source 1000 \
             --seed 42
+      - name: Prepare first-wave conversational datasets
+        run: |
+          python data/prepare_first_wave_datasets.py \
+            --max-examples-per-source 1000 \
+            --seed 42 \
+            --output data/first_wave_chat.jsonl \
+            --manifest-output data/first_wave_datasets_manifest.json \
+            --append-to data/expanded_sft_chat.jsonl
       - name: Validate generated chat and emotion records
         run: |
           python - <<'PY'
@@ -2754,6 +2762,7 @@ jobs:
 
           paths = (
               "data/expanded_chat.jsonl",
+              "data/first_wave_chat.jsonl",
               "data/expanded_sft_chat.jsonl",
               "data/research_chat.jsonl",
               "data/expanded_emotion.jsonl",
@@ -2800,6 +2809,20 @@ jobs:
         with:
           name: catai-expanded-dataset-manifest
           path: data/expanded_datasets_manifest.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload first-wave chat dataset
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-first-wave-chat-datasets
+          path: data/first_wave_chat.jsonl
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload first-wave dataset manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-first-wave-dataset-manifest
+          path: data/first_wave_datasets_manifest.json
           if-no-files-found: error
           retention-days: 14
 
