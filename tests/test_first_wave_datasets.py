@@ -127,8 +127,25 @@ def test_multiwoz_rejects_unknown_speaker_and_checksum_catalog_is_complete():
     assert first_wave.convert_multiwoz_dialogue({
         "turns": [{"speaker": "TOOL", "utterance": "unexpected"}]
     }) is None
-    assert len(first_wave.MULTIWOZ_TRAIN_SHARDS) == 17
-    assert all(len(value) == 64 for value in first_wave.MULTIWOZ_TRAIN_SHARDS.values())
+    assert first_wave.MULTIWOZ_TRAIN_SHARDS == {
+        "dialogues_001.json": "2d1a5d92bb5ea1a6017f416f76b43e11bdad945b1f93acf870f2f671a98c3032",
+        "dialogues_002.json": "2f3ea771d4e01cb2780357738cff7f7496b87d34c221cc240df74501312438d3",
+        "dialogues_003.json": "74f73311936c7b4928b073698e5ea61dedad009dc45672963735684e1279521a",
+        "dialogues_004.json": "2f9f18b6cb0abbc58c86ca9291aa19baf80395521f9556cf02189c698c48bc52",
+        "dialogues_005.json": "eedbe5c649072a3c163e8da109f3c3fd0502425c63db584a11a9cadaa09c91db",
+        "dialogues_006.json": "2a51cfed1224110e4cdce80b051d3f7ebecd223d0b3d1c4ade0dd8fc484675fe",
+        "dialogues_007.json": "e062becf19b670a45b9333390b6a72f93fc2ed436371ba342499e6532912b1f3",
+        "dialogues_008.json": "9cd73cfae130e4d8c76854b6c0f393d68fb084f665a1c7527e04e3b26f877d1b",
+        "dialogues_009.json": "fff3f55ee9bd8ecc2492cdb8101e3d5908705e4edd65b3e8cbd7a825be18e47e",
+        "dialogues_010.json": "628db438d4f6ab62fb849d3e9df264845b921961052c19b336c8853e2bf4e8d8",
+        "dialogues_011.json": "82e2d2900a037b866a01d05974734dd419e89b329fe29ef93b35eea96d27feb8",
+        "dialogues_012.json": "5b18461e0f3ff0698818e02a2e105f4f25727d88d02cc4706de19d138e9ceba0",
+        "dialogues_013.json": "0f90ba730400be770f753fc46e868189709e6ce06e97d780843ed09db16762b4",
+        "dialogues_014.json": "7bd668216f43f6713232c07dcaa1d84e490eeee15caa1b3d843c3075d4b84a10",
+        "dialogues_015.json": "5f551d134860595e7834eedab3ebe16e277953cc81b29f46104ef3070cddd4ac",
+        "dialogues_016.json": "22eeed01c15a4fba6ac395a6708400672c5c07dbfbd6448bcb451f8697324881",
+        "dialogues_017.json": "a1dba37c0fd1dba519500b57be0384219dd4a7bacaec94e124d431932724bd8d",
+    }
 
 
 def test_record_preserves_license_and_attribution_provenance():
