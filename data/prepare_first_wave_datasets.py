@@ -401,6 +401,7 @@ def prepare(
     manifest_output: Path,
     max_examples_per_source: int,
     seed: int,
+    append_to: Path | None = None,
 ) -> dict[str, Any]:
     all_records: list[dict[str, Any]] = []
     manifest: dict[str, Any] = {
@@ -523,6 +524,28 @@ def prepare(
         "chat": str(output),
         "usable_examples": len(all_records),
     }
+    if append_to is not None:
+        existing: list[dict[str, Any]] = []
+        if append_to.is_file():
+            with append_to.open("r", encoding="utf-8") as stream:
+                for line_number, line in enumerate(stream, start=1):
+                    if not line.strip():
+                        continue
+                    try:
+                        item = json.loads(line)
+                    except json.JSONDecodeError as exc:
+                        raise ValueError(
+                            f"invalid JSON in existing SFT dataset at line {line_number}"
+                        ) from exc
+                    if not isinstance(item, dict):
+                        raise ValueError(
+                            f"existing SFT dataset line {line_number} must be an object"
+                        )
+                    existing.append(item)
+        combined = _deduplicate([*existing, *all_records])
+        _write_jsonl(combined, append_to)
+        manifest["outputs"]["merged_sft_chat"] = str(append_to)
+        manifest["outputs"]["merged_sft_examples"] = len(combined)
     manifest["total_sources"] = len(manifest["sources"])
     manifest_output.parent.mkdir(parents=True, exist_ok=True)
     manifest_output.write_text(
@@ -544,6 +567,12 @@ def main() -> int:
         type=Path,
         default=Path("data/first_wave_datasets_manifest.json"),
     )
+    parser.add_argument(
+        "--append-to",
+        type=Path,
+        default=None,
+        help="Also merge these records into an existing SFT JSONL file.",
+    )
     args = parser.parse_args()
     if args.max_examples_per_source < 1 or args.seed < 0:
         raise ValueError("max-examples-per-source must be positive and seed non-negative")
@@ -552,6 +581,7 @@ def main() -> int:
         manifest_output=args.manifest_output,
         max_examples_per_source=args.max_examples_per_source,
         seed=args.seed,
+        append_to=args.append_to,
     )
     print(
         f"Prepared {manifest['outputs']['usable_examples']:,} first-wave chat examples "
