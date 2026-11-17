@@ -20,12 +20,12 @@ def _base_training_blocks(workflow: str) -> list[tuple[str, str]]:
     return blocks
 
 
-def test_hosted_base_training_is_a_32_stage_recovery_chain() -> None:
+def test_hosted_base_training_is_a_64_stage_recovery_chain() -> None:
     workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
     blocks = _base_training_blocks(workflow)
 
     expected_names = ["base_training"] + [
-        f"base_training{index}" for index in range(2, 33)
+        f"base_training{index}" for index in range(2, 65)
     ]
     assert [name for name, _ in blocks] == expected_names
 
@@ -33,9 +33,15 @@ def test_hosted_base_training_is_a_32_stage_recovery_chain() -> None:
         assert "--vocab-size 2048" in block
         assert "--warmup-fraction 0.03" in block
         assert "--minimum-learning-rate-ratio 0.1" in block
+        assert '--epochs "$BASE_EPOCHS"' in block
+        assert '--batch-size "$BASE_BATCH_SIZE"' in block
+        assert '--sequence-length "$SEQUENCE_LENGTH"' in block
+        assert '--max-tokens "$MAX_TOKENS"' in block
+        assert "--minimum-tokens-per-parameter 20" in block
+        assert "timeout-minutes: 360" in block
 
         if index == 1:
-            previous_artifact = None
+            assert "--max-batches-per-run-fraction 0.015625" in block
         else:
             previous_artifact = (
                 "catai-base-recovery"
@@ -44,8 +50,8 @@ def test_hosted_base_training_is_a_32_stage_recovery_chain() -> None:
             )
             assert f"name: {previous_artifact}" in block
 
-        if index < 32:
-            assert "--max-batches-per-run-fraction 0.03125" in block
+        if index < 64:
+            assert "--max-batches-per-run-fraction 0.015625" in block
             output_artifact = (
                 "catai-base-recovery"
                 if index == 1
@@ -53,7 +59,8 @@ def test_hosted_base_training_is_a_32_stage_recovery_chain() -> None:
             )
             assert f"name: {output_artifact}" in block
         else:
-            assert "needs: [test, base_training31]" in block
+            assert "needs: [test, base_training63]" in block
+            assert "--max-batches-per-run-fraction" not in block
             assert "scripts/evaluate_base.py" in block
             assert "name: catai-base-checkpoint" in block
 

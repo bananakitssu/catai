@@ -399,7 +399,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Train base model (part 1 of 32)
+      - name: Train base model (part 1 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -432,7 +432,7 @@ jobs:
             --device cpu \
             --recovery-checkpoint catai-base-recovery.pt \
             --checkpoint-every-batches 50 \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -474,7 +474,7 @@ jobs:
         with:
           name: catai-base-recovery
           path: .
-      - name: Resume base training (part 2 of 32)
+      - name: Resume base training (part 2 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -506,7 +506,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -548,7 +548,7 @@ jobs:
         with:
           name: catai-base-recovery2
           path: .
-      - name: Resume base training (part 3 of 32)
+      - name: Resume base training (part 3 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -580,7 +580,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -622,7 +622,7 @@ jobs:
         with:
           name: catai-base-recovery3
           path: .
-      - name: Resume base training (part 4 of 32)
+      - name: Resume base training (part 4 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -654,7 +654,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -696,7 +696,7 @@ jobs:
         with:
           name: catai-base-recovery4
           path: .
-      - name: Resume base training (part 5 of 32)
+      - name: Resume base training (part 5 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -728,7 +728,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -770,7 +770,7 @@ jobs:
         with:
           name: catai-base-recovery5
           path: .
-      - name: Resume base training (part 6 of 32)
+      - name: Resume base training (part 6 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -802,7 +802,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -844,7 +844,7 @@ jobs:
         with:
           name: catai-base-recovery6
           path: .
-      - name: Resume base training (part 7 of 32)
+      - name: Resume base training (part 7 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -876,7 +876,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -918,7 +918,7 @@ jobs:
         with:
           name: catai-base-recovery7
           path: .
-      - name: Resume base training (part 8 of 32)
+      - name: Resume base training (part 8 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -950,7 +950,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -992,7 +992,7 @@ jobs:
         with:
           name: catai-base-recovery8
           path: .
-      - name: Resume base training (part 9 of 32)
+      - name: Resume base training (part 9 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -1024,7 +1024,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -1066,7 +1066,7 @@ jobs:
         with:
           name: catai-base-recovery9
           path: .
-      - name: Resume base training (part 10 of 32)
+      - name: Resume base training (part 10 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -1098,7 +1098,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -1140,7 +1140,7 @@ jobs:
         with:
           name: catai-base-recovery10
           path: .
-      - name: Resume base training (part 11 of 32)
+      - name: Resume base training (part 11 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -1172,7 +1172,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -1214,7 +1214,7 @@ jobs:
         with:
           name: catai-base-recovery11
           path: .
-      - name: Resume base training (part 12 of 32)
+      - name: Resume base training (part 12 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -1246,7 +1246,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -1288,7 +1288,7 @@ jobs:
         with:
           name: catai-base-recovery12
           path: .
-      - name: Resume base training (part 13 of 32)
+      - name: Resume base training (part 13 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -1320,7 +1320,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -1362,7 +1362,7 @@ jobs:
         with:
           name: catai-base-recovery13
           path: .
-      - name: Resume base training (part 14 of 32)
+      - name: Resume base training (part 14 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -1394,7 +1394,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -1436,7 +1436,7 @@ jobs:
         with:
           name: catai-base-recovery14
           path: .
-      - name: Resume base training (part 15 of 32)
+      - name: Resume base training (part 15 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -1468,7 +1468,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -1510,7 +1510,7 @@ jobs:
         with:
           name: catai-base-recovery15
           path: .
-      - name: Resume base training (part 16 of 32)
+      - name: Resume base training (part 16 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -1542,7 +1542,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -1584,7 +1584,7 @@ jobs:
         with:
           name: catai-base-recovery16
           path: .
-      - name: Resume base training (part 17 of 32)
+      - name: Resume base training (part 17 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -1616,7 +1616,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -1658,7 +1658,7 @@ jobs:
         with:
           name: catai-base-recovery17
           path: .
-      - name: Resume base training (part 18 of 32)
+      - name: Resume base training (part 18 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -1690,7 +1690,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -1732,7 +1732,7 @@ jobs:
         with:
           name: catai-base-recovery18
           path: .
-      - name: Resume base training (part 19 of 32)
+      - name: Resume base training (part 19 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -1764,7 +1764,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -1806,7 +1806,7 @@ jobs:
         with:
           name: catai-base-recovery19
           path: .
-      - name: Resume base training (part 20 of 32)
+      - name: Resume base training (part 20 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -1838,7 +1838,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -1880,7 +1880,7 @@ jobs:
         with:
           name: catai-base-recovery20
           path: .
-      - name: Resume base training (part 21 of 32)
+      - name: Resume base training (part 21 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -1912,7 +1912,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -1954,7 +1954,7 @@ jobs:
         with:
           name: catai-base-recovery21
           path: .
-      - name: Resume base training (part 22 of 32)
+      - name: Resume base training (part 22 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -1986,7 +1986,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -2028,7 +2028,7 @@ jobs:
         with:
           name: catai-base-recovery22
           path: .
-      - name: Resume base training (part 23 of 32)
+      - name: Resume base training (part 23 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -2060,7 +2060,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -2102,7 +2102,7 @@ jobs:
         with:
           name: catai-base-recovery23
           path: .
-      - name: Resume base training (part 24 of 32)
+      - name: Resume base training (part 24 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -2134,7 +2134,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -2176,7 +2176,7 @@ jobs:
         with:
           name: catai-base-recovery24
           path: .
-      - name: Resume base training (part 25 of 32)
+      - name: Resume base training (part 25 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -2208,7 +2208,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -2250,7 +2250,7 @@ jobs:
         with:
           name: catai-base-recovery25
           path: .
-      - name: Resume base training (part 26 of 32)
+      - name: Resume base training (part 26 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -2282,7 +2282,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -2324,7 +2324,7 @@ jobs:
         with:
           name: catai-base-recovery26
           path: .
-      - name: Resume base training (part 27 of 32)
+      - name: Resume base training (part 27 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -2356,7 +2356,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -2398,7 +2398,7 @@ jobs:
         with:
           name: catai-base-recovery27
           path: .
-      - name: Resume base training (part 28 of 32)
+      - name: Resume base training (part 28 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -2430,7 +2430,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -2472,7 +2472,7 @@ jobs:
         with:
           name: catai-base-recovery28
           path: .
-      - name: Resume base training (part 29 of 32)
+      - name: Resume base training (part 29 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -2504,7 +2504,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -2546,7 +2546,7 @@ jobs:
         with:
           name: catai-base-recovery29
           path: .
-      - name: Resume base training (part 30 of 32)
+      - name: Resume base training (part 30 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -2578,7 +2578,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -2620,7 +2620,7 @@ jobs:
         with:
           name: catai-base-recovery30
           path: .
-      - name: Resume base training (part 31 of 32)
+      - name: Resume base training (part 31 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
@@ -2652,7 +2652,7 @@ jobs:
             --warmup-fraction 0.03 \
             --minimum-learning-rate-ratio 0.1 \
             --device cpu \
-            --max-batches-per-run-fraction 0.03125
+            --max-batches-per-run-fraction 0.015625
 
       - name: Upload base training recovery checkpoint
         uses: actions/upload-artifact@v4
@@ -2694,7 +2694,2375 @@ jobs:
         with:
           name: catai-base-recovery31
           path: .
-      - name: Finish base training (final part 32 of 32)
+      - name: Resume base training (part 32 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery32
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training33:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training32]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery32
+          path: .
+      - name: Resume base training (part 33 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery33
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training34:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training33]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery33
+          path: .
+      - name: Resume base training (part 34 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery34
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training35:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training34]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery34
+          path: .
+      - name: Resume base training (part 35 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery35
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training36:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training35]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery35
+          path: .
+      - name: Resume base training (part 36 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery36
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training37:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training36]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery36
+          path: .
+      - name: Resume base training (part 37 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery37
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training38:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training37]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery37
+          path: .
+      - name: Resume base training (part 38 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery38
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training39:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training38]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery38
+          path: .
+      - name: Resume base training (part 39 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery39
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training40:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training39]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery39
+          path: .
+      - name: Resume base training (part 40 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery40
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training41:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training40]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery40
+          path: .
+      - name: Resume base training (part 41 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery41
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training42:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training41]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery41
+          path: .
+      - name: Resume base training (part 42 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery42
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training43:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training42]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery42
+          path: .
+      - name: Resume base training (part 43 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery43
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training44:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training43]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery43
+          path: .
+      - name: Resume base training (part 44 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery44
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training45:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training44]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery44
+          path: .
+      - name: Resume base training (part 45 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery45
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training46:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training45]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery45
+          path: .
+      - name: Resume base training (part 46 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery46
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training47:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training46]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery46
+          path: .
+      - name: Resume base training (part 47 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery47
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training48:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training47]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery47
+          path: .
+      - name: Resume base training (part 48 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery48
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training49:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training48]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery48
+          path: .
+      - name: Resume base training (part 49 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery49
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training50:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training49]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery49
+          path: .
+      - name: Resume base training (part 50 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery50
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training51:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training50]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery50
+          path: .
+      - name: Resume base training (part 51 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery51
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training52:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training51]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery51
+          path: .
+      - name: Resume base training (part 52 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery52
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training53:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training52]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery52
+          path: .
+      - name: Resume base training (part 53 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery53
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training54:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training53]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery53
+          path: .
+      - name: Resume base training (part 54 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery54
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training55:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training54]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery54
+          path: .
+      - name: Resume base training (part 55 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery55
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training56:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training55]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery55
+          path: .
+      - name: Resume base training (part 56 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery56
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training57:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training56]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery56
+          path: .
+      - name: Resume base training (part 57 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery57
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training58:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training57]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery57
+          path: .
+      - name: Resume base training (part 58 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery58
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training59:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training58]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery58
+          path: .
+      - name: Resume base training (part 59 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery59
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training60:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training59]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery59
+          path: .
+      - name: Resume base training (part 60 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery60
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training61:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training60]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery60
+          path: .
+      - name: Resume base training (part 61 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery61
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training62:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training61]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery61
+          path: .
+      - name: Resume base training (part 62 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery62
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training63:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training62]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery62
+          path: .
+      - name: Resume base training (part 63 of 64)
+        env:
+          BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
+          TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
+          SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
+          MAX_TOKENS: ${{ inputs.max_tokens || '850000000' }}
+          MODEL_SIZE: ${{ inputs.model_size || 'base' }}
+        run: |
+          if [[ "$SEQUENCE_LENGTH" == "1024" ]]; then
+            BASE_BATCH_SIZE=4
+          else
+            BASE_BATCH_SIZE=16
+          fi
+          python -m catai \
+            --corpus data/corpus.txt \
+            --checkpoint catai.pt \
+            --resume-from catai-base-recovery.pt \
+            --recovery-checkpoint catai-base-recovery.pt \
+            --checkpoint-every-batches 50 \
+            --epochs "$BASE_EPOCHS" \
+            --batch-size "$BASE_BATCH_SIZE" \
+            --sequence-length "$SEQUENCE_LENGTH" \
+            --model-size "$MODEL_SIZE" \
+            --tokenizer "$TOKENIZER" \
+            --vocab-size 2048 \
+            --tokenizer-sample-chars 250000 \
+            --max-tokens "$MAX_TOKENS" \
+            --validation-split 0.05 \
+            --minimum-tokens-per-parameter 20 \
+            --warmup-fraction 0.03 \
+            --minimum-learning-rate-ratio 0.1 \
+            --device cpu \
+            --max-batches-per-run-fraction 0.015625
+
+      - name: Upload base training recovery checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-base-recovery63
+          path: catai-base-recovery.pt
+          retention-days: 7
+  base_training64:
+    if: github.event_name == 'workflow_dispatch' && inputs.training_mode == 'full'
+    needs: [test, base_training63]
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+      - name: Install CatAI and corpus tooling
+        run: python -m pip install -e ".[data]"
+      - name: Restore corpus cache
+        id: corpus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download real text corpus
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        run: python data/download_corpus.py --output data/corpus.txt --target-chars 1400000000 --fineweb-edu-chars 210000000 --cosmopedia-chars 140000000 --common-corpus-chars 140000000 --common-corpus-max-documents 7000
+      - name: Save corpus cache
+        if: steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: data/corpus.txt
+          key: catai-corpus-curated-v6-${{ hashFiles('data/download_corpus.py') }}
+      - name: Download base training recovery checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: catai-base-recovery63
+          path: .
+      - name: Finish base training (final part 64 of 64)
         env:
           BASE_EPOCHS: ${{ inputs.base_epochs || '1' }}
           TOKENIZER: ${{ inputs.tokenizer || 'bpe' }}
