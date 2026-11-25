@@ -88,12 +88,13 @@ def create_adamw(
 ) -> torch.optim.Optimizer:
     """Create AdamW with fused CUDA updates when the installed backend supports them."""
     target = torch.device(device)
+    parameter_list = list(parameters)
     if target.type == "cuda":
         try:
-            return torch.optim.AdamW(parameters, lr=learning_rate, fused=True)
+            return torch.optim.AdamW(parameter_list, lr=learning_rate, fused=True)
         except (TypeError, RuntimeError, NotImplementedError):
             pass
-    return torch.optim.AdamW(parameters, lr=learning_rate)
+    return torch.optim.AdamW(parameter_list, lr=learning_rate)
 
 
 def _autocast_context(device: torch.device, precision: str):
