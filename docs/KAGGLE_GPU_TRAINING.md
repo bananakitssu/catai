@@ -2,6 +2,14 @@
 
 This is an optional GPU worker for the existing SFT workload. It does **not** lower the training budget or change the model, sequence length, sample count, sampling ratios, batch size, learning rate, clipping, validation split, or epochs. The only execution changes are CUDA, fused AdamW where supported, fused scaled-dot-product attention, and automatic BF16 on GPUs that support it.
 
+## Base pretraining (optional)
+
+For a new base checkpoint, use `notebooks/catai-base-gpu-kaggle.ipynb`. It downloads the same curated corpus as CI when no corpus is attached, then runs the unchanged base-training configuration: base preset (39,596,544 parameters), BPE vocabulary 2,048, 1,024-token context, 850,000,000-token cap, one epoch, batch size 4, 5% validation, 20-token-per-parameter minimum, 3% warmup, and 10% learning-rate floor.
+
+If a Kaggle session ends before the run completes, download both `corpus.txt` and `catai-base-recovery.pt` from the notebook output and attach them in a private Kaggle Dataset named `catai-pretraining-corpus`. The notebook will resume from the recovery checkpoint. Do not discard the recovery file or replace the corpus with a smaller one.
+
+A completed run produces `catai.pt`, which can then be used as the base checkpoint for the SFT preparation workflow below. Base pretraining is substantially more work than SFT; the two-hour target is not guaranteed, and Kaggle session limits may require multiple resumable sessions.
+
 ## 1. Prepare the training inputs
 
 A completed base-training run must already have produced the `catai-base-checkpoint` artifact.
