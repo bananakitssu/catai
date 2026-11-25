@@ -143,7 +143,11 @@ def run_training(mode: str) -> dict[str, str | bool]:
 
     import torch
     print("Starting CatAI", mode, "training on", torch.cuda.get_device_name(0), flush=True)
-    subprocess.run(command, cwd="/root/catai", check=True)
+    try:
+        subprocess.run(command, cwd="/root/catai", check=True)
+    finally:
+        # Persist recovery checkpoints even if the training command exits with an error.
+        volume.commit()
 
     completed = checkpoint.is_file()
     if completed:
