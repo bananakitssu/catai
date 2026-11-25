@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import math
+from contextlib import nullcontext
+from collections.abc import Iterable
 
 import torch
 from torch import nn
@@ -79,19 +81,54 @@ def clip_gradients(model: nn.Module, max_norm: float) -> float:
     return float(nn.utils.clip_grad_norm_(model.parameters(), max_norm))
 
 
+def create_adamw(
+    parameters: Iterable[nn.Parameter],
+    learning_rate: float,
+    device: torch.device | str,
+) -> torch.optim.Optimizer:
+    """Create AdamW with fused CUDA updates when the installed backend supports them."""
+    target = torch.device(device)
+    if target.type == "cuda":
+        try:
+            return torch.optim.AdamW(parameters, lr=learning_rate, fused=True)
+        except (TypeError, RuntimeError, NotImplementedError):
+            pass
+    return torch.optim.AdamW(parameters, lr=learning_rate)
+
+
+def _autocast_context(device: torch.device, precision: str):
+    """Resolve optional BF16 autocast without changing CPU training behavior."""
+    if precision not in {"auto", "fp32", "bf16"}:
+        raise ValueError("precision must be 'auto', 'fp32', or 'bf16'")
+    if precision == "fp32" or device.type != "cuda":
+        if precision == "bf16" and device.type != "cuda":
+            raise ValueError("BF16 autocast requires a CUDA device")
+        return nullcontext()
+    supported = torch.cuda.is_bf16_supported()
+    if precision == "bf16" and not supported:
+        raise ValueError("this CUDA device does not support BF16")
+    if precision == "auto" and not supported:
+        return nullcontext()
+    return torch.autocast(device_type="cuda", dtype=torch.bfloat16)
+
+
 def train_step(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
     tokens: torch.Tensor,
     grad_clip: float | None = None,
+    *,
+    precision: str = "auto",
 ) -> float:
     """Run one optimization step and return the loss before the update."""
     if grad_clip is not None and grad_clip <= 0:
         raise ValueError("grad_clip must be positive when provided")
     model.train()
     inputs, targets = make_next_token_batch(tokens)
-    logits = model(inputs)
-    loss = causal_language_model_loss(logits, targets)
+    device = next(model.parameters()).device
+    with _autocast_context(device, precision):
+        logits = model(inputs)
+        loss = causal_language_model_loss(logits.float(), targets)
     optimizer.zero_grad(set_to_none=True)
     loss.backward()
     if grad_clip is not None:
