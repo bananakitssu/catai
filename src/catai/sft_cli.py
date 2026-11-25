@@ -560,7 +560,7 @@ def main(argv: list[str] | None = None) -> int:
             "stale_epochs": stale_epochs,
             "total_steps": total_steps,
             "base_step": base_step,
-            "current_epoch_loss": resume_epoch_loss,
+            "current_epoch_loss": float(resume_epoch_loss.detach()) if isinstance(resume_epoch_loss, torch.Tensor) else resume_epoch_loss,
             "current_epoch_batches": resume_epoch_batches,
             "elapsed_training_seconds": elapsed_before_run + max(time.perf_counter() - started_at, 0.0),
             "batch_size": args.batch_size,
@@ -635,7 +635,7 @@ def main(argv: list[str] | None = None) -> int:
             batch_labels = batch["labels"].to(device)
             total_loss += sft_train_step(
                 model, optimizer, batch_input_ids, batch_labels, grad_clip=args.grad_clip,
-                precision=args.precision,
+                precision=args.precision, return_loss_tensor=True,
             )
             batches += 1
             total_steps += 1
@@ -651,13 +651,13 @@ def main(argv: list[str] | None = None) -> int:
                 eta = remaining * elapsed / max(completed_total - start_epoch * total_batches, 1)
                 print(
                     f"  batch {completed_batch}/{len(batches_for_epoch)} "
-                    f"loss={total_loss / max(batches, 1):.4f} ETA={eta:.0f}s",
+                    f"loss={(float(total_loss.detach()) if isinstance(total_loss, torch.Tensor) else total_loss) / max(batches, 1):.4f} ETA={eta:.0f}s",
                     flush=True,
                 )
         if batches == 0 and first_batch == 0:
             raise ValueError("training dataset produced no batches")
         if batches:
-            epoch_loss = total_loss / batches
+            epoch_loss = (float(total_loss.detach()) if isinstance(total_loss, torch.Tensor) else total_loss) / batches
             if len(losses) < epoch + 1:
                 losses.append(epoch_loss)
             else:
