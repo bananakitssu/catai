@@ -81,7 +81,6 @@ def test_cosine_warmup_learning_rate_validates_inputs():
         cosine_warmup_learning_rate(1.0, 0, 10, warmup_fraction=1.0)
 
 
-
 def test_create_adamw_uses_standard_optimizer_on_cpu():
     from catai.training import create_adamw
 
@@ -96,3 +95,14 @@ def test_train_step_accepts_explicit_fp32_precision():
     tokens = torch.tensor([[1, 2, 3, 4]])
     loss = train_step(model, optimizer, tokens, precision="fp32")
     assert loss > 0
+
+
+
+def test_train_step_can_return_detached_loss_tensor():
+    model = CatAI(vocab_size=8, max_seq_len=8, d_model=16, n_heads=4, n_layers=1)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+    tokens = torch.tensor([[1, 2, 3, 4]])
+    loss = train_step(model, optimizer, tokens, return_loss_tensor=True)
+    assert isinstance(loss, torch.Tensor)
+    assert not loss.requires_grad
+    assert loss.item() > 0
