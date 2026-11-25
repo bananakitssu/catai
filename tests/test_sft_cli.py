@@ -156,7 +156,7 @@ def test_sft_cli_restores_the_best_validation_epoch(tmp_path, monkeypatch):
 
     training_step = 0
 
-    def fake_train_step(model, optimizer, input_ids, labels, grad_clip=None):
+    def fake_train_step(model, optimizer, input_ids, labels, grad_clip=None, **kwargs):
         nonlocal training_step
         training_step += 1
         with torch.no_grad():

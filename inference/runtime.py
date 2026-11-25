@@ -460,6 +460,72 @@ def _forward(weights: dict[str, np.ndarray], model: dict[str, Any], tokens: list
     return x[-1] @ weights["lm_head.weight"].T
 
 
+def _forward_cached(
+    weights: dict[str, np.ndarray],
+    model: dict[str, Any],
+    tokens: list[int],
+    cache: dict[str, Any] | None = None,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """Run a prompt or incremental token using per-layer KV caches."""
+    if not tokens:
+        raise ValueError("cached forward requires at least one token")
+    d_model = int(model["d_model"])
+    n_heads = int(model["n_heads"])
+    n_layers = int(model["n_layers"])
+    head_dim = d_model // n_heads
+    if cache is None:
+        cache = {"position": 0, "layers": [None] * n_layers}
+    past_len = int(cache["position"])
+    seq_len = len(tokens)
+    x = weights["token_embedding.weight"][np.asarray(tokens, dtype=np.int64)]
+
+    inv_freq = 1.0 / (10000.0 ** (np.arange(0, head_dim, 2, dtype=np.float32) / head_dim))
+    positions = np.arange(past_len, past_len + seq_len, dtype=np.float32)
+    freqs = np.outer(positions, inv_freq)
+    angles = np.concatenate((freqs, freqs), axis=-1)
+    cos = np.cos(angles)[None, :, :].astype(np.float32, copy=False)
+    sin = np.sin(angles)[None, :, :].astype(np.float32, copy=False)
+    causal_mask = (
+        np.arange(past_len + seq_len)[None, :] > (past_len + np.arange(seq_len)[:, None])
+    )
+
+    for index in range(n_layers):
+        prefix = f"blocks.{index}."
+        norm_x = _rms_norm(x, weights[prefix + "norm1.weight"])
+        qkv = norm_x @ weights[prefix + "attention.qkv.weight"].T
+        qkv = qkv.reshape(seq_len, 3, n_heads, head_dim).transpose(1, 2, 0, 3)
+        q, current_k, current_v = qkv[0], qkv[1], qkv[2]
+        q = (q * cos) + (_rotate_half(q) * sin)
+        current_k = (current_k * cos) + (_rotate_half(current_k) * sin)
+
+        previous = cache["layers"][index]
+        if previous is None:
+            keys, values = current_k, current_v
+        else:
+            keys = np.concatenate((previous[0], current_k), axis=1)
+            values = np.concatenate((previous[1], current_v), axis=1)
+        cache["layers"][index] = (keys, values)
+
+        scores = (q @ keys.transpose(0, 2, 1)) * (head_dim ** -0.5)
+        scores = np.where(causal_mask[None, :, :], -1.0e30, scores)
+        scores -= np.max(scores, axis=-1, keepdims=True)
+        attention = np.exp(scores)
+        attention /= np.sum(attention, axis=-1, keepdims=True)
+        attended = attention @ values
+        attended = attended.transpose(1, 0, 2).reshape(seq_len, d_model)
+        x = x + attended @ weights[prefix + "attention.out_proj.weight"].T
+
+        norm_x = _rms_norm(x, weights[prefix + "norm2.weight"])
+        gate = norm_x @ weights[prefix + "mlp.w1.weight"].T
+        gate = gate / (1.0 + np.exp(-np.clip(gate, -80.0, 80.0)))
+        value = norm_x @ weights[prefix + "mlp.w3.weight"].T
+        x = x + (gate * value) @ weights[prefix + "mlp.w2.weight"].T
+
+    cache["position"] = past_len + seq_len
+    x = _rms_norm(x, weights["norm.weight"])
+    return x[-1] @ weights["lm_head.weight"].T, cache
+
+
 def _sample(logits: np.ndarray, temperature: float, top_k: int, rng: np.random.Generator) -> int:
     logits = logits.astype(np.float64, copy=False) / temperature
     if top_k > 0 and top_k < logits.size:
@@ -529,13 +595,24 @@ def generate_stream(
         sent_chars = 0
         leading_whitespace = ""
         has_visible_text = False
+        cache = None
+        logits = None
         for _ in range(int(max_new_tokens)):
-            context = (input_tokens + generated)[-context_length:]
-            logits = _forward(loaded["weights"], model_meta, context)
+            if cache is None:
+                context = (input_tokens + generated)[-context_length:]
+                logits, cache = _forward_cached(loaded["weights"], model_meta, context)
             next_token = _sample(logits, float(temperature), int(top_k), rng)
             if eos is not None and next_token == eos:
                 break
             generated.append(next_token)
+            if len(input_tokens) + len(generated) <= context_length:
+                logits, cache = _forward_cached(
+                    loaded["weights"], model_meta, [next_token], cache
+                )
+            else:
+                # Match the existing sliding context window by rebuilding the
+                # cache with rebased RoPE positions after the window advances.
+                cache = None
             if len(generated) % int(chunk_tokens) == 0:
                 current_text = decode(generated)
                 delta = current_text[sent_chars:]

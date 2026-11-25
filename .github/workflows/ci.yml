@@ -53,7 +53,7 @@ on:
         required: true
         default: false
       training_mode:
-        description: "Run tests, full retraining, SFT-only, emotion-data, or expanded dataset preparation"
+        description: "Run tests, full retraining, SFT-only, Kaggle SFT data preparation, emotion-data, or expanded dataset preparation"
         type: choice
         options:
           - tests_only
@@ -61,10 +61,11 @@ on:
           - sft_only
           - emotions_only
           - datasets_only
+          - prepare_sft_data
         required: true
         default: full
       base_checkpoint_run_id:
-        description: "For sft_only: Actions run ID containing the catai-base-checkpoint artifact"
+        description: "For sft_only or prepare_sft_data: Actions run ID containing the catai-base-checkpoint artifact"
         required: false
         default: ""
 
@@ -155,7 +156,7 @@ jobs:
           print("Experiment inputs validated.")
           PY
       - name: Compile CatAI Python sources
-        run: python -m compileall -q inference scripts data src tests
+        run: python -m compileall -q inference scripts data src tests modal
 
       - name: Run tests with disk monitor
         shell: bash
@@ -9849,7 +9850,7 @@ jobs:
           retention-days: 7
 
   dataset_expansion:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'datasets_only' || inputs.training_mode == 'full' || inputs.training_mode == 'sft_only')
+    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'datasets_only' || inputs.training_mode == 'full' || inputs.training_mode == 'sft_only' || inputs.training_mode == 'prepare_sft_data')
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -10062,7 +10063,7 @@ jobs:
 
 
   extra_sft_data:
-    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'sft_only')
+    if: github.event_name == 'workflow_dispatch' && (inputs.training_mode == 'full' || inputs.training_mode == 'sft_only' || inputs.training_mode == 'prepare_sft_data')
     needs: test
     runs-on: ubuntu-latest
     steps:
@@ -10129,7 +10130,7 @@ jobs:
       always() &&
       github.event_name == 'workflow_dispatch' &&
       needs.test.result == 'success' &&
-      (needs.base_training128.result == 'success' || inputs.training_mode == 'sft_only') &&
+      (needs.base_training128.result == 'success' || inputs.training_mode == 'sft_only' || inputs.training_mode == 'prepare_sft_data') &&
       needs.extra_sft_data.result == 'success' &&
       needs.dataset_expansion.result == 'success'
     needs: [test, base_training128, extra_sft_data, dataset_expansion]
@@ -10138,14 +10139,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate SFT-only inputs
-        if: inputs.training_mode == 'sft_only'
+        if: inputs.training_mode == 'sft_only' || inputs.training_mode == 'prepare_sft_data'
         shell: bash
         env:
           BASE_CHECKPOINT_RUN_ID: ${{ inputs.base_checkpoint_run_id }}
         run: |
           set -euo pipefail
           if [[ ! "$BASE_CHECKPOINT_RUN_ID" =~ ^[0-9]+$ ]]; then
-            echo "SFT-only mode needs base_checkpoint_run_id: the Actions run ID that has the catai-base-checkpoint artifact." >&2
+            echo "This mode needs base_checkpoint_run_id: the Actions run ID that has the catai-base-checkpoint artifact." >&2
             exit 1
           fi
       - name: Verify B2 publishing configuration
@@ -10198,7 +10199,7 @@ jobs:
       - name: Install CatAI
         run: python -m pip install -e .
       - name: Download base checkpoint from selected prior run
-        if: inputs.training_mode == 'sft_only'
+        if: inputs.training_mode == 'sft_only' || inputs.training_mode == 'prepare_sft_data'
         uses: actions/download-artifact@v4
         with:
           name: catai-base-checkpoint
@@ -10348,7 +10349,24 @@ jobs:
               f"{instruction_dataset.skipped_overlength_examples:,} skipped"
           )
           PY
+      - name: Upload prepared Kaggle GPU training inputs
+        if: inputs.training_mode == 'prepare_sft_data'
+        uses: actions/upload-artifact@v4
+        with:
+          name: catai-kaggle-sft-inputs
+          path: |
+            catai.pt
+            data/oasst_chat.jsonl
+            data/instruction_chat.jsonl
+            data/smol_smoltalk_chat.jsonl
+            data/blended_skill_talk_chat.jsonl
+            data/ultrachat_200k_chat.jsonl
+            data/expanded_sft_chat.jsonl
+            data/markdown_sft_chat.jsonl
+          if-no-files-found: error
+          retention-days: 7
       - name: Supervised fine-tuning (SFT, epochs 1–2)
+        if: inputs.training_mode != 'prepare_sft_data'
         env:
           SFT_TOTAL_EPOCHS: ${{ inputs.sft_epochs || '3' }}
           SEQUENCE_LENGTH: ${{ inputs.sequence_length || '1024' }}
@@ -10402,7 +10420,8 @@ jobs:
       github.event_name == 'workflow_dispatch' &&
       needs.test.result == 'success' &&
       needs.sft.result == 'success' &&
-      (needs.base_training128.result == 'success' || inputs.training_mode == 'sft_only') &&
+      inputs.training_mode != 'prepare_sft_data' &&
+      (needs.base_training128.result == 'success' || inputs.training_mode == 'sft_only' || inputs.training_mode == 'prepare_sft_data') &&
       needs.extra_sft_data.result == 'success' &&
       needs.dataset_expansion.result == 'success'
     needs: [test, base_training128, extra_sft_data, dataset_expansion, sft]
@@ -10411,14 +10430,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate SFT-only inputs
-        if: inputs.training_mode == 'sft_only'
+        if: inputs.training_mode == 'sft_only' || inputs.training_mode == 'prepare_sft_data'
         shell: bash
         env:
           BASE_CHECKPOINT_RUN_ID: ${{ inputs.base_checkpoint_run_id }}
         run: |
           set -euo pipefail
           if [[ ! "$BASE_CHECKPOINT_RUN_ID" =~ ^[0-9]+$ ]]; then
-            echo "SFT-only mode needs base_checkpoint_run_id: the Actions run ID that has the catai-base-checkpoint artifact." >&2
+            echo "This mode needs base_checkpoint_run_id: the Actions run ID that has the catai-base-checkpoint artifact." >&2
             exit 1
           fi
       - name: Verify B2 publishing configuration
@@ -10471,7 +10490,7 @@ jobs:
       - name: Install CatAI
         run: python -m pip install -e .
       - name: Download base checkpoint from selected prior run
-        if: inputs.training_mode == 'sft_only'
+        if: inputs.training_mode == 'sft_only' || inputs.training_mode == 'prepare_sft_data'
         uses: actions/download-artifact@v4
         with:
           name: catai-base-checkpoint

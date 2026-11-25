@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Sequence
+from contextlib import nullcontext
 
 import torch
 from torch import nn
@@ -230,8 +231,11 @@ def sft_train_step(
     input_ids: torch.Tensor,
     labels: torch.Tensor,
     grad_clip: float | None = None,
-) -> float:
-    """Run one supervised fine-tuning step."""
+    *,
+    precision: str = "auto",
+    return_loss_tensor: bool = False,
+) -> float | torch.Tensor:
+    """Run one SFT step with optional CUDA BF16 and deferred loss synchronization."""
     if input_ids.ndim != 2 or labels.ndim != 2:
         raise ValueError("input_ids and labels must have shape (batch, sequence)")
     if input_ids.shape != labels.shape:
@@ -240,14 +244,28 @@ def sft_train_step(
         raise ValueError("grad_clip must be positive when provided")
 
     model.train()
-    logits = model(input_ids)
-    loss = supervised_causal_language_model_loss(logits, labels)
+    device = next(model.parameters()).device
+    if precision not in {"auto", "fp32", "bf16"}:
+        raise ValueError("precision must be 'auto', 'fp32', or 'bf16'")
+    if precision == "bf16" and device.type != "cuda":
+        raise ValueError("BF16 autocast requires a CUDA device")
+    use_bf16 = device.type == "cuda" and precision != "fp32" and torch.cuda.is_bf16_supported()
+    if precision == "bf16" and not use_bf16:
+        raise ValueError("this CUDA device does not support BF16")
+    context = (
+        torch.autocast(device_type="cuda", dtype=torch.bfloat16)
+        if use_bf16 else nullcontext()
+    )
+    with context:
+        logits = model(input_ids)
+        loss = supervised_causal_language_model_loss(logits.float(), labels)
     optimizer.zero_grad(set_to_none=True)
     loss.backward()
     if grad_clip is not None:
         nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
     optimizer.step()
-    return float(loss.detach())
+    detached_loss = loss.detach()
+    return detached_loss if return_loss_tensor else float(detached_loss)
 
 
 def evaluate_sft(

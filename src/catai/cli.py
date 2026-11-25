@@ -22,7 +22,7 @@ from .dataset import TokenWindowDataset
 from .device import resolve_device
 from .model import CatAI
 from .tokenizer import tokenizer_from_metadata
-from .training import cosine_warmup_learning_rate, evaluate, train_step
+from .training import cosine_warmup_learning_rate, create_adamw, evaluate, train_step
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -70,6 +70,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-batches-per-run-fraction", type=float, default=None, help="Stop after this fraction of the full multi-epoch run, saving a recovery checkpoint for the next job.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducible training.")
     parser.add_argument("--device", default=None)
+    parser.add_argument("--precision", choices=("auto", "fp32", "bf16"), default="auto", help="Use BF16 autocast on supported CUDA GPUs; CPU remains FP32.")
     return parser
 
 
@@ -194,7 +195,7 @@ def main(argv: list[str] | None = None) -> int:
         n_heads=n_heads,
         n_layers=n_layers,
     ).to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
+    optimizer = create_adamw(model.parameters(), args.learning_rate, device)
     parameter_count = model.parameter_count()
     document_eos_count = (
         int((tokens == tokenizer.eos_token_id).sum().item())
@@ -386,7 +387,7 @@ def main(argv: list[str] | None = None) -> int:
             "total_steps": total_steps,
             "total_tokens": total_tokens,
             "base_step": base_step,
-            "current_epoch_loss": current_epoch_loss,
+            "current_epoch_loss": float(current_epoch_loss.detach()) if isinstance(current_epoch_loss, torch.Tensor) else current_epoch_loss,
             "current_epoch_batches": current_epoch_batches,
             "elapsed_training_seconds": elapsed_before_run + max(time.perf_counter() - started_at, 0.0),
         }
@@ -447,7 +448,8 @@ def main(argv: list[str] | None = None) -> int:
             for parameter_group in optimizer.param_groups:
                 parameter_group["lr"] = scheduled_lr
             epoch_loss += train_step(
-                model, optimizer, batch, grad_clip=config.grad_clip
+                model, optimizer, batch, grad_clip=config.grad_clip, precision=args.precision,
+                return_loss_tensor=True,
             )
             epoch_batches += 1
             total_steps += 1
@@ -477,7 +479,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(
                     f"  {progress} {percent:5.1f}% "
                     f"batch {completed_batch}/{total_batches}: "
-                    f"loss={epoch_loss / epoch_batches:.4f} "
+                    f"loss={float(epoch_loss.detach()) / epoch_batches if isinstance(epoch_loss, torch.Tensor) else epoch_loss / epoch_batches:.4f} "
                     f"tokens={total_tokens} tok/s={tokens_per_second:.1f} "
                     f"ETA={eta_seconds:.0f}s",
                     flush=True,
@@ -503,7 +505,7 @@ def main(argv: list[str] | None = None) -> int:
         if epoch_batches == 0:
             raise ValueError("training dataset produced no batches")
 
-        epoch_loss_value = epoch_loss / epoch_batches
+        epoch_loss_value = (float(epoch_loss.detach()) if isinstance(epoch_loss, torch.Tensor) else epoch_loss) / epoch_batches
         if len(losses) < epoch + 1:
             losses.append(epoch_loss_value)
         else:

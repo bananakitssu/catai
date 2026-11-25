@@ -152,7 +152,7 @@ def test_generate_stream_yields_incremental_text_and_accepts_file_role(
     monkeypatch.setattr(inference_runtime, "_evict_if_idle_locked", lambda now: None)
     monkeypatch.setattr(inference_runtime, "_load_model_locked", lambda: loaded)
     monkeypatch.setattr(inference_runtime, "_touch_model_locked", lambda: None)
-    monkeypatch.setattr(inference_runtime, "_forward", lambda weights, model, tokens: np.zeros(len(vocabulary), dtype=np.float32))
+    monkeypatch.setattr(inference_runtime, "_forward_cached", lambda weights, model, tokens, cache=None: (np.zeros(len(vocabulary), dtype=np.float32), {"position": (cache["position"] if cache else 0) + len(tokens), "layers": []}))
     monkeypatch.setattr(inference_runtime, "_sample", lambda *args: next(generated_tokens))
 
     events = list(inference_runtime.generate_stream(
@@ -190,7 +190,7 @@ def test_generate_stream_does_not_emit_whitespace_only_deltas(
     monkeypatch.setattr(inference_runtime, "_evict_if_idle_locked", lambda now: None)
     monkeypatch.setattr(inference_runtime, "_load_model_locked", lambda: loaded)
     monkeypatch.setattr(inference_runtime, "_touch_model_locked", lambda: None)
-    monkeypatch.setattr(inference_runtime, "_forward", lambda weights, model, tokens: np.zeros(len(vocabulary), dtype=np.float32))
+    monkeypatch.setattr(inference_runtime, "_forward_cached", lambda weights, model, tokens, cache=None: (np.zeros(len(vocabulary), dtype=np.float32), {"position": (cache["position"] if cache else 0) + len(tokens), "layers": []}))
     monkeypatch.setattr(inference_runtime, "_sample", lambda *args: next(generated_tokens))
 
     events = list(inference_runtime.generate_stream(
@@ -233,7 +233,7 @@ def test_generate_stream_accepts_native_tool_and_mcp_roles(
     monkeypatch.setattr(inference_runtime, "_evict_if_idle_locked", lambda now: None)
     monkeypatch.setattr(inference_runtime, "_load_model_locked", lambda: loaded)
     monkeypatch.setattr(inference_runtime, "_touch_model_locked", lambda: None)
-    monkeypatch.setattr(inference_runtime, "_forward", lambda weights, model, tokens: np.zeros(len(vocabulary), dtype=np.float32))
+    monkeypatch.setattr(inference_runtime, "_forward_cached", lambda weights, model, tokens, cache=None: (np.zeros(len(vocabulary), dtype=np.float32), {"position": (cache["position"] if cache else 0) + len(tokens), "layers": []}))
     monkeypatch.setattr(inference_runtime, "_sample", lambda *args: next(generated_tokens))
 
     events = list(inference_runtime.generate_stream(
@@ -377,3 +377,42 @@ def test_runtime_multi_agent_assistant_roles_receive_sft_eos(role: str) -> None:
     ])
 
     assert f"<|{role}|>\nAnswer.\n<EOS>" in serialized
+
+
+
+def test_numpy_cached_forward_matches_full_forward_across_incremental_tokens() -> None:
+    torch.manual_seed(12)
+    tokenizer = CharTokenizer.default()
+    model = CatAI(
+        vocab_size=tokenizer.vocab_size,
+        max_seq_len=16,
+        d_model=16,
+        n_heads=4,
+        n_layers=2,
+    ).eval()
+    weights = {
+        name: value.detach().cpu().numpy().astype(np.float32, copy=False)
+        for name, value in model.state_dict().items()
+    }
+    metadata = {
+        "max_seq_len": 16,
+        "d_model": 16,
+        "n_heads": 4,
+        "n_layers": 2,
+    }
+    prompt = [4, 18, 31, 42, 8]
+    with torch.no_grad():
+        expected_prompt = model(torch.tensor([prompt]))[0, -1].cpu().numpy()
+    actual_prompt, cache = inference_runtime._forward_cached(
+        weights, metadata, prompt
+    )
+    np.testing.assert_allclose(actual_prompt, expected_prompt, rtol=2e-4, atol=2e-5)
+
+    extended = prompt + [7]
+    with torch.no_grad():
+        expected_next = model(torch.tensor([extended]))[0, -1].cpu().numpy()
+    actual_next, cache = inference_runtime._forward_cached(
+        weights, metadata, [7], cache
+    )
+    np.testing.assert_allclose(actual_next, expected_next, rtol=2e-4, atol=2e-5)
+    assert cache["position"] == len(extended)

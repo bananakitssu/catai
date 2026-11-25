@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import math
+from contextlib import nullcontext
+from collections.abc import Iterable
 
 import torch
 from torch import nn
@@ -72,11 +74,49 @@ def causal_language_model_loss(logits: torch.Tensor, targets: torch.Tensor) -> t
     return nn.functional.cross_entropy(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
 
 
-def clip_gradients(model: nn.Module, max_norm: float) -> float:
-    """Clip model gradients to a maximum global norm and return the pre-clip norm."""
+def clip_gradients(
+    model: nn.Module,
+    max_norm: float,
+    *,
+    return_tensor: bool = False,
+) -> float | torch.Tensor:
+    """Clip gradients and optionally keep the norm on-device to avoid a CUDA sync."""
     if max_norm <= 0:
         raise ValueError("max_norm must be positive")
-    return float(nn.utils.clip_grad_norm_(model.parameters(), max_norm))
+    norm = nn.utils.clip_grad_norm_(model.parameters(), max_norm)
+    return norm if return_tensor else float(norm)
+
+
+def create_adamw(
+    parameters: Iterable[nn.Parameter],
+    learning_rate: float,
+    device: torch.device | str,
+) -> torch.optim.Optimizer:
+    """Create AdamW with fused CUDA updates when the installed backend supports them."""
+    target = torch.device(device)
+    parameter_list = list(parameters)
+    if target.type == "cuda":
+        try:
+            return torch.optim.AdamW(parameter_list, lr=learning_rate, fused=True)
+        except (TypeError, RuntimeError, NotImplementedError):
+            pass
+    return torch.optim.AdamW(parameter_list, lr=learning_rate)
+
+
+def _autocast_context(device: torch.device, precision: str):
+    """Resolve optional BF16 autocast without changing CPU training behavior."""
+    if precision not in {"auto", "fp32", "bf16"}:
+        raise ValueError("precision must be 'auto', 'fp32', or 'bf16'")
+    if precision == "fp32" or device.type != "cuda":
+        if precision == "bf16" and device.type != "cuda":
+            raise ValueError("BF16 autocast requires a CUDA device")
+        return nullcontext()
+    supported = torch.cuda.is_bf16_supported()
+    if precision == "bf16" and not supported:
+        raise ValueError("this CUDA device does not support BF16")
+    if precision == "auto" and not supported:
+        return nullcontext()
+    return torch.autocast(device_type="cuda", dtype=torch.bfloat16)
 
 
 def train_step(
@@ -84,20 +124,26 @@ def train_step(
     optimizer: torch.optim.Optimizer,
     tokens: torch.Tensor,
     grad_clip: float | None = None,
-) -> float:
-    """Run one optimization step and return the loss before the update."""
+    *,
+    precision: str = "auto",
+    return_loss_tensor: bool = False,
+) -> float | torch.Tensor:
+    """Run one optimization step; optionally defer the device-to-host loss sync."""
     if grad_clip is not None and grad_clip <= 0:
         raise ValueError("grad_clip must be positive when provided")
     model.train()
     inputs, targets = make_next_token_batch(tokens)
-    logits = model(inputs)
-    loss = causal_language_model_loss(logits, targets)
+    device = next(model.parameters()).device
+    with _autocast_context(device, precision):
+        logits = model(inputs)
+        loss = causal_language_model_loss(logits.float(), targets)
     optimizer.zero_grad(set_to_none=True)
     loss.backward()
     if grad_clip is not None:
-        clip_gradients(model, grad_clip)
+        clip_gradients(model, grad_clip, return_tensor=True)
     optimizer.step()
-    return float(loss.detach())
+    detached_loss = loss.detach()
+    return detached_loss if return_loss_tensor else float(detached_loss)
 
 
 def evaluate(model: nn.Module, loader: DataLoader[torch.Tensor], device: torch.device | str = "cpu") -> float:
