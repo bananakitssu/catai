@@ -120,8 +120,9 @@ def train_step(
     grad_clip: float | None = None,
     *,
     precision: str = "auto",
-) -> float:
-    """Run one optimization step and return the loss before the update."""
+    return_loss_tensor: bool = False,
+) -> float | torch.Tensor:
+    """Run one optimization step; optionally defer the device-to-host loss sync."""
     if grad_clip is not None and grad_clip <= 0:
         raise ValueError("grad_clip must be positive when provided")
     model.train()
@@ -135,7 +136,8 @@ def train_step(
     if grad_clip is not None:
         clip_gradients(model, grad_clip)
     optimizer.step()
-    return float(loss.detach())
+    detached_loss = loss.detach()
+    return detached_loss if return_loss_tensor else float(detached_loss)
 
 
 def evaluate(model: nn.Module, loader: DataLoader[torch.Tensor], device: torch.device | str = "cpu") -> float:
