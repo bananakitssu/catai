@@ -122,6 +122,8 @@ research-only samples in a model intended for distribution.
 
 To prepare the complete shortlist without training, run **Actions → CI → Run workflow** and select `training_mode: datasets_only`. Full and SFT-only training use the same bounded sample preparation automatically. Samples are not committed to Git.
 
+For GPU training, see [the Kaggle GPU guide](docs/KAGGLE_GPU_TRAINING.md) and the two notebooks under `notebooks/`. The base-pretraining notebook retains the full 850M-token budget; `training_mode: prepare_sft_data` creates a private input artifact for the SFT GPU notebook without running CPU fine-tuning.
+
 To prepare the exact SFT inputs for a Kaggle GPU run without spending time on CPU fine-tuning, select `training_mode: prepare_sft_data` and provide the run ID of a previous base-checkpoint artifact. Download the resulting `catai-kaggle-sft-inputs` artifact and follow [the Kaggle GPU training guide](docs/KAGGLE_GPU_TRAINING.md).
 
 ## Updated base-training data and budget
