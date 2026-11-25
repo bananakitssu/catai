@@ -16,7 +16,7 @@ Modal is an optional GPU worker. GitHub Actions remains the CI/orchestration pat
 Install the optional dependency from the CatAI repository root:
 
 ```bash
-python -m pip install -e ".[modal]"
+python -m pip install modal
 modal setup
 ```
 
