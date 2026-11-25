@@ -403,3 +403,35 @@ def test_sft_validation_loss_is_weighted_by_assistant_target_tokens(monkeypatch)
 
     loss = evaluate_sft(MarkerModel(), loader)
     assert loss == pytest.approx(3.5)
+
+
+
+def test_sft_train_step_can_return_detached_loss_tensor():
+    tokenizer = CharTokenizer.default()
+    dataset = ChatSupervisedDataset(
+        [[
+            {"role": "user", "content": "hello"},
+            {"role": "assistant", "content": "hi"},
+        ]],
+        tokenizer,
+        sequence_length=40,
+    )
+    sample = dataset[0]
+    model = CatAI(
+        vocab_size=tokenizer.vocab_size,
+        max_seq_len=40,
+        d_model=16,
+        n_heads=4,
+        n_layers=1,
+    )
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+    loss = sft_train_step(
+        model,
+        optimizer,
+        sample["input_ids"].unsqueeze(0),
+        sample["labels"].unsqueeze(0),
+        return_loss_tensor=True,
+    )
+    assert isinstance(loss, torch.Tensor)
+    assert not loss.requires_grad
+    assert loss.item() > 0
