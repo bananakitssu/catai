@@ -74,11 +74,17 @@ def causal_language_model_loss(logits: torch.Tensor, targets: torch.Tensor) -> t
     return nn.functional.cross_entropy(logits.reshape(-1, logits.size(-1)), targets.reshape(-1))
 
 
-def clip_gradients(model: nn.Module, max_norm: float) -> float:
-    """Clip model gradients to a maximum global norm and return the pre-clip norm."""
+def clip_gradients(
+    model: nn.Module,
+    max_norm: float,
+    *,
+    return_tensor: bool = False,
+) -> float | torch.Tensor:
+    """Clip gradients and optionally keep the norm on-device to avoid a CUDA sync."""
     if max_norm <= 0:
         raise ValueError("max_norm must be positive")
-    return float(nn.utils.clip_grad_norm_(model.parameters(), max_norm))
+    norm = nn.utils.clip_grad_norm_(model.parameters(), max_norm)
+    return norm if return_tensor else float(norm)
 
 
 def create_adamw(
@@ -134,7 +140,7 @@ def train_step(
     optimizer.zero_grad(set_to_none=True)
     loss.backward()
     if grad_clip is not None:
-        clip_gradients(model, grad_clip)
+        clip_gradients(model, grad_clip, return_tensor=True)
     optimizer.step()
     detached_loss = loss.detach()
     return detached_loss if return_loss_tensor else float(detached_loss)
