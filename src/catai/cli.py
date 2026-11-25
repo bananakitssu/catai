@@ -22,7 +22,7 @@ from .dataset import TokenWindowDataset
 from .device import resolve_device
 from .model import CatAI
 from .tokenizer import tokenizer_from_metadata
-from .training import cosine_warmup_learning_rate, evaluate, train_step
+from .training import cosine_warmup_learning_rate, create_adamw, evaluate, train_step
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -70,6 +70,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-batches-per-run-fraction", type=float, default=None, help="Stop after this fraction of the full multi-epoch run, saving a recovery checkpoint for the next job.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducible training.")
     parser.add_argument("--device", default=None)
+    parser.add_argument("--precision", choices=("auto", "fp32", "bf16"), default="auto", help="Use BF16 autocast on supported CUDA GPUs; CPU remains FP32.")
     return parser
 
 
@@ -194,7 +195,7 @@ def main(argv: list[str] | None = None) -> int:
         n_heads=n_heads,
         n_layers=n_layers,
     ).to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
+    optimizer = create_adamw(model.parameters(), args.learning_rate, device)
     parameter_count = model.parameter_count()
     document_eos_count = (
         int((tokens == tokenizer.eos_token_id).sum().item())
@@ -447,7 +448,7 @@ def main(argv: list[str] | None = None) -> int:
             for parameter_group in optimizer.param_groups:
                 parameter_group["lr"] = scheduled_lr
             epoch_loss += train_step(
-                model, optimizer, batch, grad_clip=config.grad_clip
+                model, optimizer, batch, grad_clip=config.grad_clip, precision=args.precision
             )
             epoch_batches += 1
             total_steps += 1
