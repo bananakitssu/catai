@@ -122,6 +122,8 @@ research-only samples in a model intended for distribution.
 
 To prepare the complete shortlist without training, run **Actions → CI → Run workflow** and select `training_mode: datasets_only`. Full and SFT-only training use the same bounded sample preparation automatically. Samples are not committed to Git.
 
+To prepare the exact SFT inputs for a Kaggle GPU run without spending time on CPU fine-tuning, select `training_mode: prepare_sft_data` and provide the run ID of a previous base-checkpoint artifact. Download the resulting `catai-kaggle-sft-inputs` artifact and follow [the Kaggle GPU training guide](docs/KAGGLE_GPU_TRAINING.md).
+
 ## Updated base-training data and budget
 
 The Actions workflow defaults to the **base** preset (39,596,544 parameters), a 2,048-token BPE vocabulary, and an 850M-token pretraining cap. After the 5% validation split, a fully populated 850M-token run provides about 20.4 training tokens per parameter, meeting the workflow's 20-token training-data threshold. The hosted corpus request is intentionally larger than the token cap because source characters do not map one-to-one to BPE tokens and filters reject some rows; the CLI checks the actual encoded corpus and refuses to train when the minimum is not met. Base training uses 3% linear warmup followed by cosine decay to 10% of the peak learning rate. The base preset is split across 128 resumable Actions jobs, with each intermediate stage processing half as many batches as in the 64-stage layout while preserving the full training budget. The hosted workflow exposes `tiny`, `small`, and `base`; the larger `medium` preset remains available in the Python CLI for hardware and token budgets beyond the hosted runner design. The trainer checks the actual model
