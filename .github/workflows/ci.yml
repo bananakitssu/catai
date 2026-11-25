@@ -156,7 +156,7 @@ jobs:
           print("Experiment inputs validated.")
           PY
       - name: Compile CatAI Python sources
-        run: python -m compileall -q inference scripts data src tests
+        run: python -m compileall -q inference scripts data src tests modal
 
       - name: Run tests with disk monitor
         shell: bash
