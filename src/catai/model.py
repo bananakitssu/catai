@@ -103,13 +103,17 @@ class CausalSelfAttention(nn.Module):
         cos, sin = self.rope(seq_len)
         q, k = apply_rotary_pos_emb(q, k, cos, sin)
 
-        # Attention scores
-        attn = torch.matmul(q, k.transpose(-2, -1)) * self.scale
-        attn = attn.masked_fill(self.mask[:seq_len, :seq_len], float("-inf"))
-        attn = F.softmax(attn, dim=-1)
-        attn = self.dropout(attn)
-
-        out = torch.matmul(attn, v)  # (batch, heads, seq, head_dim)
+        # PyTorch's fused SDPA kernels avoid materializing the full attention
+        # score/probability matrices and select an efficient CUDA backend when
+        # available. The causal mask is equivalent to the previous explicit mask.
+        out = F.scaled_dot_product_attention(
+            q,
+            k,
+            v,
+            attn_mask=None,
+            dropout_p=self.dropout.p if self.training else 0.0,
+            is_causal=True,
+        )
         out = out.transpose(1, 2).contiguous().view(batch, seq_len, -1)
         return self.out_proj(out)
 
