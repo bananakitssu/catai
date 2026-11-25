@@ -233,8 +233,9 @@ def sft_train_step(
     grad_clip: float | None = None,
     *,
     precision: str = "auto",
-) -> float:
-    """Run one supervised fine-tuning step with optional CUDA BF16 autocast."""
+    return_loss_tensor: bool = False,
+) -> float | torch.Tensor:
+    """Run one SFT step with optional CUDA BF16 and deferred loss synchronization."""
     if input_ids.ndim != 2 or labels.ndim != 2:
         raise ValueError("input_ids and labels must have shape (batch, sequence)")
     if input_ids.shape != labels.shape:
@@ -263,7 +264,8 @@ def sft_train_step(
     if grad_clip is not None:
         nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
     optimizer.step()
-    return float(loss.detach())
+    detached_loss = loss.detach()
+    return detached_loss if return_loss_tensor else float(detached_loss)
 
 
 def evaluate_sft(
