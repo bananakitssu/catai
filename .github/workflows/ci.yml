@@ -53,7 +53,7 @@ on:
         required: true
         default: false
       training_mode:
-        description: "Run tests, full retraining, SFT-only, emotion-data, or expanded dataset preparation"
+        description: "Run tests, full retraining, SFT-only, Kaggle SFT data preparation, emotion-data, or expanded dataset preparation"
         type: choice
         options:
           - tests_only
@@ -65,7 +65,7 @@ on:
         required: true
         default: full
       base_checkpoint_run_id:
-        description: "For sft_only: Actions run ID containing the catai-base-checkpoint artifact"
+        description: "For sft_only or prepare_sft_data: Actions run ID containing the catai-base-checkpoint artifact"
         required: false
         default: ""
 
@@ -10146,7 +10146,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ ! "$BASE_CHECKPOINT_RUN_ID" =~ ^[0-9]+$ ]]; then
-            echo "SFT-only mode needs base_checkpoint_run_id: the Actions run ID that has the catai-base-checkpoint artifact." >&2
+            echo "This mode needs base_checkpoint_run_id: the Actions run ID that has the catai-base-checkpoint artifact." >&2
             exit 1
           fi
       - name: Verify B2 publishing configuration
@@ -10437,7 +10437,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ ! "$BASE_CHECKPOINT_RUN_ID" =~ ^[0-9]+$ ]]; then
-            echo "SFT-only mode needs base_checkpoint_run_id: the Actions run ID that has the catai-base-checkpoint artifact." >&2
+            echo "This mode needs base_checkpoint_run_id: the Actions run ID that has the catai-base-checkpoint artifact." >&2
             exit 1
           fi
       - name: Verify B2 publishing configuration
