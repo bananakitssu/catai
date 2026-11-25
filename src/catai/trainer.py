@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from .config import TrainingConfig
-from .training import train_epochs
+from .training import create_adamw, train_epochs
 
 
 def train_model(
@@ -19,7 +19,7 @@ def train_model(
     """Train a model with a TrainingConfig and return one loss per epoch."""
     target_device = torch.device(device) if device is not None else torch.device("cpu")
     model.to(target_device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate)
+    optimizer = create_adamw(model.parameters(), config.learning_rate, target_device)
 
     def batches_on_device() -> DataLoader[torch.Tensor]:
         class DeviceLoader:
