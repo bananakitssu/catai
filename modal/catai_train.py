@@ -22,9 +22,6 @@ image = (
     .pip_install(
         "torch>=2.2",
         "numpy>=1.26",
-        "datasets>=3.3",
-        "pyarrow>=14",
-        "zstandard>=0.22",
     )
     .add_local_dir("src", remote_path="/root/catai/src")
     .add_local_file("pyproject.toml", remote_path="/root/catai/pyproject.toml")
