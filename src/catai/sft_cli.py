@@ -21,6 +21,7 @@ from .checkpoint import (load_checkpoint, load_checkpoint_metadata, load_checkpo
 from .device import resolve_device
 from .model import CatAI
 from .sft import ChatSupervisedDataset, evaluate_sft, sft_train_step
+from .training import create_adamw
 from .tokenizer import BPETokenizer, CharTokenizer
 
 
@@ -90,6 +91,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sequence-length", type=int, default=1024)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", default=None)
+    parser.add_argument("--precision", choices=("auto", "fp32", "bf16"), default="auto", help="Use BF16 autocast on supported CUDA GPUs; CPU remains FP32.")
     return parser
 
 
@@ -461,7 +463,7 @@ def main(argv: list[str] | None = None) -> int:
         loader = DataLoader(train_dataset, batch_size=args.batch_size, sampler=sampler)
     else:
         loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
+    optimizer = create_adamw(model.parameters(), args.learning_rate, device)
     losses: list[float] = []
     validation_losses: list[float] = []
     best_validation_loss = float("inf")
@@ -632,7 +634,8 @@ def main(argv: list[str] | None = None) -> int:
             batch_input_ids = batch["input_ids"].to(device)
             batch_labels = batch["labels"].to(device)
             total_loss += sft_train_step(
-                model, optimizer, batch_input_ids, batch_labels, grad_clip=args.grad_clip
+                model, optimizer, batch_input_ids, batch_labels, grad_clip=args.grad_clip,
+                precision=args.precision,
             )
             batches += 1
             total_steps += 1
