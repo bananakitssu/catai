@@ -434,7 +434,7 @@ def test_context_fitting_keeps_recent_messages_at_message_boundaries() -> None:
     ]
 
     fitted, tokens = inference_runtime._fit_messages_to_context(
-        messages, tokenizer.encode, context_length=80
+        messages, tokenizer.encode, context_length=120
     )
 
     assert fitted[0] == messages[0]
