@@ -142,7 +142,7 @@ def _fit_messages_to_context(
                 else:
                     high = middle - 1
             if best:
-                return [system, {**message, "content": message["content"][-best_length:]}], best
+                return [system, {**message, "content": message["content"][-best_length:] if best_length else ""}], best
         break
 
     fitted = [system, *reversed(selected)]
@@ -716,7 +716,7 @@ def generate_stream(
             if eos is not None and next_token == eos:
                 break
             generated.append(next_token)
-            if len(input_tokens) + len(generated) <= context_length:
+            if token_index + 1 < int(max_new_tokens) and len(input_tokens) + len(generated) <= context_length:
                 forward_started = time.perf_counter()
                 logits, cache = _forward_cached(
                     loaded["weights"], model_meta, [next_token], cache
