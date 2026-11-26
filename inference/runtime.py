@@ -669,9 +669,11 @@ def generate_stream(
     if needs_download:
         yield {"event": "status", "status": "loading_model"}
 
+    load_started = time.perf_counter()
     with _LOCK:
         _evict_if_idle_locked(time.monotonic())
         loaded = _load_model_locked()
+        model_load_ms = (time.perf_counter() - load_started) * 1000.0
         _ACTIVE_GENERATIONS += 1
         _touch_model_locked()
 
@@ -778,6 +780,7 @@ def generate_stream(
             "tokens_out": len(generated),
             "context_limit": context_length,
             "metrics": {
+                "model_load_ms": round(model_load_ms, 2),
                 "tokenize_ms": round(tokenize_ms, 2),
                 "prefill_ms": round(prefill_ms, 2),
                 "time_to_first_token_ms": round(first_token_ms or generation_ms, 2),
