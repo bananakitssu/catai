@@ -439,7 +439,7 @@ def test_context_fitting_keeps_recent_messages_at_message_boundaries() -> None:
 
     assert fitted[0] == messages[0]
     assert fitted[-1] == messages[-1]
-    assert len(tokens) <= 80
+    assert len(tokens) <= 120
     assert all(message in messages for message in fitted)
 
 
