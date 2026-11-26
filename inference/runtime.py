@@ -130,17 +130,19 @@ def _fit_messages_to_context(
         if not selected:
             low, high = 0, len(message["content"])
             best: list[int] = []
+            best_length = 0
             while low <= high:
                 middle = (low + high) // 2
                 shortened = {**message, "content": message["content"][-middle:] if middle else ""}
                 trial = encode(_serialize_messages([system, shortened]))
                 if len(trial) <= context_length:
                     best = trial
+                    best_length = middle
                     low = middle + 1
                 else:
                     high = middle - 1
             if best:
-                return [system, {**message, "content": message["content"][-max(0, high + 1):]}], best
+                return [system, {**message, "content": message["content"][-best_length:]}], best
         break
 
     fitted = [system, *reversed(selected)]
