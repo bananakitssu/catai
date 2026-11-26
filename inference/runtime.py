@@ -104,6 +104,48 @@ def _serialize_messages(messages: list[dict[str, str]]) -> str:
     parts.append("<|assistant|>\n")
     return "".join(parts)
 
+def _fit_messages_to_context(
+    messages: list[dict[str, str]],
+    encode,
+    context_length: int,
+) -> tuple[list[dict[str, str]], list[int]]:
+    """Keep the system prompt and newest whole messages before truncating text."""
+    if not messages:
+        return [], []
+    system = messages[0]
+    history = messages[1:]
+    selected: list[dict[str, str]] = []
+    base_tokens = encode(_serialize_messages([system]))
+    if len(base_tokens) >= context_length:
+        return [system], base_tokens[-context_length:]
+
+    for message in reversed(history):
+        candidate = [system, message, *reversed(selected)]
+        candidate_tokens = encode(_serialize_messages(candidate))
+        if len(candidate_tokens) <= context_length:
+            selected.append(message)
+            continue
+
+        # The newest message gets priority even when it alone is too long.
+        if not selected:
+            low, high = 0, len(message["content"])
+            best: list[int] = []
+            while low <= high:
+                middle = (low + high) // 2
+                shortened = {**message, "content": message["content"][-middle:] if middle else ""}
+                trial = encode(_serialize_messages([system, shortened]))
+                if len(trial) <= context_length:
+                    best = trial
+                    low = middle + 1
+                else:
+                    high = middle - 1
+            if best:
+                return [system, {**message, "content": message["content"][-max(0, high + 1):]}], best
+        break
+
+    fitted = [system, *reversed(selected)]
+    return fitted, encode(_serialize_messages(fitted))
+
 _LOCK = threading.RLock()
 _MODEL: dict[str, Any] | None = None
 _LAST_USED = 0.0
@@ -638,8 +680,9 @@ def generate_stream(
         tokenize_started = time.perf_counter()
         encode, decode, eos = _tokenizer_from_metadata(metadata)
         clean_messages = _ensure_default_system_message(clean_messages)
-        prompt = _serialize_messages(clean_messages)
-        input_tokens = encode(prompt)[-context_length:]
+        clean_messages, input_tokens = _fit_messages_to_context(
+            clean_messages, encode, context_length
+        )
         tokenize_ms = (time.perf_counter() - tokenize_started) * 1000.0
         if not input_tokens:
             raise ValueError("The prompt produced no model tokens")
@@ -653,7 +696,7 @@ def generate_stream(
         cache = None
         logits = None
         prefill_ms = 0.0
-        decode_started = None
+        decode_compute_seconds = 0.0
         first_token_ms = None
         flush_count = 0
         for token_index in range(int(max_new_tokens)):
@@ -663,17 +706,20 @@ def generate_stream(
                 logits, cache = _forward_cached(loaded["weights"], model_meta, context)
                 if token_index == 0:
                     prefill_ms = (time.perf_counter() - forward_started) * 1000.0
-                    decode_started = time.perf_counter()
+            sample_started = time.perf_counter()
             next_token = _sample(logits, float(temperature), int(top_k), rng)
+            decode_compute_seconds += time.perf_counter() - sample_started
             if first_token_ms is None:
                 first_token_ms = (time.perf_counter() - total_started) * 1000.0
             if eos is not None and next_token == eos:
                 break
             generated.append(next_token)
             if len(input_tokens) + len(generated) <= context_length:
+                forward_started = time.perf_counter()
                 logits, cache = _forward_cached(
                     loaded["weights"], model_meta, [next_token], cache
                 )
+                decode_compute_seconds += time.perf_counter() - forward_started
             else:
                 # Rebase RoPE positions after the sliding context window advances.
                 cache = None
@@ -711,7 +757,7 @@ def generate_stream(
             else:
                 yield {"event": "delta", "text": final_delta}
                 flush_count += 1
-        decode_ms = (time.perf_counter() - decode_started) * 1000.0 if decode_started is not None else 0.0
+        decode_ms = decode_compute_seconds * 1000.0
         generation_ms = (time.perf_counter() - total_started) * 1000.0
         with _LOCK:
             _touch_model_locked()
