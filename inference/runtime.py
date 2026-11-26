@@ -706,8 +706,11 @@ def generate_stream(
                 context = (input_tokens + generated)[-context_length:]
                 forward_started = time.perf_counter()
                 logits, cache = _forward_cached(loaded["weights"], model_meta, context)
+                forward_elapsed = time.perf_counter() - forward_started
                 if token_index == 0:
-                    prefill_ms = (time.perf_counter() - forward_started) * 1000.0
+                    prefill_ms = forward_elapsed * 1000.0
+                else:
+                    decode_compute_seconds += forward_elapsed
             sample_started = time.perf_counter()
             next_token = _sample(logits, float(temperature), int(top_k), rng)
             decode_compute_seconds += time.perf_counter() - sample_started
