@@ -719,16 +719,6 @@ def generate_stream(
             if eos is not None and next_token == eos:
                 break
             generated.append(next_token)
-            if token_index + 1 < int(max_new_tokens) and len(input_tokens) + len(generated) <= context_length:
-                forward_started = time.perf_counter()
-                logits, cache = _forward_cached(
-                    loaded["weights"], model_meta, [next_token], cache
-                )
-                decode_compute_seconds += time.perf_counter() - forward_started
-            else:
-                # Rebase RoPE positions after the sliding context window advances.
-                cache = None
-
             pending_count = len(generated) - sent_tokens
             if pending_count:
                 new_text = decode(generated[sent_tokens:])
@@ -752,6 +742,18 @@ def generate_stream(
                         has_visible_text = True
                     yield {"event": "delta", "text": delta}
                     flush_count += 1
+
+            # Deliver a visible delta before spending time computing the next
+            # token's logits, reducing first-token latency for streamed clients.
+            if token_index + 1 < int(max_new_tokens) and len(input_tokens) + len(generated) <= context_length:
+                forward_started = time.perf_counter()
+                logits, cache = _forward_cached(
+                    loaded["weights"], model_meta, [next_token], cache
+                )
+                decode_compute_seconds += time.perf_counter() - forward_started
+            else:
+                # Rebase RoPE positions after the sliding context window advances.
+                cache = None
 
         final_delta = decode(generated[sent_tokens:])
         if final_delta:
