@@ -734,6 +734,7 @@ def generate_stream(
                 new_text = decode(generated[sent_tokens:])
                 should_flush = (
                     pending_count >= int(chunk_tokens)
+                    or (not has_visible_text and bool(new_text.strip()))
                     or len(new_text) >= 40
                     or new_text.endswith((".", "!", "?", "\n", ":", ";"))
                 )
