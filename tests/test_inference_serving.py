@@ -416,3 +416,45 @@ def test_numpy_cached_forward_matches_full_forward_across_incremental_tokens() -
     )
     np.testing.assert_allclose(actual_next, expected_next, rtol=2e-4, atol=2e-5)
     assert cache["position"] == len(extended)
+
+    assert cache["max_seq_len"] == 16
+    assert len(cache["layers"]) == model.n_layers
+    for keys, values in cache["layers"]:
+        assert keys.shape == (model.n_heads, model.context_length, model.d_model // model.n_heads)
+        assert values.shape == keys.shape
+
+
+def test_context_fitting_keeps_recent_messages_at_message_boundaries() -> None:
+    tokenizer = CharTokenizer.default()
+    messages = [
+        {"role": "system", "content": "Be helpful."},
+        {"role": "user", "content": "An older message with lots of unnecessary history."},
+        {"role": "assistant", "content": "An older response with lots of unnecessary history."},
+        {"role": "user", "content": "Keep this latest question intact."},
+    ]
+
+    fitted, tokens = inference_runtime._fit_messages_to_context(
+        messages, tokenizer.encode, context_length=120
+    )
+
+    assert fitted[0] == messages[0]
+    assert fitted[-1] == messages[-1]
+    assert len(tokens) <= 120
+    assert all(message in messages for message in fitted)
+
+
+def test_context_fitting_truncates_only_the_latest_message_when_necessary() -> None:
+    tokenizer = CharTokenizer.default()
+    messages = [
+        {"role": "system", "content": "Be helpful."},
+        {"role": "user", "content": "X" * 300},
+    ]
+
+    fitted, tokens = inference_runtime._fit_messages_to_context(
+        messages, tokenizer.encode, context_length=80
+    )
+
+    assert fitted[0] == messages[0]
+    assert fitted[-1]["content"]
+    assert len(fitted[-1]["content"]) < len(messages[-1]["content"])
+    assert len(tokens) <= 80

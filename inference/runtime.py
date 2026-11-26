@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import atexit
 import gc
+import heapq
 import hashlib
 import logging
 import json
@@ -103,10 +104,55 @@ def _serialize_messages(messages: list[dict[str, str]]) -> str:
     parts.append("<|assistant|>\n")
     return "".join(parts)
 
+def _fit_messages_to_context(
+    messages: list[dict[str, str]],
+    encode,
+    context_length: int,
+) -> tuple[list[dict[str, str]], list[int]]:
+    """Keep the system prompt and newest whole messages before truncating text."""
+    if not messages:
+        return [], []
+    system = messages[0]
+    history = messages[1:]
+    selected: list[dict[str, str]] = []
+    base_tokens = encode(_serialize_messages([system]))
+    if len(base_tokens) >= context_length:
+        return [system], base_tokens[-context_length:]
+
+    for message in reversed(history):
+        candidate = [system, message, *reversed(selected)]
+        candidate_tokens = encode(_serialize_messages(candidate))
+        if len(candidate_tokens) <= context_length:
+            selected.append(message)
+            continue
+
+        # The newest message gets priority even when it alone is too long.
+        if not selected:
+            low, high = 0, len(message["content"])
+            best: list[int] = []
+            best_length = 0
+            while low <= high:
+                middle = (low + high) // 2
+                shortened = {**message, "content": message["content"][-middle:] if middle else ""}
+                trial = encode(_serialize_messages([system, shortened]))
+                if len(trial) <= context_length:
+                    best = trial
+                    best_length = middle
+                    low = middle + 1
+                else:
+                    high = middle - 1
+            if best:
+                return [system, {**message, "content": message["content"][-best_length:] if best_length else ""}], best
+        break
+
+    fitted = [system, *reversed(selected)]
+    return fitted, encode(_serialize_messages(fitted))
+
 _LOCK = threading.RLock()
 _MODEL: dict[str, Any] | None = None
 _LAST_USED = 0.0
 _EVICT_TIMER: threading.Timer | None = None
+_ACTIVE_GENERATIONS = 0
 
 
 def _required_env(name: str) -> str:
@@ -281,14 +327,14 @@ def _evict_locked() -> None:
 
 
 def _evict_if_idle_locked(now: float) -> None:
-    if _MODEL is not None and now - _LAST_USED >= IDLE_SECONDS:
+    if _MODEL is not None and _ACTIVE_GENERATIONS == 0 and now - _LAST_USED >= IDLE_SECONDS:
         _evict_locked()
 
 
 def _scheduled_evict(expected_last_used: float) -> None:
     global _MODEL, _EVICT_TIMER
     with _LOCK:
-        if _MODEL is not None and _LAST_USED == expected_last_used and time.monotonic() - _LAST_USED >= IDLE_SECONDS:
+        if _MODEL is not None and _ACTIVE_GENERATIONS == 0 and _LAST_USED == expected_last_used and time.monotonic() - _LAST_USED >= IDLE_SECONDS:
             _evict_locked()
         _EVICT_TIMER = None
 
@@ -356,27 +402,60 @@ def _tokenizer_from_metadata(metadata: dict[str, Any]):
         merges = tokenizer.get("merges", [])
         normalized_merges = [(str(pair[0]), str(pair[1])) for pair in merges]
 
+        merge_rank = {pair: rank for rank, pair in enumerate(normalized_merges)}
+
         def encode_piece(text: str) -> list[int]:
+            # Apply the same lowest-rank-first BPE merges as training, but only
+            # revisit adjacent pairs affected by a merge (rather than scanning
+            # every merge over the entire remaining string).
             symbols = list(text)
-            # The ordered merge list is the same rank order used by the
-            # training tokenizer's priority-queue implementation.
-            for left, right in normalized_merges:
-                rewritten = []
-                index = 0
-                while index < len(symbols):
+            if len(symbols) < 2 or not merge_rank:
+                merged_symbols = symbols
+            else:
+                count = len(symbols)
+                previous = [index - 1 for index in range(count)]
+                following = [index + 1 if index + 1 < count else -1 for index in range(count)]
+                alive = [True] * count
+                heap: list[tuple[int, int, int]] = []
+
+                def push_pair(left_index: int) -> None:
+                    right_index = following[left_index]
+                    if right_index < 0 or not alive[left_index] or not alive[right_index]:
+                        return
+                    rank = merge_rank.get((symbols[left_index], symbols[right_index]))
+                    if rank is not None:
+                        heapq.heappush(heap, (rank, left_index, right_index))
+
+                for index in range(count - 1):
+                    push_pair(index)
+
+                while heap:
+                    rank, left_index, right_index = heapq.heappop(heap)
                     if (
-                        index + 1 < len(symbols)
-                        and symbols[index] == left
-                        and symbols[index + 1] == right
+                        not alive[left_index]
+                        or not alive[right_index]
+                        or following[left_index] != right_index
+                        or merge_rank.get((symbols[left_index], symbols[right_index])) != rank
                     ):
-                        rewritten.append(left + right)
-                        index += 2
-                    else:
-                        rewritten.append(symbols[index])
-                        index += 1
-                symbols = rewritten
+                        continue
+                    symbols[left_index] += symbols[right_index]
+                    alive[right_index] = False
+                    next_index = following[right_index]
+                    following[left_index] = next_index
+                    if next_index >= 0:
+                        previous[next_index] = left_index
+                    push_pair(previous[left_index]) if previous[left_index] >= 0 else None
+                    push_pair(left_index)
+
+                merged_symbols = []
+                index = 0
+                while index >= 0:
+                    if alive[index]:
+                        merged_symbols.append(symbols[index])
+                    index = following[index]
+
             token_ids = []
-            for symbol in symbols:
+            for symbol in merged_symbols:
                 token_id = lookup.get(symbol)
                 if token_id is None:
                     if unk is None:
@@ -466,27 +545,35 @@ def _forward_cached(
     tokens: list[int],
     cache: dict[str, Any] | None = None,
 ) -> tuple[np.ndarray, dict[str, Any]]:
-    """Run a prompt or incremental token using per-layer KV caches."""
+    """Run a prompt or incremental token using preallocated per-layer KV buffers."""
     if not tokens:
         raise ValueError("cached forward requires at least one token")
     d_model = int(model["d_model"])
     n_heads = int(model["n_heads"])
     n_layers = int(model["n_layers"])
     head_dim = d_model // n_heads
+    max_seq_len = int(model["max_seq_len"])
     if cache is None:
-        cache = {"position": 0, "layers": [None] * n_layers}
+        cache = {
+            "position": 0,
+            "max_seq_len": max_seq_len,
+            "layers": [None] * n_layers,
+        }
     past_len = int(cache["position"])
     seq_len = len(tokens)
+    end_position = past_len + seq_len
+    if end_position > max_seq_len:
+        raise ValueError("KV cache capacity exceeded; rebuild the cache for the active context window")
     x = weights["token_embedding.weight"][np.asarray(tokens, dtype=np.int64)]
 
     inv_freq = 1.0 / (10000.0 ** (np.arange(0, head_dim, 2, dtype=np.float32) / head_dim))
-    positions = np.arange(past_len, past_len + seq_len, dtype=np.float32)
+    positions = np.arange(past_len, end_position, dtype=np.float32)
     freqs = np.outer(positions, inv_freq)
     angles = np.concatenate((freqs, freqs), axis=-1)
     cos = np.cos(angles)[None, :, :].astype(np.float32, copy=False)
     sin = np.sin(angles)[None, :, :].astype(np.float32, copy=False)
     causal_mask = (
-        np.arange(past_len + seq_len)[None, :] > (past_len + np.arange(seq_len)[:, None])
+        np.arange(end_position)[None, :] > (past_len + np.arange(seq_len)[:, None])
     )
 
     for index in range(n_layers):
@@ -498,20 +585,24 @@ def _forward_cached(
         q = (q * cos) + (_rotate_half(q) * sin)
         current_k = (current_k * cos) + (_rotate_half(current_k) * sin)
 
-        previous = cache["layers"][index]
-        if previous is None:
-            keys, values = current_k, current_v
+        layer_cache = cache["layers"][index]
+        if layer_cache is None:
+            keys = np.empty((n_heads, max_seq_len, head_dim), dtype=np.float32)
+            values = np.empty_like(keys)
+            cache["layers"][index] = (keys, values)
         else:
-            keys = np.concatenate((previous[0], current_k), axis=1)
-            values = np.concatenate((previous[1], current_v), axis=1)
-        cache["layers"][index] = (keys, values)
+            keys, values = layer_cache
+        keys[:, past_len:end_position, :] = current_k
+        values[:, past_len:end_position, :] = current_v
+        active_keys = keys[:, :end_position, :]
+        active_values = values[:, :end_position, :]
 
-        scores = (q @ keys.transpose(0, 2, 1)) * (head_dim ** -0.5)
+        scores = (q @ active_keys.transpose(0, 2, 1)) * (head_dim ** -0.5)
         scores = np.where(causal_mask[None, :, :], -1.0e30, scores)
         scores -= np.max(scores, axis=-1, keepdims=True)
         attention = np.exp(scores)
         attention /= np.sum(attention, axis=-1, keepdims=True)
-        attended = attention @ values
+        attended = attention @ active_values
         attended = attended.transpose(1, 0, 2).reshape(seq_len, d_model)
         x = x + attended @ weights[prefix + "attention.out_proj.weight"].T
 
@@ -521,23 +612,25 @@ def _forward_cached(
         value = norm_x @ weights[prefix + "mlp.w3.weight"].T
         x = x + (gate * value) @ weights[prefix + "mlp.w2.weight"].T
 
-    cache["position"] = past_len + seq_len
+    cache["position"] = end_position
     x = _rms_norm(x, weights["norm.weight"])
     return x[-1] @ weights["lm_head.weight"].T, cache
 
 
 def _sample(logits: np.ndarray, temperature: float, top_k: int, rng: np.random.Generator) -> int:
-    logits = logits.astype(np.float64, copy=False) / temperature
-    if top_k > 0 and top_k < logits.size:
-        kept = np.argpartition(logits, -top_k)[-top_k:]
-        mask = np.ones(logits.shape, dtype=bool)
-        mask[kept] = False
-        logits = logits.copy()
-        logits[mask] = -np.inf
-    logits -= np.max(logits)
-    probabilities = np.exp(logits)
+    # Restrict softmax and sampling to the retained candidates. This avoids
+    # allocating a vocabulary-sized probability vector for every generated token.
+    candidate_count = min(max(1, int(top_k)), int(logits.size))
+    if candidate_count < logits.size:
+        candidate_ids = np.argpartition(logits, -candidate_count)[-candidate_count:]
+        candidate_logits = logits[candidate_ids].astype(np.float64, copy=False) / temperature
+    else:
+        candidate_ids = np.arange(logits.size)
+        candidate_logits = logits.astype(np.float64, copy=False) / temperature
+    candidate_logits = candidate_logits - np.max(candidate_logits)
+    probabilities = np.exp(candidate_logits)
     probabilities /= probabilities.sum()
-    return int(rng.choice(logits.size, p=probabilities))
+    return int(candidate_ids[int(rng.choice(candidate_count, p=probabilities))])
 
 
 def generate_stream(
@@ -548,8 +641,8 @@ def generate_stream(
     top_k: int = 40,
     chunk_tokens: int = 4,
 ) -> Iterator[dict[str, Any]]:
-    """Yield small text deltas followed by final generation metadata."""
-    global _LAST_USED, _EVICT_TIMER
+    """Yield incremental text and timing metadata without serializing generations."""
+    global _ACTIVE_GENERATIONS
     if not isinstance(messages, list) or not messages or len(messages) > MAX_PROMPT_MESSAGES:
         raise ValueError(f"messages must contain between 1 and {MAX_PROMPT_MESSAGES} entries")
     clean_messages = []
@@ -569,84 +662,138 @@ def generate_stream(
     if not 1 <= int(chunk_tokens) <= 16:
         raise ValueError("chunk_tokens must be between 1 and 16")
 
+    total_started = time.perf_counter()
     with _LOCK:
         _evict_if_idle_locked(time.monotonic())
         needs_download = _MODEL is None
     if needs_download:
         yield {"event": "status", "status": "loading_model"}
 
+    load_started = time.perf_counter()
     with _LOCK:
         _evict_if_idle_locked(time.monotonic())
         loaded = _load_model_locked()
+        model_load_ms = (time.perf_counter() - load_started) * 1000.0
+        _ACTIVE_GENERATIONS += 1
         _touch_model_locked()
+
+    try:
         metadata = loaded["metadata"]
         model_meta = metadata["model"]
         context_length = int(model_meta["max_seq_len"])
+        tokenize_started = time.perf_counter()
         encode, decode, eos = _tokenizer_from_metadata(metadata)
         clean_messages = _ensure_default_system_message(clean_messages)
-        prompt = _serialize_messages(clean_messages)
-        input_tokens = encode(prompt)[-context_length:]
+        clean_messages, input_tokens = _fit_messages_to_context(
+            clean_messages, encode, context_length
+        )
+        tokenize_ms = (time.perf_counter() - tokenize_started) * 1000.0
         if not input_tokens:
             raise ValueError("The prompt produced no model tokens")
 
         yield {"event": "status", "status": "connecting"}
         rng = np.random.default_rng()
         generated: list[int] = []
-        sent_chars = 0
+        sent_tokens = 0
         leading_whitespace = ""
         has_visible_text = False
         cache = None
         logits = None
-        for _ in range(int(max_new_tokens)):
+        prefill_ms = 0.0
+        decode_compute_seconds = 0.0
+        first_token_ms = None
+        flush_count = 0
+        for token_index in range(int(max_new_tokens)):
             if cache is None:
                 context = (input_tokens + generated)[-context_length:]
+                forward_started = time.perf_counter()
                 logits, cache = _forward_cached(loaded["weights"], model_meta, context)
+                forward_elapsed = time.perf_counter() - forward_started
+                if token_index == 0:
+                    prefill_ms = forward_elapsed * 1000.0
+                else:
+                    decode_compute_seconds += forward_elapsed
+            sample_started = time.perf_counter()
             next_token = _sample(logits, float(temperature), int(top_k), rng)
+            decode_compute_seconds += time.perf_counter() - sample_started
+            if first_token_ms is None:
+                first_token_ms = (time.perf_counter() - total_started) * 1000.0
             if eos is not None and next_token == eos:
                 break
             generated.append(next_token)
-            if len(input_tokens) + len(generated) <= context_length:
+            pending_count = len(generated) - sent_tokens
+            if pending_count:
+                new_text = decode(generated[sent_tokens:])
+                should_flush = (
+                    pending_count >= int(chunk_tokens)
+                    or (not has_visible_text and bool(new_text.strip()))
+                    or len(new_text) >= 40
+                    or new_text.endswith((".", "!", "?", "\n", ":", ";"))
+                )
+                if should_flush:
+                    sent_tokens = len(generated)
+                    delta = new_text
+                    if not delta:
+                        continue
+                    if not has_visible_text:
+                        leading_whitespace += delta
+                        if not leading_whitespace.strip():
+                            continue
+                        delta = leading_whitespace
+                        leading_whitespace = ""
+                        has_visible_text = True
+                    yield {"event": "delta", "text": delta}
+                    flush_count += 1
+
+            # Deliver a visible delta before spending time computing the next
+            # token's logits, reducing first-token latency for streamed clients.
+            if token_index + 1 < int(max_new_tokens) and len(input_tokens) + len(generated) <= context_length:
+                forward_started = time.perf_counter()
                 logits, cache = _forward_cached(
                     loaded["weights"], model_meta, [next_token], cache
                 )
+                decode_compute_seconds += time.perf_counter() - forward_started
             else:
-                # Match the existing sliding context window by rebuilding the
-                # cache with rebased RoPE positions after the window advances.
+                # Rebase RoPE positions after the sliding context window advances.
                 cache = None
-            if len(generated) % int(chunk_tokens) == 0:
-                current_text = decode(generated)
-                delta = current_text[sent_chars:]
-                sent_chars = len(current_text)
-                if not delta:
-                    continue
-                if not has_visible_text:
-                    leading_whitespace += delta
-                    if not leading_whitespace.strip():
-                        continue
-                    delta = leading_whitespace
-                    leading_whitespace = ""
-                    has_visible_text = True
-                yield {"event": "delta", "text": delta}
 
-        text = decode(generated)
-        delta = text[sent_chars:]
-        if delta:
+        final_delta = decode(generated[sent_tokens:])
+        if final_delta:
             if not has_visible_text:
-                leading_whitespace += delta
+                leading_whitespace += final_delta
                 if leading_whitespace.strip():
                     yield {"event": "delta", "text": leading_whitespace}
+                    flush_count += 1
             else:
-                yield {"event": "delta", "text": delta}
-        _touch_model_locked()
+                yield {"event": "delta", "text": final_delta}
+                flush_count += 1
+        decode_ms = decode_compute_seconds * 1000.0
+        generation_ms = (time.perf_counter() - total_started) * 1000.0
+        with _LOCK:
+            _touch_model_locked()
         yield {
             "event": "done",
-            "text": text,
+            "text": decode(generated),
             "model": "purr-1.0",
             "model_revision": loaded["sha256"][:12],
             "tokens_in": len(input_tokens),
             "tokens_out": len(generated),
             "context_limit": context_length,
+            "metrics": {
+                "model_load_ms": round(model_load_ms, 2),
+                "tokenize_ms": round(tokenize_ms, 2),
+                "prefill_ms": round(prefill_ms, 2),
+                "time_to_first_token_ms": round(first_token_ms or generation_ms, 2),
+                "decode_ms": round(decode_ms, 2),
+                "total_ms": round(generation_ms, 2),
+                "tokens_per_second": round(len(generated) / max(decode_ms / 1000.0, 1e-9), 2),
+                "stream_flush_count": flush_count,
+            },
         }
+    finally:
+        with _LOCK:
+            _ACTIVE_GENERATIONS = max(0, _ACTIVE_GENERATIONS - 1)
+            _touch_model_locked()
 
 
 def generate(
