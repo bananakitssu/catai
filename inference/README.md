@@ -72,7 +72,7 @@ breaks. This reduces tiny network writes without waiting for the full response.
 
 The response contains \`text\`, \`model_revision\`, \`tokens_in\`,
 \`tokens_out\`, \`context_limit\`, and \`metrics\` with tokenization, prefill,
-first-token latency, decode time, throughput, and stream flush counts. The endpoint
+model-load time, first-token latency, decode time, throughput, and stream flush counts. The endpoint
 does not save conversations;
 Banana Data Center owns the authenticated conversation history in Upstash.
 
