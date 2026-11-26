@@ -55,7 +55,8 @@ POST to \`/api/generate\` with a private bearer token:
   ],
   "max_new_tokens": 160,
   "temperature": 0.8,
-  "top_k": 40
+  "top_k": 40,
+  "stream": true
 }
 \`\`\`
 
@@ -65,9 +66,26 @@ metadata, and \`error\` describes a generation failure. The regular JSON respons
 remains available when streaming is not requested. The runtime accepts \`file\`
 messages for uploaded text and code content.
 
+Streaming uses adaptive text flushes: it sends the first visible text promptly,
+then batches small token groups while flushing at punctuation and natural line
+breaks. This reduces tiny network writes without waiting for the full response.
+
 The response contains \`text\`, \`model_revision\`, \`tokens_in\`,
 \`tokens_out\`, and \`context_limit\`. The endpoint does not save conversations;
 Banana Data Center owns the authenticated conversation history in Upstash.
+
+## Generation performance
+
+The NumPy runtime uses preallocated per-layer key/value buffers, top-K-only
+sampling, incremental decoding, and rank-priority BPE merges. Model loading and
+cache lifecycle are protected by a short lock; independent requests can run
+in parallel against the immutable loaded weights. Active generations prevent
+idle eviction until they finish. Prompt fitting retains the system prompt and
+newest whole messages before truncating the newest message as a last resort.
+
+Conversation-prefix KV caching is intentionally not enabled yet: the inference
+request contract currently has no authenticated conversation identifier, and
+sharing cached conversation state without that identity would be unsafe.
 
 ## Local cache behavior
 
