@@ -235,3 +235,7 @@ green workflow do not prove coherent generation: its base-model sample was
 already incoherent before SFT. Compare the fixed prompts and task-specific
 scores after every fresh full-pretraining run; SFT cannot reliably teach
 foundational language patterns that the base checkpoint has not learned.
+
+## Contact
+
+**Contact Email:** catai.dev@proton.me
